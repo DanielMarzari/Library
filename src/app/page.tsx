@@ -228,9 +228,11 @@ export default function Home() {
       {/* Header */}
       <header className="sticky top-0 z-10 bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800">
         <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-2">
             <h1 className="text-2xl font-bold tracking-tight">My Library</h1>
-            <div className="flex items-center gap-2">
+          </div>
+          <div className="mb-4">
+            <div className="flex items-center gap-2 flex-wrap">
               <Link
                 href="/stats"
                 className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
@@ -256,6 +258,12 @@ export default function Home() {
                 Skills
               </Link>
               <Link
+                href="/reading-list"
+                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                List
+              </Link>
+              <Link
                 href="/recommendations"
                 className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
               >
@@ -266,6 +274,12 @@ export default function Home() {
                 className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
               >
                 Lending
+              </Link>
+              <Link
+                href="/wrapped"
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                Wrapped
               </Link>
               <Link
                 href="/setup"
