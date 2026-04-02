@@ -28,11 +28,6 @@ interface EditingState {
   field: "ethnicity" | "nationality";
 }
 
-interface OpenLibraryAuthor {
-  key: string;
-  name: string;
-}
-
 const ETHNICITY_OPTIONS = [
   "African / Black",
   "Arab / Middle Eastern",
@@ -42,7 +37,6 @@ const ETHNICITY_OPTIONS = [
   "European / White",
   "Hispanic / Latino",
   "Indigenous / Native",
-  "Biracial",
   "Mixed / Multiracial",
   "Pacific Islander",
   "Caribbean",
@@ -305,7 +299,7 @@ function ImageSearchModal({
   onSelectImage: (imageUrl: string) => void;
   onClose: () => void;
 }) {
-  const [images, setImages] = useState<string[]>([]);
+  const [images, setImages] = useState<{ url: string; label: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -314,45 +308,99 @@ function ImageSearchModal({
       try {
         setLoading(true);
         setError(null);
-        const response = await fetch(
-          `https://openlibrary.org/search/authors.json?q=${encodeURIComponent(
-            authorName
-          )}`
-        );
-        const data = await response.json();
+        const results: { url: string; label: string }[] = [];
 
-        const candidateUrls: string[] = [];
-        if (data.docs && Array.isArray(data.docs)) {
-          for (const doc of data.docs) {
-            if (doc.key && candidateUrls.length < 12) {
-              const olid = doc.key.replace("/authors/", "");
-              // ?default=false returns 404 instead of placeholder
-              candidateUrls.push(
-                `https://covers.openlibrary.org/a/olid/${olid}-M.jpg?default=false`
-              );
+        // 1. Wikipedia REST API — best source for author portraits
+        try {
+          const wikiRes = await fetch(
+            `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(authorName)}`
+          );
+          if (wikiRes.ok) {
+            const wikiData = await wikiRes.json();
+            if (wikiData.thumbnail?.source) {
+              // Get higher res version by replacing size in URL
+              const hiRes = wikiData.thumbnail.source.replace(/\/\d+px-/, "/500px-");
+              results.push({ url: hiRes, label: "Wikipedia" });
             }
+            if (wikiData.originalimage?.source) {
+              results.push({ url: wikiData.originalimage.source, label: "Wikipedia (full)" });
+            }
+          }
+        } catch {
+          // Wikipedia failed, continue
+        }
+
+        // 2. Try name variants on Wikipedia (first last, last)
+        const nameParts = authorName.split(" ");
+        if (nameParts.length >= 2) {
+          // Try "First_Last_(author)" pattern
+          const wikiVariant = `${nameParts.join("_")}_(author)`;
+          try {
+            const res = await fetch(
+              `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(wikiVariant)}`
+            );
+            if (res.ok) {
+              const data = await res.json();
+              if (data.thumbnail?.source) {
+                const hiRes = data.thumbnail.source.replace(/\/\d+px-/, "/500px-");
+                const existing = results.find((r) => r.url === hiRes);
+                if (!existing) {
+                  results.push({ url: hiRes, label: "Wikipedia (author)" });
+                }
+              }
+            }
+          } catch {
+            // skip
           }
         }
 
-        // Validate each URL with HEAD request to filter out 404s
-        const validUrls: string[] = [];
-        await Promise.all(
-          candidateUrls.map(async (url) => {
-            try {
-              const res = await fetch(url, { method: "HEAD" });
-              if (res.ok) {
-                validUrls.push(url);
+        // 3. Open Library as fallback
+        try {
+          const olRes = await fetch(
+            `https://openlibrary.org/search/authors.json?q=${encodeURIComponent(authorName)}`
+          );
+          if (olRes.ok) {
+            const olData = await olRes.json();
+            if (olData.docs && Array.isArray(olData.docs)) {
+              const candidates: string[] = [];
+              for (const doc of olData.docs) {
+                if (doc.key && candidates.length < 4) {
+                  const olid = doc.key.replace("/authors/", "");
+                  candidates.push(
+                    `https://covers.openlibrary.org/a/olid/${olid}-M.jpg?default=false`
+                  );
+                }
               }
-            } catch {
-              // skip failed URLs
+              // Validate with HEAD requests
+              await Promise.all(
+                candidates.map(async (url) => {
+                  try {
+                    const res = await fetch(url, { method: "HEAD" });
+                    if (res.ok) {
+                      results.push({ url, label: "Open Library" });
+                    }
+                  } catch {
+                    // skip
+                  }
+                })
+              );
             }
-          })
-        );
+          }
+        } catch {
+          // Open Library failed, continue
+        }
 
-        if (validUrls.length === 0) {
+        if (results.length === 0) {
           setError("No images found for this author.");
         } else {
-          setImages(validUrls.slice(0, 6));
+          // Deduplicate by URL
+          const seen = new Set<string>();
+          const unique = results.filter((r) => {
+            if (seen.has(r.url)) return false;
+            seen.add(r.url);
+            return true;
+          });
+          setImages(unique.slice(0, 6));
         }
       } catch (err) {
         setError("Failed to fetch author images.");
@@ -387,21 +435,29 @@ function ImageSearchModal({
         ) : error ? (
           <div className="text-center py-8 text-red-400">{error}</div>
         ) : (
-          <div className="grid grid-cols-3 gap-4">
-            {images.map((url, index) => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            {images.map((img, index) => (
               <div
                 key={index}
-                onClick={() => onSelectImage(url)}
-                className="cursor-pointer hover:opacity-75 transition-opacity"
+                onClick={() => onSelectImage(img.url)}
+                className="cursor-pointer group"
               >
-                <img
-                  src={url}
-                  alt={`Author ${index + 1}`}
-                  className="w-full h-32 object-cover rounded-lg bg-zinc-800"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = "none";
-                  }}
-                />
+                <div className="relative overflow-hidden rounded-lg border border-zinc-700 hover:border-emerald-500 transition-colors">
+                  <img
+                    src={img.url}
+                    alt={`Author ${index + 1}`}
+                    className="w-full h-36 object-cover bg-zinc-800"
+                    onError={(e) => {
+                      ((e.target as HTMLImageElement).closest("div.group") as HTMLElement).style.display = "none";
+                    }}
+                  />
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1">
+                    <span className="text-[10px] text-zinc-300">{img.label}</span>
+                  </div>
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                    <span className="text-white font-semibold text-sm opacity-0 group-hover:opacity-100 transition-opacity">Select</span>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -686,7 +742,7 @@ export default function AuthorsPage() {
             return (
               <div
                 key={author.name}
-                className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 hover:border-zinc-700 transition-colors"
+                className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 hover:border-zinc-700 transition-colors relative focus-within:z-50"
               >
                 {/* Avatar */}
                 <div className="flex justify-center mb-4">
