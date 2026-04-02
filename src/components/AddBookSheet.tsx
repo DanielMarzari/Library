@@ -237,17 +237,17 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
           <div>
             <label className="block text-[10px] text-zinc-600 mb-0.5">Intro (roman)</label>
             <input type="text" inputMode="numeric" pattern="[0-9]*" value={introPages}
-              onChange={(e) => setIntroPages(e.target.value)} placeholder="0" className={numInputCls} />
+              onChange={(e) => setIntroPages(e.target.value)} onFocus={(e) => e.target.select()} placeholder="0" className={numInputCls} />
           </div>
           <div>
             <label className="block text-[10px] text-zinc-600 mb-0.5">Start page</label>
             <input type="text" inputMode="numeric" pattern="[0-9]*" value={startPage}
-              onChange={(e) => setStartPage(e.target.value)} placeholder="1" className={numInputCls} />
+              onChange={(e) => setStartPage(e.target.value)} onFocus={(e) => e.target.select()} placeholder="1" className={numInputCls} />
           </div>
           <div>
             <label className="block text-[10px] text-zinc-600 mb-0.5">End page</label>
             <input type="text" inputMode="numeric" pattern="[0-9]*" value={endPage}
-              onChange={(e) => setEndPage(e.target.value)} placeholder="" className={numInputCls} />
+              onChange={(e) => setEndPage(e.target.value)} onFocus={(e) => e.target.select()} placeholder="" className={numInputCls} />
           </div>
         </div>
         {computedReadingPages && (

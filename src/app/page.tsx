@@ -429,6 +429,11 @@ export default function Home() {
             setSelectedBook(null);
             refetch();
           }}
+          recentSources={[
+            ...new Set(
+              books.map((b) => b.source).filter(Boolean) as string[]
+            ),
+          ]}
         />
       )}
     </div>

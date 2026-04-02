@@ -10,6 +10,7 @@ interface BookDetailProps {
   onClose: () => void;
   onUpdated: () => void;
   onDeleted: () => void;
+  recentSources?: string[];
 }
 
 const statusLabels: Record<Book["status"], string> = {
@@ -18,7 +19,7 @@ const statusLabels: Record<Book["status"], string> = {
   read: "Read",
 };
 
-export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailProps) {
+export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources = [] }: BookDetailProps) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(book.title);
   const [author, setAuthor] = useState(book.author);
@@ -39,6 +40,7 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
   const [topicInput, setTopicInput] = useState("");
   const [autoTopics, setAutoTopics] = useState<string[]>(book.auto_topics || []);
   const [favorite, setFavorite] = useState(book.favorite || false);
+  const [showSourceSuggestions, setShowSourceSuggestions] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [refreshing, setRefreshing] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -272,6 +274,9 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
             <button onClick={() => { setFavorite(!favorite); scheduleAutoSave(); }} className={`bg-black/40 rounded-full w-8 h-8 flex items-center justify-center text-sm ${favorite ? "text-red-500" : "text-zinc-500 hover:text-zinc-200"}`} title={favorite ? "Remove from favorites" : "Add to favorites"}>
               {favorite ? "❤" : "♡"}
             </button>
+            <a href={`https://annas-archive.gl/search?q=${encodeURIComponent(book.title)}`} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-zinc-200 bg-black/40 rounded-full w-8 h-8 flex items-center justify-center text-sm" title="Find PDF">
+              PDF
+            </a>
             <button onClick={() => setEditing(!editing)} className="text-zinc-400 hover:text-zinc-200 bg-black/40 rounded-full w-8 h-8 flex items-center justify-center text-sm">✏️</button>
             <button onClick={() => { if (saveTimeoutRef.current) { clearTimeout(saveTimeoutRef.current); doSave(); } onUpdated(); }} className="text-zinc-400 hover:text-zinc-200 bg-black/40 rounded-full w-8 h-8 flex items-center justify-center">×</button>
           </div>
@@ -307,9 +312,23 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
                   <label className="block text-xs text-zinc-500 mb-1">Volume</label>
                   <input type="text" value={volume} onChange={(e) => { setVolume(e.target.value); scheduleAutoSave(); }} placeholder="Vol. 1" className={inputCls} />
                 </div>
-                <div>
+                <div className="relative">
                   <label className="block text-xs text-zinc-500 mb-1">Source</label>
-                  <input type="text" value={source} onChange={(e) => { setSource(e.target.value); scheduleAutoSave(); }} placeholder="Gift, Library..." className={inputCls} />
+                  <input type="text" value={source}
+                    onChange={(e) => { setSource(e.target.value); setShowSourceSuggestions(true); scheduleAutoSave(); }}
+                    onFocus={() => setShowSourceSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowSourceSuggestions(false), 200)}
+                    placeholder="Gift, Library..." className={inputCls} />
+                  {showSourceSuggestions && recentSources.filter((s) => s.toLowerCase().includes(source.toLowerCase()) && s !== source).length > 0 && (
+                    <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-zinc-800 border border-zinc-700 rounded-lg overflow-hidden shadow-lg">
+                      {recentSources.filter((s) => s.toLowerCase().includes(source.toLowerCase()) && s !== source).slice(0, 5).map((s) => (
+                        <button key={s} onMouseDown={() => { setSource(s); setShowSourceSuggestions(false); scheduleAutoSave(); }}
+                          className="w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-700 transition-colors">
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -319,19 +338,19 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
                 <div className="grid grid-cols-4 gap-2">
                   <div>
                     <label className="block text-[10px] text-zinc-600 mb-0.5">Total</label>
-                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={pages} onChange={(e) => { setPages(e.target.value); scheduleAutoSave(); }} placeholder="—" className={numCls} />
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={pages} onChange={(e) => { setPages(e.target.value); scheduleAutoSave(); }} onFocus={(e) => e.target.select()} placeholder="—" className={numCls} />
                   </div>
                   <div>
                     <label className="block text-[10px] text-zinc-600 mb-0.5">Intro</label>
-                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={introPages} onChange={(e) => { setIntroPages(e.target.value); recalcPages(e.target.value, startPage, endPage); scheduleAutoSave(); }} placeholder="0" className={numCls} />
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={introPages} onChange={(e) => { setIntroPages(e.target.value); recalcPages(e.target.value, startPage, endPage); scheduleAutoSave(); }} onFocus={(e) => e.target.select()} placeholder="0" className={numCls} />
                   </div>
                   <div>
                     <label className="block text-[10px] text-zinc-600 mb-0.5">Start</label>
-                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={startPage} onChange={(e) => { setStartPage(e.target.value); recalcPages(introPages, e.target.value, endPage); scheduleAutoSave(); }} placeholder="1" className={numCls} />
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={startPage} onChange={(e) => { setStartPage(e.target.value); recalcPages(introPages, e.target.value, endPage); scheduleAutoSave(); }} onFocus={(e) => e.target.select()} placeholder="1" className={numCls} />
                   </div>
                   <div>
                     <label className="block text-[10px] text-zinc-600 mb-0.5">End</label>
-                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={endPage} onChange={(e) => { setEndPage(e.target.value); recalcPages(introPages, startPage, e.target.value); scheduleAutoSave(); }} placeholder="—" className={numCls} />
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={endPage} onChange={(e) => { setEndPage(e.target.value); recalcPages(introPages, startPage, e.target.value); scheduleAutoSave(); }} onFocus={(e) => e.target.select()} placeholder="—" className={numCls} />
                   </div>
                 </div>
                 {computedReadingPages && <p className="text-xs text-zinc-500 mt-1">Reading pages: <span className="text-zinc-300 font-medium">{computedReadingPages}</span></p>}
