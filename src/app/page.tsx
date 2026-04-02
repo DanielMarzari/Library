@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { Book } from "@/types/book";
 import { BookShelf } from "@/components/BookShelf";
@@ -12,6 +12,7 @@ import Link from "next/link";
 
 type FilterStatus = "all" | "not_read" | "reading" | "read" | "favorites";
 type SortMode = "recent" | "alpha" | "rating" | "lcc" | "ddc";
+type HeaderTab = "filter" | "sort";
 
 export default function Home() {
   const [books, setBooks] = useState<Book[]>([]);
@@ -23,9 +24,25 @@ export default function Home() {
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // Nav + header UI
+  const [showNav, setShowNav] = useState(false);
+  const [headerTab, setHeaderTab] = useState<HeaderTab>("filter");
+  const navRef = useRef<HTMLDivElement>(null);
+
   // Multi-select state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const selectMode = selectedIds.size > 0;
+
+  // Close nav menu on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (navRef.current && !navRef.current.contains(e.target as Node)) {
+        setShowNav(false);
+      }
+    };
+    if (showNav) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showNav]);
 
   useEffect(() => {
     let ignore = false;
@@ -223,127 +240,134 @@ export default function Home() {
     { label: "DDC", value: "ddc" },
   ];
 
+  const navLinkCls = "block px-3 py-2 text-sm text-muted hover:bg-surface-2 rounded-lg transition-colors";
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between mb-2">
-            <h1 className="text-2xl font-bold tracking-tight">My Library</h1>
-          </div>
-          <div className="mb-4">
-            <div className="flex items-center gap-2 flex-wrap">
-              <Link
-                href="/stats"
-                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-              >
-                Stats
-              </Link>
-              <Link
-                href="/goals"
-                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-              >
-                Goals
-              </Link>
-              <Link
-                href="/authors"
-                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-              >
-                Authors
-              </Link>
-              <Link
-                href="/expertise"
-                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-              >
-                Skills
-              </Link>
-              <Link
-                href="/reading-list"
-                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-              >
-                List
-              </Link>
-              <Link
-                href="/recommendations"
-                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-              >
-                Recs
-              </Link>
-              <Link
-                href="/lending"
-                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-              >
-                Lending
-              </Link>
-              <Link
-                href="/wrapped"
-                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-              >
-                Wrapped
-              </Link>
-              <Link
-                href="/setup"
-                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-              >
-                Setup
-              </Link>
+      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border-custom">
+        <div className="max-w-7xl mx-auto px-4 py-3">
+          {/* Top row: title, nav toggle, add */}
+          <div className="flex items-center gap-3 mb-3">
+            <div className="relative" ref={navRef}>
               <button
-                onClick={() => setShowAddSheet(true)}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                onClick={() => setShowNav((v) => !v)}
+                className="p-2 rounded-lg bg-surface hover:bg-surface-2 text-muted transition-colors"
+                aria-label="Menu"
               >
-                + Add
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+                </svg>
               </button>
+
+              {showNav && (
+                <div className="absolute top-full left-0 mt-2 w-56 bg-surface border border-border-custom rounded-xl shadow-xl p-2 z-50">
+                  <p className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-2 font-semibold">Tracking</p>
+                  <Link href="/stats" className={navLinkCls} onClick={() => setShowNav(false)}>Stats</Link>
+                  <Link href="/goals" className={navLinkCls} onClick={() => setShowNav(false)}>Goals</Link>
+                  <Link href="/reading-list" className={navLinkCls} onClick={() => setShowNav(false)}>Reading List</Link>
+                  <Link href="/wrapped" className="block px-3 py-2 text-sm font-medium bg-gradient-to-r from-purple-600/20 to-pink-600/20 text-purple-300 hover:from-purple-600/30 hover:to-pink-600/30 rounded-lg transition-colors" onClick={() => setShowNav(false)}>Wrapped</Link>
+
+                  <div className="border-t border-border-custom my-1.5" />
+                  <p className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-2 font-semibold">Discover</p>
+                  <Link href="/authors" className={navLinkCls} onClick={() => setShowNav(false)}>Authors</Link>
+                  <Link href="/expertise" className={navLinkCls} onClick={() => setShowNav(false)}>Skills</Link>
+                  <Link href="/recommendations" className={navLinkCls} onClick={() => setShowNav(false)}>Recommendations</Link>
+
+                  <div className="border-t border-border-custom my-1.5" />
+                  <p className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-2 font-semibold">Manage</p>
+                  <Link href="/lending" className={navLinkCls} onClick={() => setShowNav(false)}>Lending</Link>
+                  <Link href="/setup" className={navLinkCls} onClick={() => setShowNav(false)}>Setup</Link>
+                </div>
+              )}
             </div>
+
+            <h1 className="text-xl font-bold tracking-tight flex-1">My Library</h1>
+
+            <button
+              onClick={() => setShowAddSheet(true)}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              + Add
+            </button>
           </div>
 
+          {/* Search */}
           <input
             type="text"
             placeholder="Search by title or author..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent mb-3"
+            className="w-full bg-surface border border-border-custom rounded-lg px-4 py-2.5 text-sm text-foreground placeholder-muted-2 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent mb-3"
           />
 
-          <div className="flex items-center justify-between">
-            <div className="flex gap-1.5 overflow-x-auto pb-1">
-              {filterButtons.map((f) => (
-                <button
-                  key={f.value}
-                  onClick={() => setFilter(f.value)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
-                    filter === f.value
-                      ? "bg-emerald-600 text-white"
-                      : "bg-zinc-800 text-zinc-400 hover:text-zinc-200"
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
+          {/* Filter / Sort toggle row */}
+          <div className="flex items-center gap-2">
+            {/* Toggle buttons */}
+            <div className="flex gap-0.5 bg-surface rounded-lg p-0.5 flex-shrink-0">
+              <button
+                onClick={() => setHeaderTab("filter")}
+                className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                  headerTab === "filter" ? "bg-surface-2 text-foreground" : "text-muted-2 hover:text-muted"
+                }`}
+              >
+                Filter
+              </button>
+              <button
+                onClick={() => setHeaderTab("sort")}
+                className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                  headerTab === "sort" ? "bg-surface-2 text-foreground" : "text-muted-2 hover:text-muted"
+                }`}
+              >
+                Sort
+              </button>
             </div>
 
-            <div className="flex gap-0.5 bg-zinc-800 rounded-lg p-0.5 ml-2 flex-shrink-0">
-              {sortButtons.map((s) => (
-                <button
-                  key={s.value}
-                  onClick={() => setSortMode(s.value)}
-                  className={`px-2 py-1 rounded text-[10px] transition-colors ${
-                    sortMode === s.value
-                      ? "bg-zinc-700 text-zinc-100"
-                      : "text-zinc-500 hover:text-zinc-300"
-                  }`}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
+            {/* Filter pills */}
+            {headerTab === "filter" && (
+              <div className="flex gap-1.5 overflow-x-auto pb-1">
+                {filterButtons.map((f) => (
+                  <button
+                    key={f.value}
+                    onClick={() => setFilter(f.value)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                      filter === f.value
+                        ? "bg-emerald-600 text-white"
+                        : "bg-surface text-muted hover:text-foreground"
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Sort pills */}
+            {headerTab === "sort" && (
+              <div className="flex gap-1.5 overflow-x-auto pb-1">
+                {sortButtons.map((s) => (
+                  <button
+                    key={s.value}
+                    onClick={() => setSortMode(s.value)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                      sortMode === s.value
+                        ? "bg-emerald-600 text-white"
+                        : "bg-surface text-muted hover:text-foreground"
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </header>
 
       {/* Bulk action bar */}
       {selectMode && (
-        <div className="sticky top-[155px] z-10 bg-zinc-900/95 backdrop-blur-md border-b border-zinc-700 px-4 py-3">
-          <div className="max-w-4xl mx-auto flex items-center justify-between">
+        <div className="sticky top-[130px] z-10 bg-surface/95 backdrop-blur-md border-b border-border-custom px-4 py-3">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3">
               <button
                 onClick={clearSelection}
@@ -386,7 +410,7 @@ export default function Home() {
       )}
 
       {/* Main content */}
-      <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-6">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6">
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="animate-spin rounded-full h-8 w-8 border-2 border-zinc-700 border-t-emerald-500" />

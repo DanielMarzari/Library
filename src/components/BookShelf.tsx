@@ -101,7 +101,7 @@ function ShelfBook({
 
       <div
         className={`relative aspect-[2/3] rounded-md overflow-hidden shadow-lg shadow-black/40 transition-all group-hover:scale-105 group-hover:-translate-y-1 ${
-          selected ? "ring-2 ring-emerald-500 ring-offset-2 ring-offset-zinc-950" : book.favorite ? "ring-2 ring-red-500/70 ring-offset-1 ring-offset-zinc-950" : ""
+          selected ? "ring-2 ring-emerald-500 ring-offset-2 ring-offset-background" : book.favorite ? "ring-2 ring-red-500/70 ring-offset-1 ring-offset-background" : ""
         }`}
       >
         {book._optimistic ? (
@@ -147,10 +147,10 @@ function ShelfBook({
       </div>
 
       <div className="mt-1.5">
-        <p className="text-[11px] font-medium text-zinc-300 truncate">
+        <p className="text-[11px] font-medium text-foreground truncate">
           {book.title}
         </p>
-        <p className="text-[10px] text-zinc-500 truncate">{book.author}</p>
+        <p className="text-[10px] text-muted-2 truncate">{book.author}</p>
       </div>
     </button>
   );
@@ -203,7 +203,7 @@ export function BookShelf({
               </div>
             )}
 
-            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 gap-3 px-1">
+            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 2xl:grid-cols-12 gap-3 px-1">
               {sectionBooks.map((book) => (
                 <ShelfBook
                   key={book.id}

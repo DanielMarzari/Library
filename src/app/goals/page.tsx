@@ -195,7 +195,7 @@ export default function GoalsPage() {
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <span className="text-base leading-none">{achieved ? m.emoji : "○"}</span>
+                      <span className={`text-base leading-none ${achieved ? "" : "grayscale opacity-40"}`}>{m.emoji}</span>
                       <div className="min-w-0">
                         <div className="font-semibold truncate">{m.label}</div>
                         <div className={`text-[10px] truncate ${achieved ? "text-emerald-400" : "text-zinc-600"}`}>

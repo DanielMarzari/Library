@@ -41,6 +41,8 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
   const [manAuthor, setManAuthor] = useState("");
   const [manIsbn, setManIsbn] = useState("");
   const [manPages, setManPages] = useState("");
+  const [manCoverUrl, setManCoverUrl] = useState("");
+  const [confirmCoverUrl, setConfirmCoverUrl] = useState("");
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerContainerId = "isbn-scanner";
@@ -78,6 +80,7 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
     setSelected(enriched);
     if (enriched.pages) setEndPage(enriched.pages.toString());
     if (enriched.topics) setEditTopics(enriched.topics);
+    setConfirmCoverUrl(enriched.cover_url || "");
     setEnriching(false);
   };
 
@@ -138,9 +141,10 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
     const sp = parseInt(startPage) || 1;
     const ep = parseInt(endPage) || null;
 
+    const coverToUse = confirmCoverUrl.trim() || book.cover_url;
     const newBook: Partial<Book> = {
       title: book.title, author: book.author, isbn: book.isbn,
-      cover_url: book.cover_url || undefined, description: book.description || undefined,
+      cover_url: coverToUse || undefined, description: book.description || undefined,
       pages: book.pages || undefined, status,
       source: source.trim() || undefined, volume: volume.trim() || undefined,
       lcc: book.lcc || undefined, ddc: book.ddc || undefined,
@@ -150,7 +154,7 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
 
     await supabase.from("books").insert({
       title: book.title, author: book.author, isbn: book.isbn || null,
-      cover_url: book.cover_url, description: book.description,
+      cover_url: coverToUse, description: book.description,
       pages: book.pages, intro_pages: ip || 0, start_page: sp, end_page: ep,
       status, source: source.trim() || null, volume: volume.trim() || null,
       lcc: book.lcc || null, ddc: book.ddc || null,
@@ -167,9 +171,11 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
     const sp = parseInt(startPage) || 1;
     const ep = parseInt(endPage) || null;
 
+    const coverToUse = manCoverUrl.trim() || null;
     const newBook: Partial<Book> = {
       title: manTitle.trim(), author: manAuthor.trim(), status,
       isbn: manIsbn.trim() || undefined,
+      cover_url: coverToUse || undefined,
       source: source.trim() || undefined, volume: volume.trim() || undefined,
       pages: manPages ? parseInt(manPages) : undefined,
     };
@@ -178,6 +184,7 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
     await supabase.from("books").insert({
       title: manTitle.trim(), author: manAuthor.trim(), status,
       isbn: manIsbn.trim() || null,
+      cover_url: coverToUse,
       pages: manPages ? parseInt(manPages) : null,
       intro_pages: ip || 0, start_page: sp, end_page: ep,
       source: source.trim() || null, volume: volume.trim() || null,
@@ -409,6 +416,13 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
               </div>
             </div>
 
+            {/* Cover URL override */}
+            <div>
+              <label className="block text-xs text-zinc-500 mb-1">Cover Image URL</label>
+              <input type="url" value={confirmCoverUrl} onChange={(e) => setConfirmCoverUrl(e.target.value)}
+                placeholder="https://... (leave blank to use default)" className={inputCls} />
+            </div>
+
             {sharedFields}
 
             <div className="flex gap-3">
@@ -439,6 +453,11 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
             <div>
               <label className="block text-xs text-zinc-500 mb-1">Total Pages</label>
               <input type="text" inputMode="numeric" pattern="[0-9]*" value={manPages} onChange={(e) => setManPages(e.target.value)} placeholder="Page count" className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-xs text-zinc-500 mb-1">Cover Image URL</label>
+              <input type="url" value={manCoverUrl} onChange={(e) => setManCoverUrl(e.target.value)}
+                placeholder="https://..." className={inputCls} />
             </div>
 
             {sharedFields}
