@@ -68,6 +68,16 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
     return ep > 0 ? ep - sp + 1 + ip : null;
   })();
 
+  // Auto-update total pages when intro/start/end change
+  const recalcPages = (ip: string, sp: string, ep: string) => {
+    const epNum = parseInt(ep) || 0;
+    const spNum = parseInt(sp) || 1;
+    const ipNum = parseInt(ip) || 0;
+    if (epNum > 0) {
+      setPages((epNum - spNum + 1 + ipNum).toString());
+    }
+  };
+
   // Refresh data from Open Library
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -313,15 +323,15 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
                   </div>
                   <div>
                     <label className="block text-[10px] text-zinc-600 mb-0.5">Intro</label>
-                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={introPages} onChange={(e) => { setIntroPages(e.target.value); scheduleAutoSave(); }} placeholder="0" className={numCls} />
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={introPages} onChange={(e) => { setIntroPages(e.target.value); recalcPages(e.target.value, startPage, endPage); scheduleAutoSave(); }} placeholder="0" className={numCls} />
                   </div>
                   <div>
                     <label className="block text-[10px] text-zinc-600 mb-0.5">Start</label>
-                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={startPage} onChange={(e) => { setStartPage(e.target.value); scheduleAutoSave(); }} placeholder="1" className={numCls} />
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={startPage} onChange={(e) => { setStartPage(e.target.value); recalcPages(introPages, e.target.value, endPage); scheduleAutoSave(); }} placeholder="1" className={numCls} />
                   </div>
                   <div>
                     <label className="block text-[10px] text-zinc-600 mb-0.5">End</label>
-                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={endPage} onChange={(e) => { setEndPage(e.target.value); scheduleAutoSave(); }} placeholder="—" className={numCls} />
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={endPage} onChange={(e) => { setEndPage(e.target.value); recalcPages(introPages, startPage, e.target.value); scheduleAutoSave(); }} placeholder="—" className={numCls} />
                   </div>
                 </div>
                 {computedReadingPages && <p className="text-xs text-zinc-500 mt-1">Reading pages: <span className="text-zinc-300 font-medium">{computedReadingPages}</span></p>}

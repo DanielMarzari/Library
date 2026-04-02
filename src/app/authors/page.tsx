@@ -608,7 +608,7 @@ export default function AuthorsPage() {
           [field]: value,
         };
 
-        const { error } = await supabase.from("authors").upsert([upsertData]);
+        const { error } = await supabase.from("authors").upsert([upsertData], { onConflict: "name" });
 
         if (error) throw error;
 
@@ -637,7 +637,7 @@ export default function AuthorsPage() {
           image_url: imageUrl,
         };
 
-        const { error } = await supabase.from("authors").upsert([upsertData]);
+        const { error } = await supabase.from("authors").upsert([upsertData], { onConflict: "name" });
 
         if (error) throw error;
 
