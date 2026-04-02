@@ -14,6 +14,7 @@ interface AuthorData {
   averageRating: number | null;
   ethnicity: string | null;
   nationality: string | null;
+  image_url: string | null;
   id?: string;
 }
 
@@ -26,6 +27,134 @@ interface EditingState {
   author: string;
   field: "ethnicity" | "nationality";
 }
+
+interface OpenLibraryAuthor {
+  key: string;
+  name: string;
+}
+
+const ETHNICITY_OPTIONS = [
+  "African / Black",
+  "Arab / Middle Eastern",
+  "East Asian",
+  "South Asian",
+  "Southeast Asian",
+  "European / White",
+  "Hispanic / Latino",
+  "Indigenous / Native",
+  "Mixed / Multiracial",
+  "Pacific Islander",
+  "Caribbean",
+  "Central Asian",
+  "Jewish",
+  "Other",
+];
+
+const NATIONALITY_OPTIONS = [
+  "Afghan",
+  "Algerian",
+  "American",
+  "Argentinian",
+  "Australian",
+  "Austrian",
+  "Bangladeshi",
+  "Belgian",
+  "Bolivian",
+  "Brazilian",
+  "British",
+  "Bulgarian",
+  "Cambodian",
+  "Canadian",
+  "Chilean",
+  "Chinese",
+  "Colombian",
+  "Congolese",
+  "Costa Rican",
+  "Croatian",
+  "Cuban",
+  "Czech",
+  "Danish",
+  "Dominican",
+  "Dutch",
+  "Ecuadorian",
+  "Egyptian",
+  "Ethiopian",
+  "Filipino",
+  "Finnish",
+  "French",
+  "German",
+  "Ghanaian",
+  "Greek",
+  "Guatemalan",
+  "Haitian",
+  "Honduran",
+  "Hungarian",
+  "Icelandic",
+  "Indian",
+  "Indonesian",
+  "Iranian",
+  "Iraqi",
+  "Irish",
+  "Israeli",
+  "Italian",
+  "Jamaican",
+  "Japanese",
+  "Jordanian",
+  "Kazakh",
+  "Kenyan",
+  "Korean",
+  "Kuwaiti",
+  "Lebanese",
+  "Libyan",
+  "Malaysian",
+  "Mexican",
+  "Moroccan",
+  "Mozambican",
+  "Myanmar",
+  "Nepali",
+  "New Zealander",
+  "Nicaraguan",
+  "Nigerian",
+  "Norwegian",
+  "Pakistani",
+  "Palestinian",
+  "Panamanian",
+  "Paraguayan",
+  "Peruvian",
+  "Polish",
+  "Portuguese",
+  "Puerto Rican",
+  "Romanian",
+  "Russian",
+  "Saudi",
+  "Senegalese",
+  "Serbian",
+  "Singaporean",
+  "Slovak",
+  "Slovenian",
+  "Somali",
+  "South African",
+  "Spanish",
+  "Sri Lankan",
+  "Sudanese",
+  "Swedish",
+  "Swiss",
+  "Syrian",
+  "Taiwanese",
+  "Tanzanian",
+  "Thai",
+  "Trinidadian",
+  "Tunisian",
+  "Turkish",
+  "Ugandan",
+  "Ukrainian",
+  "Uruguayan",
+  "Uzbek",
+  "Venezuelan",
+  "Vietnamese",
+  "Yemeni",
+  "Zimbabwean",
+];
 
 const colorPalette = ["emerald", "blue", "purple", "pink", "amber", "cyan", "rose", "orange"];
 
@@ -66,6 +195,205 @@ const getColorClasses = (color: string): { bg: string; text: string } => {
   return colorMap[color] || colorMap.emerald;
 };
 
+// Dropdown Component for Ethnicity/Nationality
+function DropdownSelector({
+  value,
+  options,
+  onSelect,
+  onClear,
+  label,
+}: {
+  value: string | null;
+  options: string[];
+  onSelect: (value: string) => void;
+  onClear: () => void;
+  label: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
+
+  const filtered = options.filter((option) =>
+    option.toLowerCase().includes(searchInput.toLowerCase())
+  );
+
+  const handleSelect = (option: string) => {
+    onSelect(option);
+    setIsOpen(false);
+    setSearchInput("");
+  };
+
+  const handleClear = () => {
+    onClear();
+    setIsOpen(false);
+    setSearchInput("");
+  };
+
+  return (
+    <div className="relative">
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        className="px-2 py-1 bg-zinc-800 rounded text-xs text-zinc-300 cursor-pointer hover:bg-zinc-700 transition-colors"
+      >
+        {value ? (
+          <span>
+            {label}: {value}
+          </span>
+        ) : (
+          <span className="text-zinc-500 italic">+ Add {label.toLowerCase()}</span>
+        )}
+      </div>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg">
+          <input
+            type="text"
+            placeholder={`Search ${label.toLowerCase()}...`}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="w-full px-3 py-2 bg-zinc-750 text-xs text-zinc-200 placeholder-zinc-500 border-b border-zinc-700 focus:outline-none"
+            autoFocus
+          />
+          <div className="max-h-48 overflow-y-auto">
+            {filtered.length > 0 ? (
+              filtered.map((option) => (
+                <div
+                  key={option}
+                  onClick={() => handleSelect(option)}
+                  className="px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 cursor-pointer"
+                >
+                  {option}
+                </div>
+              ))
+            ) : (
+              <div className="px-3 py-2 text-xs text-zinc-500 italic">No matches</div>
+            )}
+          </div>
+          {value && (
+            <div className="border-t border-zinc-700 px-3 py-2">
+              <button
+                onClick={handleClear}
+                className="text-xs text-red-400 hover:text-red-300 transition-colors"
+              >
+                Clear
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => {
+            setIsOpen(false);
+            setSearchInput("");
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Image Search Modal Component
+function ImageSearchModal({
+  authorName,
+  onSelectImage,
+  onClose,
+}: {
+  authorName: string;
+  onSelectImage: (imageUrl: string) => void;
+  onClose: () => void;
+}) {
+  const [images, setImages] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchImages = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await fetch(
+          `https://openlibrary.org/search/authors.json?q=${encodeURIComponent(
+            authorName
+          )}`
+        );
+        const data = await response.json();
+
+        const imageUrls: string[] = [];
+        if (data.docs && Array.isArray(data.docs)) {
+          for (const doc of data.docs) {
+            if (doc.key && imageUrls.length < 6) {
+              const olid = doc.key.replace("/authors/", "");
+              imageUrls.push(
+                `https://covers.openlibrary.org/a/olid/${olid}-M.jpg`
+              );
+            }
+          }
+        }
+
+        if (imageUrls.length === 0) {
+          setError("No images found for this author.");
+        } else {
+          setImages(imageUrls);
+        }
+      } catch (err) {
+        setError("Failed to fetch author images.");
+        console.error("Image fetch error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchImages();
+  }, [authorName]);
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 max-w-2xl w-full mx-4">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-bold text-zinc-100">
+            Find photo for {authorName}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-zinc-400 hover:text-zinc-200 text-2xl leading-none"
+          >
+            ×
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-8 text-zinc-400">
+            Loading images...
+          </div>
+        ) : error ? (
+          <div className="text-center py-8 text-red-400">{error}</div>
+        ) : (
+          <div className="grid grid-cols-3 gap-4">
+            {images.map((url, index) => (
+              <div
+                key={index}
+                onClick={() => onSelectImage(url)}
+                className="cursor-pointer hover:opacity-75 transition-opacity"
+              >
+                <img
+                  src={url}
+                  alt={`Author ${index + 1}`}
+                  className="w-full h-32 object-cover rounded-lg bg-zinc-800"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function AuthorsPage() {
   const [authors, setAuthors] = useState<AuthorData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,8 +402,7 @@ export default function AuthorsPage() {
     key: "bookCount",
     direction: "desc",
   });
-  const [editingCell, setEditingCell] = useState<EditingState | null>(null);
-  const [editValue, setEditValue] = useState("");
+  const [imageSearchAuthor, setImageSearchAuthor] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchAuthors = async () => {
@@ -105,6 +432,7 @@ export default function AuthorsPage() {
                   averageRating: null,
                   ethnicity: null,
                   nationality: null,
+                  image_url: null,
                 });
               }
 
@@ -143,6 +471,7 @@ export default function AuthorsPage() {
             if (author) {
               author.ethnicity = metadata.ethnicity;
               author.nationality = metadata.nationality;
+              author.image_url = metadata.image_url;
               author.id = metadata.id;
             }
           });
@@ -193,24 +522,13 @@ export default function AuthorsPage() {
     }));
   }, []);
 
-  const handleCellClick = useCallback(
-    (author: string, field: "ethnicity" | "nationality") => {
-      const authorData = authors.find((a) => a.name === author);
-      setEditingCell({ author, field });
-      setEditValue(authorData?.[field] || "");
-    },
-    [authors]
-  );
-
-  const handleSaveEdit = useCallback(
-    async (authorName: string) => {
-      if (!editingCell) return;
-
+  const handleSaveMetadata = useCallback(
+    async (authorName: string, field: "ethnicity" | "nationality", value: string | null) => {
       try {
         const { error } = await supabase.from("authors").upsert([
           {
             name: authorName,
-            [editingCell.field]: editValue || null,
+            [field]: value,
           },
         ]);
 
@@ -219,30 +537,43 @@ export default function AuthorsPage() {
         setAuthors((prev) =>
           prev.map((author) =>
             author.name === authorName
-              ? { ...author, [editingCell.field]: editValue || null }
+              ? { ...author, [field]: value }
               : author
           )
         );
-
-        setEditingCell(null);
-        setEditValue("");
       } catch (error) {
         console.error("Error saving author metadata:", error);
       }
     },
-    [editingCell, editValue]
+    []
   );
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent, authorName: string) => {
-      if (e.key === "Enter") {
-        handleSaveEdit(authorName);
-      } else if (e.key === "Escape") {
-        setEditingCell(null);
-        setEditValue("");
+  const handleSaveImage = useCallback(
+    async (authorName: string, imageUrl: string) => {
+      try {
+        const { error } = await supabase.from("authors").upsert([
+          {
+            name: authorName,
+            image_url: imageUrl,
+          },
+        ]);
+
+        if (error) throw error;
+
+        setAuthors((prev) =>
+          prev.map((author) =>
+            author.name === authorName
+              ? { ...author, image_url: imageUrl }
+              : author
+          )
+        );
+
+        setImageSearchAuthor(null);
+      } catch (error) {
+        console.error("Error saving author image:", error);
       }
     },
-    [handleSaveEdit]
+    []
   );
 
   if (loading) {
@@ -334,11 +665,24 @@ export default function AuthorsPage() {
               >
                 {/* Avatar */}
                 <div className="flex justify-center mb-4">
-                  <div
-                    className={`w-16 h-16 rounded-full ${colorClasses.bg} ${colorClasses.text} flex items-center justify-center font-bold text-xl`}
+                  <button
+                    onClick={() => setImageSearchAuthor(author.name)}
+                    className="relative group"
                   >
-                    {initials}
-                  </div>
+                    {author.image_url ? (
+                      <img
+                        src={author.image_url}
+                        alt={author.name}
+                        className="w-16 h-16 rounded-full object-cover border border-zinc-700 group-hover:border-emerald-500 transition-colors"
+                      />
+                    ) : (
+                      <div
+                        className={`w-16 h-16 rounded-full ${colorClasses.bg} ${colorClasses.text} flex items-center justify-center font-bold text-xl group-hover:ring-2 group-hover:ring-emerald-500 transition-all`}
+                      >
+                        {initials}
+                      </div>
+                    )}
+                  </button>
                 </div>
 
                 {/* Author Name */}
@@ -355,60 +699,37 @@ export default function AuthorsPage() {
 
                 {/* Badges */}
                 <div className="space-y-2 mb-4">
-                  {/* Ethnicity Badge */}
-                  {editingCell?.author === author.name &&
-                  editingCell?.field === "ethnicity" ? (
-                    <input
-                      type="text"
-                      value={editValue}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      onBlur={() => handleSaveEdit(author.name)}
-                      onKeyDown={(e) => handleKeyDown(e, author.name)}
-                      autoFocus
-                      className="w-full px-2 py-1 bg-zinc-800 border border-emerald-500 rounded text-xs text-zinc-200 focus:outline-none"
-                    />
-                  ) : (
-                    <div
-                      onClick={() => handleCellClick(author.name, "ethnicity")}
-                      className="px-2 py-1 bg-zinc-800 rounded text-xs text-zinc-300 cursor-pointer hover:bg-zinc-700 transition-colors"
-                    >
-                      {author.ethnicity ? (
-                        <span>Ethnicity: {author.ethnicity}</span>
-                      ) : (
-                        <span className="text-zinc-500 italic">+ Add ethnicity</span>
-                      )}
-                    </div>
-                  )}
+                  {/* Ethnicity Dropdown */}
+                  <DropdownSelector
+                    value={author.ethnicity}
+                    options={ETHNICITY_OPTIONS}
+                    onSelect={(value) => handleSaveMetadata(author.name, "ethnicity", value)}
+                    onClear={() => handleSaveMetadata(author.name, "ethnicity", null)}
+                    label="Ethnicity"
+                  />
 
-                  {/* Nationality Badge */}
-                  {editingCell?.author === author.name &&
-                  editingCell?.field === "nationality" ? (
-                    <input
-                      type="text"
-                      value={editValue}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      onBlur={() => handleSaveEdit(author.name)}
-                      onKeyDown={(e) => handleKeyDown(e, author.name)}
-                      autoFocus
-                      className="w-full px-2 py-1 bg-zinc-800 border border-emerald-500 rounded text-xs text-zinc-200 focus:outline-none"
-                    />
-                  ) : (
-                    <div
-                      onClick={() => handleCellClick(author.name, "nationality")}
-                      className="px-2 py-1 bg-zinc-800 rounded text-xs text-zinc-300 cursor-pointer hover:bg-zinc-700 transition-colors"
-                    >
-                      {author.nationality ? (
-                        <span>Nationality: {author.nationality}</span>
-                      ) : (
-                        <span className="text-zinc-500 italic">+ Add nationality</span>
-                      )}
-                    </div>
-                  )}
+                  {/* Nationality Dropdown */}
+                  <DropdownSelector
+                    value={author.nationality}
+                    options={NATIONALITY_OPTIONS}
+                    onSelect={(value) => handleSaveMetadata(author.name, "nationality", value)}
+                    onClear={() => handleSaveMetadata(author.name, "nationality", null)}
+                    label="Nationality"
+                  />
                 </div>
               </div>
             );
           })}
         </div>
+      )}
+
+      {/* Image Search Modal */}
+      {imageSearchAuthor && (
+        <ImageSearchModal
+          authorName={imageSearchAuthor}
+          onSelectImage={(imageUrl) => handleSaveImage(imageSearchAuthor, imageUrl)}
+          onClose={() => setImageSearchAuthor(null)}
+        />
       )}
     </div>
   );

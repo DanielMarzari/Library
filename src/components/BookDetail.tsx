@@ -48,6 +48,10 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
   const [currentPage, setCurrentPage] = useState("");
   const [updateNotes, setUpdateNotes] = useState("");
 
+  const [showCoverSearch, setShowCoverSearch] = useState(false);
+  const [coverOptions, setCoverOptions] = useState<string[]>([]);
+  const [coverSearchLoading, setCoverSearchLoading] = useState(false);
+
   useEffect(() => {
     if (book.status === "reading" || status === "reading") loadUpdates();
   }, [book.id, book.status, status]);
@@ -146,6 +150,66 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
     if (!error) onDeleted();
   };
 
+  const searchCovers = async () => {
+    setCoverSearchLoading(true);
+    const options: string[] = [];
+
+    try {
+      // 1. Try ISBN first if available
+      if (book.isbn) {
+        const isbnUrl = `https://covers.openlibrary.org/b/isbn/${book.isbn}-L.jpg`;
+        options.push(isbnUrl);
+      }
+
+      // 2. Open Library search by title
+      const olSearchUrl = `https://openlibrary.org/search.json?title=${encodeURIComponent(title || book.title)}&limit=6`;
+      const olRes = await fetch(olSearchUrl);
+      if (olRes.ok) {
+        const olData = await olRes.json();
+        if (olData.docs) {
+          for (const doc of olData.docs) {
+            if (doc.cover_i && options.length < 10) {
+              options.push(`https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`);
+            }
+          }
+        }
+      }
+
+      // 3. Google Books search
+      const gbQuery = `${encodeURIComponent(title || book.title)}+${encodeURIComponent(author || book.author)}`;
+      const gbUrl = `https://www.googleapis.com/books/v1/volumes?q=${gbQuery}&maxResults=6`;
+      const gbRes = await fetch(gbUrl);
+      if (gbRes.ok) {
+        const gbData = await gbRes.json();
+        if (gbData.items) {
+          for (const item of gbData.items) {
+            if (item.volumeInfo?.imageLinks?.thumbnail && options.length < 10) {
+              let imgUrl = item.volumeInfo.imageLinks.thumbnail;
+              // Replace zoom=1 with zoom=3 for higher resolution
+              imgUrl = imgUrl.replace(/zoom=1/, "zoom=3");
+              if (!options.includes(imgUrl)) {
+                options.push(imgUrl);
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error searching for covers:", error);
+    }
+
+    // Deduplicate
+    const unique = Array.from(new Set(options));
+    setCoverOptions(unique.slice(0, 10));
+    setCoverSearchLoading(false);
+  };
+
+  const handleCoverSelect = (url: string) => {
+    setCoverUrl(url);
+    scheduleAutoSave();
+    setShowCoverSearch(false);
+  };
+
   const addTopic = () => {
     const t = topicInput.trim();
     if (t && !editTopics.includes(t)) { setEditTopics([...editTopics, t]); setTopicInput(""); scheduleAutoSave(); }
@@ -170,11 +234,13 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
       <div className="relative bg-zinc-900 border border-zinc-800 rounded-t-2xl sm:rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         {/* Cover */}
         <div className="relative h-48 bg-gradient-to-b from-zinc-800 to-zinc-900 flex items-center justify-center">
-          {(coverUrl || book.cover_url) ? (
-            <img src={coverUrl || book.cover_url} alt={book.title} className="h-40 rounded-lg shadow-xl shadow-black/50 object-cover" />
-          ) : (
-            <div className="h-40 w-28 rounded-lg bg-zinc-700 flex items-center justify-center"><span className="text-zinc-500 text-xs">No Cover</span></div>
-          )}
+          <button onClick={() => { setShowCoverSearch(true); searchCovers(); }} className="focus:outline-none hover:opacity-75 transition-opacity" title="Search for cover image">
+            {(coverUrl || book.cover_url) ? (
+              <img src={coverUrl || book.cover_url} alt={book.title} className="h-40 rounded-lg shadow-xl shadow-black/50 object-cover cursor-pointer" />
+            ) : (
+              <div className="h-40 w-28 rounded-lg bg-zinc-700 flex items-center justify-center cursor-pointer hover:bg-zinc-600"><span className="text-zinc-500 text-xs">No Cover</span></div>
+            )}
+          </button>
           <div className="absolute top-3 right-3 flex gap-2">
             <button onClick={() => { setFavorite(!favorite); scheduleAutoSave(); }} className={`bg-black/40 rounded-full w-8 h-8 flex items-center justify-center text-sm ${favorite ? "text-red-500" : "text-zinc-500 hover:text-zinc-200"}`} title={favorite ? "Remove from favorites" : "Add to favorites"}>
               {favorite ? "❤" : "♡"}
@@ -415,6 +481,56 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
               className="px-4 py-2.5 rounded-lg text-sm font-medium text-red-400 bg-red-950/30 hover:bg-red-950/50 transition-colors">Remove</button>
           </div>
         </div>
+
+        {/* Cover Search Overlay */}
+        {showCoverSearch && (
+          <div className="fixed inset-0 z-60 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowCoverSearch(false)} />
+            <div className="relative bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+              {/* Header */}
+              <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+                <h3 className="text-lg font-semibold text-zinc-100">Search Cover Images</h3>
+                <button onClick={() => setShowCoverSearch(false)} className="text-zinc-400 hover:text-zinc-200 text-xl">×</button>
+              </div>
+
+              {/* Content */}
+              <div className="overflow-y-auto flex-1 p-4">
+                {coverSearchLoading ? (
+                  <div className="flex items-center justify-center h-32">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="animate-spin rounded-full h-8 w-8 border border-zinc-600 border-t-emerald-500" />
+                      <p className="text-sm text-zinc-400">Searching for covers...</p>
+                    </div>
+                  </div>
+                ) : coverOptions.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    {coverOptions.map((url, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleCoverSelect(url)}
+                        className="group relative overflow-hidden rounded-lg border border-zinc-700 hover:border-emerald-600 transition-all hover:shadow-lg hover:shadow-emerald-600/20"
+                      >
+                        <img src={url} alt={`Cover option ${idx + 1}`} className="w-full h-32 object-cover" onError={(e) => { e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='150'%3E%3Crect fill='%23404040' width='100' height='150'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' font-size='12' fill='%23888'%3EImage Error%3C/text%3E%3C/svg%3E"; }} />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                          <span className="text-white font-semibold opacity-0 group-hover:opacity-100 transition-opacity">Select</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-32">
+                    <p className="text-sm text-zinc-400">No covers found. Try searching again or enter a URL manually.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="border-t border-zinc-800 p-4 flex gap-2">
+                <button onClick={() => setShowCoverSearch(false)} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 py-2 rounded-lg text-sm font-medium transition-colors">Close</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
