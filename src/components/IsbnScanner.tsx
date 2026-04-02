@@ -4,74 +4,18 @@ import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { supabase } from "@/lib/supabase";
 import { Book } from "@/types/book";
+import { BookSearchResult, searchBooks } from "@/lib/bookLookup";
 
 interface IsbnScannerProps {
   onClose: () => void;
   onAdded: (optimisticBook: Partial<Book>) => void;
 }
 
-interface BookLookupResult {
-  title: string;
-  author: string;
-  isbn: string;
-  cover_url: string | null;
-  description: string | null;
-  pages: number | null;
-}
-
-async function lookupIsbn(isbn: string): Promise<BookLookupResult | null> {
-  const cleanIsbn = isbn.replace(/[^0-9X]/gi, "");
-  if (!cleanIsbn) return null;
-
-  try {
-    // Try Open Library
-    const res = await fetch(
-      `https://openlibrary.org/search.json?isbn=${encodeURIComponent(cleanIsbn)}&limit=1`
-    );
-    const data = await res.json();
-
-    if (data.docs && data.docs.length > 0) {
-      const book = data.docs[0];
-      return {
-        title: book.title || "Unknown Title",
-        author: book.author_name?.[0] || "Unknown Author",
-        isbn: cleanIsbn,
-        cover_url: book.cover_i
-          ? `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg`
-          : null,
-        description: book.first_sentence?.join(" ") || null,
-        pages: book.number_of_pages_median || null,
-      };
-    }
-
-    // Fallback: Google Books
-    const gRes = await fetch(
-      `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanIsbn}&maxResults=1`
-    );
-    const gData = await gRes.json();
-
-    if (gData.items && gData.items.length > 0) {
-      const vol = gData.items[0].volumeInfo;
-      return {
-        title: vol.title || "Unknown Title",
-        author: vol.authors?.[0] || "Unknown Author",
-        isbn: cleanIsbn,
-        cover_url: vol.imageLinks?.thumbnail?.replace("http:", "https:") || null,
-        description: vol.description?.substring(0, 300) || null,
-        pages: vol.pageCount || null,
-      };
-    }
-  } catch {
-    // fall through
-  }
-
-  return null;
-}
-
 export function IsbnScanner({ onClose, onAdded }: IsbnScannerProps) {
   const [mode, setMode] = useState<"choose" | "camera" | "manual">("choose");
   const [manualIsbn, setManualIsbn] = useState("");
-  const [lookupResult, setLookupResult] = useState<BookLookupResult | null>(null);
+  const [results, setResults] = useState<BookSearchResult[]>([]);
+  const [selectedResult, setSelectedResult] = useState<BookSearchResult | null>(null);
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -79,16 +23,22 @@ export function IsbnScanner({ onClose, onAdded }: IsbnScannerProps) {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerContainerId = "isbn-scanner";
 
-  const handleLookup = async (isbn: string) => {
+  const handleSearch = async (query: string) => {
+    const clean = query.trim();
+    if (!clean) return;
+
     setSearching(true);
     setError("");
-    setLookupResult(null);
+    setResults([]);
+    setSelectedResult(null);
 
-    const result = await lookupIsbn(isbn);
-    if (result) {
-      setLookupResult(result);
+    const found = await searchBooks(clean, 5);
+    if (found.length === 0) {
+      setError(`No books found for: ${clean}`);
+    } else if (found.length === 1) {
+      setSelectedResult(found[0]);
     } else {
-      setError(`No book found for ISBN: ${isbn.replace(/[^0-9X]/gi, "")}`);
+      setResults(found);
     }
     setSearching(false);
   };
@@ -121,7 +71,7 @@ export function IsbnScanner({ onClose, onAdded }: IsbnScannerProps) {
           (decodedText) => {
             scanner.stop().catch(() => {});
             scannerRef.current = null;
-            handleLookup(decodedText);
+            handleSearch(decodedText);
           },
           () => {}
         );
@@ -143,71 +93,37 @@ export function IsbnScanner({ onClose, onAdded }: IsbnScannerProps) {
     return () => stopCamera();
   }, []);
 
-  // Instant add: fire optimistic update, then save to DB in background
-  const handleAdd = async () => {
-    if (!lookupResult) return;
+  const handleAdd = async (book: BookSearchResult) => {
     setSaving(true);
 
-    // Build the book object
     const newBook: Partial<Book> = {
-      title: lookupResult.title,
-      author: lookupResult.author,
-      isbn: lookupResult.isbn,
-      cover_url: lookupResult.cover_url || undefined,
-      description: lookupResult.description || undefined,
-      pages: lookupResult.pages || undefined,
+      title: book.title,
+      author: book.author,
+      isbn: book.isbn,
+      cover_url: book.cover_url || undefined,
+      description: book.description || undefined,
+      pages: book.pages || undefined,
       status,
     };
 
-    // Immediately tell parent to show optimistic book and close
     onAdded(newBook);
 
-    // Save to DB in the background
     await supabase.from("books").insert({
-      title: lookupResult.title,
-      author: lookupResult.author,
-      isbn: lookupResult.isbn,
-      cover_url: lookupResult.cover_url,
-      description: lookupResult.description,
-      pages: lookupResult.pages,
+      title: book.title,
+      author: book.author,
+      isbn: book.isbn || null,
+      cover_url: book.cover_url,
+      description: book.description,
+      pages: book.pages,
       status,
     });
 
     setSaving(false);
   };
 
-  // Quick add: scan → auto-add as "not_read" without confirmation
-  const handleQuickAdd = async (isbn: string) => {
-    const result = await lookupIsbn(isbn);
-    if (result) {
-      const newBook: Partial<Book> = {
-        title: result.title,
-        author: result.author,
-        isbn: result.isbn,
-        cover_url: result.cover_url || undefined,
-        description: result.description || undefined,
-        pages: result.pages || undefined,
-        status: "not_read",
-      };
-      onAdded(newBook);
-
-      await supabase.from("books").insert({
-        title: result.title,
-        author: result.author,
-        isbn: result.isbn,
-        cover_url: result.cover_url,
-        description: result.description,
-        pages: result.pages,
-        status: "not_read",
-      });
-    } else {
-      setError(`No book found for ISBN: ${isbn}`);
-      setSearching(false);
-    }
-  };
-
   const reset = () => {
-    setLookupResult(null);
+    setResults([]);
+    setSelectedResult(null);
     setError("");
     setManualIsbn("");
     setMode("choose");
@@ -221,21 +137,73 @@ export function IsbnScanner({ onClose, onAdded }: IsbnScannerProps) {
       <div className="relative bg-zinc-900 border border-zinc-800 rounded-t-2xl sm:rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-semibold">
-            {lookupResult ? "Book Found!" : "Scan ISBN"}
+            {selectedResult
+              ? "Confirm Book"
+              : results.length > 0
+                ? "Select a Book"
+                : "Scan ISBN"}
           </h2>
           <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 text-xl">
             ×
           </button>
         </div>
 
-        {/* Book found result */}
-        {lookupResult ? (
+        {/* Multiple results picker */}
+        {results.length > 1 && !selectedResult && (
+          <div className="space-y-2 mb-4">
+            <p className="text-xs text-zinc-500 mb-3">
+              Found {results.length} results. Tap to select:
+            </p>
+            {results.map((r, i) => (
+              <button
+                key={i}
+                onClick={() => {
+                  setSelectedResult(r);
+                  setResults([]);
+                }}
+                className="w-full flex gap-3 p-3 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-left transition-colors"
+              >
+                {r.cover_url ? (
+                  <img
+                    src={r.cover_url}
+                    alt={r.title}
+                    className="w-12 h-18 rounded object-cover flex-shrink-0"
+                  />
+                ) : (
+                  <div className="w-12 h-18 rounded bg-zinc-700 flex items-center justify-center flex-shrink-0">
+                    <span className="text-zinc-500 text-[8px]">No Cover</span>
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-zinc-100 truncate">{r.title}</p>
+                  {r.subtitle && (
+                    <p className="text-xs text-zinc-500 truncate">{r.subtitle}</p>
+                  )}
+                  <p className="text-xs text-zinc-400">{r.author}</p>
+                  <div className="flex gap-2 text-[10px] text-zinc-600 mt-0.5">
+                    {r.publish_year && <span>{r.publish_year}</span>}
+                    {r.pages && <span>{r.pages} pages</span>}
+                  </div>
+                </div>
+              </button>
+            ))}
+            <button
+              onClick={reset}
+              className="w-full bg-zinc-800 hover:bg-zinc-700 py-2 rounded-lg text-sm font-medium transition-colors mt-2"
+            >
+              Search Again
+            </button>
+          </div>
+        )}
+
+        {/* Selected book confirmation */}
+        {selectedResult && (
           <div className="space-y-4">
             <div className="flex gap-4">
-              {lookupResult.cover_url ? (
+              {selectedResult.cover_url ? (
                 <img
-                  src={lookupResult.cover_url}
-                  alt={lookupResult.title}
+                  src={selectedResult.cover_url}
+                  alt={selectedResult.title}
                   className="w-20 h-30 rounded-md object-cover shadow-lg"
                 />
               ) : (
@@ -244,12 +212,15 @@ export function IsbnScanner({ onClose, onAdded }: IsbnScannerProps) {
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-zinc-100">{lookupResult.title}</h3>
-                <p className="text-sm text-zinc-400 mt-0.5">{lookupResult.author}</p>
-                <p className="text-xs text-zinc-600 mt-1">ISBN: {lookupResult.isbn}</p>
-                {lookupResult.pages && (
-                  <p className="text-xs text-zinc-600">{lookupResult.pages} pages</p>
+                <h3 className="font-semibold text-zinc-100">{selectedResult.title}</h3>
+                {selectedResult.subtitle && (
+                  <p className="text-xs text-zinc-500 mt-0.5">{selectedResult.subtitle}</p>
                 )}
+                <p className="text-sm text-zinc-400 mt-0.5">{selectedResult.author}</p>
+                <div className="flex gap-2 text-xs text-zinc-600 mt-1">
+                  {selectedResult.isbn && <span>ISBN: {selectedResult.isbn}</span>}
+                  {selectedResult.pages && <span>{selectedResult.pages} pages</span>}
+                </div>
               </div>
             </div>
 
@@ -275,7 +246,7 @@ export function IsbnScanner({ onClose, onAdded }: IsbnScannerProps) {
 
             <div className="flex gap-3">
               <button
-                onClick={handleAdd}
+                onClick={() => handleAdd(selectedResult)}
                 disabled={saving}
                 className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
               >
@@ -285,14 +256,16 @@ export function IsbnScanner({ onClose, onAdded }: IsbnScannerProps) {
                 onClick={reset}
                 className="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm font-medium transition-colors"
               >
-                Scan Another
+                Back
               </button>
             </div>
           </div>
-        ) : (
+        )}
+
+        {/* Input modes */}
+        {!selectedResult && results.length <= 1 && (
           <>
-            {/* Mode chooser */}
-            {mode === "choose" && (
+            {mode === "choose" && !searching && (
               <div className="space-y-3">
                 <button
                   onClick={startCamera}
@@ -306,12 +279,11 @@ export function IsbnScanner({ onClose, onAdded }: IsbnScannerProps) {
                   className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 py-4 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-3"
                 >
                   <span className="text-xl">⌨️</span>
-                  Enter ISBN Manually
+                  Enter ISBN or Title
                 </button>
               </div>
             )}
 
-            {/* Camera scanner */}
             {mode === "camera" && (
               <div className="space-y-4">
                 <div
@@ -333,29 +305,30 @@ export function IsbnScanner({ onClose, onAdded }: IsbnScannerProps) {
               </div>
             )}
 
-            {/* Manual ISBN input */}
-            {mode === "manual" && (
+            {mode === "manual" && !searching && (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs text-zinc-400 mb-1">ISBN</label>
+                  <label className="block text-xs text-zinc-400 mb-1">
+                    ISBN or Book Title
+                  </label>
                   <div className="flex gap-2">
                     <input
                       type="text"
                       value={manualIsbn}
                       onChange={(e) => setManualIsbn(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") handleLookup(manualIsbn);
+                        if (e.key === "Enter") handleSearch(manualIsbn);
                       }}
-                      placeholder="e.g. 9780143127550"
+                      placeholder="e.g. 9780143127550 or Harry Potter"
                       autoFocus
                       className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
                     />
                     <button
-                      onClick={() => handleLookup(manualIsbn)}
-                      disabled={searching || !manualIsbn.trim()}
+                      onClick={() => handleSearch(manualIsbn)}
+                      disabled={!manualIsbn.trim()}
                       className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                     >
-                      {searching ? "..." : "Look Up"}
+                      Search
                     </button>
                   </div>
                 </div>
@@ -371,6 +344,7 @@ export function IsbnScanner({ onClose, onAdded }: IsbnScannerProps) {
             {searching && (
               <div className="flex items-center justify-center py-6">
                 <div className="animate-spin rounded-full h-6 w-6 border-2 border-zinc-700 border-t-emerald-500" />
+                <span className="ml-3 text-sm text-zinc-500">Looking up book...</span>
               </div>
             )}
           </>
