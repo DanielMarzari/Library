@@ -9,19 +9,22 @@ import { Book } from "@/types/book";
 
 // Each milestone has a unique emoji, target, pace label, and description
 const MILESTONES = [
-  { target: 12,  emoji: "📖", label: "1/month",   desc: "One per month" },
-  { target: 24,  emoji: "📚", label: "2/month",   desc: "Two per month" },
-  { target: 36,  emoji: "🥉", label: "3/month",   desc: "Three per month" },
-  { target: 48,  emoji: "🥈", label: "4/month",   desc: "Four per month" },
-  { target: 52,  emoji: "🥇", label: "1/week",    desc: "One per week" },
-  { target: 60,  emoji: "🔥", label: "5/month",   desc: "Five per month" },
-  { target: 73,  emoji: "⚡", label: "1 / 5 days", desc: "Every five days" },
-  { target: 91,  emoji: "🏆", label: "1 / 4 days", desc: "Every four days" },
-  { target: 104, emoji: "💎", label: "2/week",    desc: "Two per week" },
-  { target: 122, emoji: "🌟", label: "1 / 3 days", desc: "Every three days" },
-  { target: 156, emoji: "👑", label: "3/week",    desc: "Three per week" },
-  { target: 183, emoji: "🦄", label: "1 / 2 days", desc: "Every two days" },
-  { target: 365, emoji: "🌈", label: "1/day",     desc: "One per day" },
+  { target: 12,  emoji: "📄", label: "1/month",      desc: "One per month" },
+  { target: 24,  emoji: "📕", label: "2/month",      desc: "Two per month" },
+  { target: 36,  emoji: "📗", label: "3/month",      desc: "Three per month" },
+  { target: 48,  emoji: "📘", label: "4/month",      desc: "Four per month" },
+  { target: 52,  emoji: "🎯", label: "1/week",       desc: "One per week" },
+  { target: 60,  emoji: "📙", label: "5/month",      desc: "Five per month" },
+  { target: 61,  emoji: "🏅", label: "1 / 6 days",   desc: "Every six days" },
+  { target: 73,  emoji: "🏆", label: "1 / 5 days",   desc: "Every five days" },
+  { target: 91,  emoji: "👑", label: "1 / 4 days",   desc: "Every four days" },
+  { target: 104, emoji: "🔥", label: "2/week",       desc: "Two per week" },
+  { target: 122, emoji: "💎", label: "1 / 3 days",   desc: "Every three days" },
+  { target: 156, emoji: "⚡", label: "3/week",       desc: "Three per week" },
+  { target: 183, emoji: "🚀", label: "1 / 2 days",   desc: "Every two days" },
+  { target: 208, emoji: "⭐", label: "4/week",       desc: "Four per week" },
+  { target: 260, emoji: "🌟", label: "5/week",       desc: "Five per week" },
+  { target: 365, emoji: "✨", label: "1/day",        desc: "One per day" },
 ];
 
 const LIFE_GOAL = 1000;
@@ -176,7 +179,7 @@ export default function GoalsPage() {
 
             {/* Milestone grid — column-first layout */}
             <p className="text-xs text-zinc-500 uppercase tracking-wide mb-3">All Milestones</p>
-            <div className="grid grid-rows-5 grid-flow-col gap-2 auto-cols-fr">
+            <div className="grid grid-rows-6 grid-flow-col gap-2 auto-cols-fr">
               {MILESTONES.map((m) => {
                 const achieved = thisYearCount >= m.target;
                 const isCurrent = currentMilestone.next?.target === m.target;
