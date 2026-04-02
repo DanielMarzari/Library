@@ -203,7 +203,7 @@ export function BookShelf({
               </div>
             )}
 
-            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 2xl:grid-cols-12 gap-3 px-1">
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-4 px-1">
               {sectionBooks.map((book) => (
                 <ShelfBook
                   key={book.id}

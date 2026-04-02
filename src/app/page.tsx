@@ -27,7 +27,18 @@ export default function Home() {
   // Nav + header UI
   const [showNav, setShowNav] = useState(false);
   const [headerTab, setHeaderTab] = useState<HeaderTab>("filter");
+  const [theme, setTheme] = useState<"system" | "light" | "dark">("system");
   const navRef = useRef<HTMLDivElement>(null);
+
+  // Apply theme class to <html>
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === "system") {
+      root.removeAttribute("data-theme");
+    } else {
+      root.setAttribute("data-theme", theme);
+    }
+  }, [theme]);
 
   // Multi-select state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -246,7 +257,7 @@ export default function Home() {
     <div className="min-h-screen flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border-custom">
-        <div className="max-w-7xl mx-auto px-4 py-3">
+        <div className="w-full px-4 py-3">
           {/* Top row: title, nav toggle, add */}
           <div className="flex items-center gap-3 mb-3">
             <div className="relative" ref={navRef}>
@@ -278,6 +289,24 @@ export default function Home() {
                   <p className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-2 font-semibold">Manage</p>
                   <Link href="/lending" className={navLinkCls} onClick={() => setShowNav(false)}>Lending</Link>
                   <Link href="/setup" className={navLinkCls} onClick={() => setShowNav(false)}>Setup</Link>
+
+                  <div className="border-t border-border-custom my-1.5" />
+                  <div className="px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-2 font-semibold mb-2">Theme</p>
+                    <div className="flex gap-1 bg-surface-2 rounded-lg p-0.5">
+                      {([["system", "Auto"], ["light", "Light"], ["dark", "Dark"]] as const).map(([val, label]) => (
+                        <button
+                          key={val}
+                          onClick={() => setTheme(val)}
+                          className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                            theme === val ? "bg-background text-foreground shadow-sm" : "text-muted-2 hover:text-muted"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -367,7 +396,7 @@ export default function Home() {
       {/* Bulk action bar */}
       {selectMode && (
         <div className="sticky top-[130px] z-10 bg-surface/95 backdrop-blur-md border-b border-border-custom px-4 py-3">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="w-full flex items-center justify-between">
             <div className="flex items-center gap-3">
               <button
                 onClick={clearSelection}
@@ -410,7 +439,7 @@ export default function Home() {
       )}
 
       {/* Main content */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6">
+      <main className="flex-1 w-full w-full px-4 py-6">
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="animate-spin rounded-full h-8 w-8 border-2 border-zinc-700 border-t-emerald-500" />

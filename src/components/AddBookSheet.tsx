@@ -319,7 +319,7 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
             </button>
             <button onClick={() => setMode("isbn")}
               className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 py-4 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-3">
-              <span className="text-xl">🔍</span> Search by ISBN or Title
+              <span className="text-xl">🔍</span> Search by Title, Author, or ISBN
             </button>
             <button onClick={() => setMode("manual")}
               className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 py-4 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-3">
@@ -344,11 +344,11 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
         {mode === "isbn" && !searching && (
           <div className="space-y-4">
             <div>
-              <label className="block text-xs text-zinc-400 mb-1">ISBN or Book Title</label>
+              <label className="block text-xs text-zinc-400 mb-1">Title, Author, or ISBN</label>
               <div className="flex gap-2">
                 <input type="text" value={query} onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") handleSearch(query); }}
-                  placeholder="e.g. 9780143127550 or The Great Gatsby" autoFocus
+                  placeholder="e.g. The Great Gatsby, N.T. Wright, or 9780143127550" autoFocus
                   className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />
                 <button onClick={() => handleSearch(query)} disabled={!query.trim()}
                   className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
