@@ -20,6 +20,7 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
   const [results, setResults] = useState<BookSearchResult[]>([]);
   const [selected, setSelected] = useState<BookSearchResult | null>(null);
   const [searching, setSearching] = useState(false);
+  const [searchingIsbn, setSearchingIsbn] = useState("");
   const [enriching, setEnriching] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -52,6 +53,7 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
     const clean = q.trim();
     if (!clean) return;
     setSearching(true);
+    setSearchingIsbn(clean);
     setError("");
     setResults([]);
     setSelected(null);
@@ -59,6 +61,7 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
     const found = await searchBooks(clean, 5);
     if (found.length === 0) {
       setError(`No books found for: ${clean}`);
+      setSearchingIsbn(clean); // keep ISBN visible for manual use
       setSearching(false);
     } else if (found.length === 1) {
       await selectBook(found[0]);
@@ -98,7 +101,7 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
         scannerRef.current = scanner;
         await scanner.start(
           { facingMode: "environment" },
-          { fps: 30, qrbox: { width: 300, height: 150 }, aspectRatio: 1.0, disableFlip: false },
+          { fps: 15, qrbox: { width: 300, height: 150 }, aspectRatio: 1.0, disableFlip: false },
           (decodedText) => {
             scanner.stop().catch(() => {});
             scannerRef.current = null;
@@ -455,14 +458,30 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
 
         {/* Loading */}
         {searching && (
-          <div className="flex items-center justify-center py-6">
-            <div className="animate-spin rounded-full h-6 w-6 border-2 border-zinc-700 border-t-emerald-500" />
-            <span className="ml-3 text-sm text-zinc-500">Looking up book...</span>
+          <div className="flex flex-col items-center justify-center py-6 gap-2">
+            <div className="flex items-center">
+              <div className="animate-spin rounded-full h-6 w-6 border-2 border-zinc-700 border-t-emerald-500" />
+              <span className="ml-3 text-sm text-zinc-400">Looking up{searchingIsbn ? ` ISBN ${searchingIsbn}` : " book"}...</span>
+            </div>
           </div>
         )}
 
         {error && (
-          <div className="mt-4 bg-red-950/30 border border-red-900/50 rounded-lg px-4 py-3 text-sm text-red-400">{error}</div>
+          <div className="mt-4 space-y-3">
+            <div className="bg-red-950/30 border border-red-900/50 rounded-lg px-4 py-3 text-sm text-red-400">{error}</div>
+            {searchingIsbn && (
+              <div className="flex gap-2">
+                <button onClick={() => { setManIsbn(searchingIsbn); setMode("manual"); setError(""); }}
+                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-lg text-sm font-medium transition-colors">
+                  Add manually with ISBN {searchingIsbn}
+                </button>
+                <button onClick={() => { setQuery(searchingIsbn); setMode("isbn"); setError(""); }}
+                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-lg text-sm font-medium transition-colors">
+                  Search again
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

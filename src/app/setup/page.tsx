@@ -121,6 +121,8 @@ export default function SetupPage() {
 
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ done: 0, total: 0 });
+  const [coverRunning, setCoverRunning] = useState(false);
+  const [coverProgress, setCoverProgress] = useState({ done: 0, total: 0, found: 0 });
 
   const handleBatchReimport = useCallback(async () => {
     if (batchRunning) return;
@@ -158,6 +160,31 @@ export default function SetupPage() {
     setRefreshKey((k) => k + 1);
   }, [filteredBooks, batchRunning]);
 
+  const handleFetchCovers = useCallback(async () => {
+    if (coverRunning) return;
+    const noCover = books.filter((b) => !b.cover_url && b.isbn);
+    if (noCover.length === 0) return;
+    setCoverRunning(true);
+    setCoverProgress({ done: 0, total: noCover.length, found: 0 });
+    let found = 0;
+    for (let i = 0; i < noCover.length; i++) {
+      const book = noCover[i];
+      try {
+        const url = `https://covers.openlibrary.org/b/isbn/${book.isbn}-L.jpg?default=false`;
+        const res = await fetch(url, { method: "HEAD" });
+        if (res.ok) {
+          const coverUrl = `https://covers.openlibrary.org/b/isbn/${book.isbn}-L.jpg`;
+          await supabase.from("books").update({ cover_url: coverUrl, updated_at: new Date().toISOString() }).eq("id", book.id);
+          found++;
+        }
+      } catch {}
+      setCoverProgress({ done: i + 1, total: noCover.length, found });
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    setCoverRunning(false);
+    setRefreshKey((k) => k + 1);
+  }, [books, coverRunning]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -175,6 +202,17 @@ export default function SetupPage() {
               Complete Setup
             </h1>
             <div className="flex items-center gap-3">
+              <button
+                onClick={handleFetchCovers}
+                disabled={coverRunning || books.filter((b) => !b.cover_url && b.isbn).length === 0}
+                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {coverRunning ? (
+                  <><div className="animate-spin rounded-full h-3 w-3 border border-zinc-600 border-t-emerald-500" /> {coverProgress.done}/{coverProgress.total} ({coverProgress.found} found)</>
+                ) : (
+                  <>🖼️ Fetch Covers</>
+                )}
+              </button>
               <button
                 onClick={handleBatchReimport}
                 disabled={batchRunning || filteredBooks.length === 0}

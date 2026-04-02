@@ -42,7 +42,6 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [refreshing, setRefreshing] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const mountedRef = useRef(false);
 
   const [updates, setUpdates] = useState<ReadingUpdate[]>([]);
   const [showAddUpdate, setShowAddUpdate] = useState(false);
@@ -78,26 +77,33 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
       if (enriched.pages && !pages) setPages(enriched.pages.toString());
       if (enriched.pages && !endPage) setEndPage(enriched.pages.toString());
       if (enriched.topics?.length && autoTopics.length === 0) setAutoTopics(enriched.topics);
+      scheduleAutoSave();
     }
     setRefreshing(false);
   };
 
+  // Ref always holds the latest field values so doSave can read them without re-creating
+  const valuesRef = useRef({ title, author, coverUrl, pages, introPages, startPage, endPage, status, rating, startDate, completeDate, source, volume, lcc, ddc, editTopics, autoTopics, favorite });
+  valuesRef.current = { title, author, coverUrl, pages, introPages, startPage, endPage, status, rating, startDate, completeDate, source, volume, lcc, ddc, editTopics, autoTopics, favorite };
+
+  // Stable doSave — reads from ref, only depends on book.id
   const doSave = useCallback(async () => {
+    const v = valuesRef.current;
     setSaveStatus("saving");
     const { error } = await supabase.from("books").update({
-      title: title.trim(), author: author.trim(),
-      cover_url: coverUrl.trim() || null,
-      pages: pages ? parseInt(pages) : null,
-      intro_pages: parseInt(introPages) || 0,
-      start_page: parseInt(startPage) || 1,
-      end_page: endPage ? parseInt(endPage) : null,
-      status, rating: rating || null,
-      start_date: startDate || null, complete_date: completeDate || null,
-      source: source.trim() || null, volume: volume.trim() || null,
-      lcc: lcc.trim() || null, ddc: ddc.trim() || null,
-      topics: editTopics.length > 0 ? editTopics : null,
-      auto_topics: autoTopics.length > 0 ? autoTopics : null,
-      favorite,
+      title: v.title.trim(), author: v.author.trim(),
+      cover_url: v.coverUrl.trim() || null,
+      pages: v.pages ? parseInt(v.pages) : null,
+      intro_pages: parseInt(v.introPages) || 0,
+      start_page: parseInt(v.startPage) || 1,
+      end_page: v.endPage ? parseInt(v.endPage) : null,
+      status: v.status, rating: v.rating || null,
+      start_date: v.startDate || null, complete_date: v.completeDate || null,
+      source: v.source.trim() || null, volume: v.volume.trim() || null,
+      lcc: v.lcc.trim() || null, ddc: v.ddc.trim() || null,
+      topics: v.editTopics.length > 0 ? v.editTopics : null,
+      auto_topics: v.autoTopics.length > 0 ? v.autoTopics : null,
+      favorite: v.favorite,
       updated_at: new Date().toISOString(),
     }).eq("id", book.id);
     if (!error) {
@@ -106,27 +112,19 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
     } else {
       setSaveStatus("idle");
     }
-  }, [book.id, title, author, coverUrl, pages, introPages, startPage, endPage, status, rating, startDate, completeDate, source, volume, lcc, ddc, editTopics, autoTopics, favorite]);
+  }, [book.id]);
 
-  // Auto-save with debounce
-  useEffect(() => {
-    if (!mountedRef.current) {
-      mountedRef.current = true;
-      return;
-    }
+  // Stable scheduleAutoSave — call from onChange handlers
+  const scheduleAutoSave = useCallback(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => {
-      doSave();
-    }, 1200);
-    return () => {
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    };
-  }, [title, author, coverUrl, pages, introPages, startPage, endPage, status, rating, startDate, completeDate, source, volume, lcc, ddc, editTopics, autoTopics, favorite]);
+    saveTimeoutRef.current = setTimeout(doSave, 1200);
+  }, [doSave]);
 
-  const handleStatusChange = async (newStatus: Book["status"]) => {
+  const handleStatusChange = (newStatus: Book["status"]) => {
     setStatus(newStatus);
     if (newStatus === "reading" && !startDate) setStartDate(new Date().toISOString().split("T")[0]);
     if (newStatus === "read" && !completeDate) setCompleteDate(new Date().toISOString().split("T")[0]);
+    scheduleAutoSave();
   };
 
   const handleAddUpdate = async () => {
@@ -150,7 +148,7 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
 
   const addTopic = () => {
     const t = topicInput.trim();
-    if (t && !editTopics.includes(t)) { setEditTopics([...editTopics, t]); setTopicInput(""); }
+    if (t && !editTopics.includes(t)) { setEditTopics([...editTopics, t]); setTopicInput(""); scheduleAutoSave(); }
   };
 
   const readingSpeed = (() => {
@@ -178,7 +176,7 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
             <div className="h-40 w-28 rounded-lg bg-zinc-700 flex items-center justify-center"><span className="text-zinc-500 text-xs">No Cover</span></div>
           )}
           <div className="absolute top-3 right-3 flex gap-2">
-            <button onClick={() => setFavorite(!favorite)} className={`bg-black/40 rounded-full w-8 h-8 flex items-center justify-center text-sm ${favorite ? "text-red-500" : "text-zinc-500 hover:text-zinc-200"}`} title={favorite ? "Remove from favorites" : "Add to favorites"}>
+            <button onClick={() => { setFavorite(!favorite); scheduleAutoSave(); }} className={`bg-black/40 rounded-full w-8 h-8 flex items-center justify-center text-sm ${favorite ? "text-red-500" : "text-zinc-500 hover:text-zinc-200"}`} title={favorite ? "Remove from favorites" : "Add to favorites"}>
               {favorite ? "❤" : "♡"}
             </button>
             <button onClick={() => setEditing(!editing)} className="text-zinc-400 hover:text-zinc-200 bg-black/40 rounded-full w-8 h-8 flex items-center justify-center text-sm">✏️</button>
@@ -201,24 +199,24 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
             <>
               <div>
                 <label className="block text-xs text-zinc-500 mb-1">Title</label>
-                <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} />
+                <input type="text" value={title} onChange={(e) => { setTitle(e.target.value); scheduleAutoSave(); }} className={inputCls} />
               </div>
               <div>
                 <label className="block text-xs text-zinc-500 mb-1">Author</label>
-                <input type="text" value={author} onChange={(e) => setAuthor(e.target.value)} className={inputCls} />
+                <input type="text" value={author} onChange={(e) => { setAuthor(e.target.value); scheduleAutoSave(); }} className={inputCls} />
               </div>
               <div>
                 <label className="block text-xs text-zinc-500 mb-1">Cover Image URL</label>
-                <input type="text" value={coverUrl} onChange={(e) => setCoverUrl(e.target.value)} placeholder="https://..." className={inputCls} />
+                <input type="text" value={coverUrl} onChange={(e) => { setCoverUrl(e.target.value); scheduleAutoSave(); }} placeholder="https://..." className={inputCls} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-zinc-500 mb-1">Volume</label>
-                  <input type="text" value={volume} onChange={(e) => setVolume(e.target.value)} placeholder="Vol. 1" className={inputCls} />
+                  <input type="text" value={volume} onChange={(e) => { setVolume(e.target.value); scheduleAutoSave(); }} placeholder="Vol. 1" className={inputCls} />
                 </div>
                 <div>
                   <label className="block text-xs text-zinc-500 mb-1">Source</label>
-                  <input type="text" value={source} onChange={(e) => setSource(e.target.value)} placeholder="Gift, Library..." className={inputCls} />
+                  <input type="text" value={source} onChange={(e) => { setSource(e.target.value); scheduleAutoSave(); }} placeholder="Gift, Library..." className={inputCls} />
                 </div>
               </div>
 
@@ -228,19 +226,19 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
                 <div className="grid grid-cols-4 gap-2">
                   <div>
                     <label className="block text-[10px] text-zinc-600 mb-0.5">Total</label>
-                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={pages} onChange={(e) => setPages(e.target.value)} placeholder="—" className={numCls} />
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={pages} onChange={(e) => { setPages(e.target.value); scheduleAutoSave(); }} placeholder="—" className={numCls} />
                   </div>
                   <div>
                     <label className="block text-[10px] text-zinc-600 mb-0.5">Intro</label>
-                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={introPages} onChange={(e) => setIntroPages(e.target.value)} placeholder="0" className={numCls} />
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={introPages} onChange={(e) => { setIntroPages(e.target.value); scheduleAutoSave(); }} placeholder="0" className={numCls} />
                   </div>
                   <div>
                     <label className="block text-[10px] text-zinc-600 mb-0.5">Start</label>
-                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={startPage} onChange={(e) => setStartPage(e.target.value)} placeholder="1" className={numCls} />
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={startPage} onChange={(e) => { setStartPage(e.target.value); scheduleAutoSave(); }} placeholder="1" className={numCls} />
                   </div>
                   <div>
                     <label className="block text-[10px] text-zinc-600 mb-0.5">End</label>
-                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={endPage} onChange={(e) => setEndPage(e.target.value)} placeholder="—" className={numCls} />
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={endPage} onChange={(e) => { setEndPage(e.target.value); scheduleAutoSave(); }} placeholder="—" className={numCls} />
                   </div>
                 </div>
                 {computedReadingPages && <p className="text-xs text-zinc-500 mt-1">Reading pages: <span className="text-zinc-300 font-medium">{computedReadingPages}</span></p>}
@@ -250,11 +248,11 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-zinc-500 mb-1">LCC</label>
-                  <input type="text" value={lcc} onChange={(e) => setLcc(e.target.value)} className={inputCls} />
+                  <input type="text" value={lcc} onChange={(e) => { setLcc(e.target.value); scheduleAutoSave(); }} className={inputCls} />
                 </div>
                 <div>
                   <label className="block text-xs text-zinc-500 mb-1">DDC</label>
-                  <input type="text" value={ddc} onChange={(e) => setDdc(e.target.value)} className={inputCls} />
+                  <input type="text" value={ddc} onChange={(e) => { setDdc(e.target.value); scheduleAutoSave(); }} className={inputCls} />
                 </div>
               </div>
 
@@ -265,7 +263,7 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     {editTopics.map((t) => (
                       <span key={t} className="inline-flex items-center gap-1 bg-zinc-800 text-zinc-300 text-xs px-2 py-0.5 rounded-full">
-                        {t}<button onClick={() => setEditTopics(editTopics.filter((x) => x !== t))} className="text-zinc-500 hover:text-red-400">×</button>
+                        {t}<button onClick={() => { setEditTopics(editTopics.filter((x) => x !== t)); scheduleAutoSave(); }} className="text-zinc-500 hover:text-red-400">×</button>
                       </span>
                     ))}
                   </div>
@@ -282,11 +280,11 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-zinc-500 mb-1">Start Date</label>
-                  <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputCls} />
+                  <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); scheduleAutoSave(); }} className={inputCls} />
                 </div>
                 <div>
                   <label className="block text-xs text-zinc-500 mb-1">Complete Date</label>
-                  <input type="date" value={completeDate} onChange={(e) => setCompleteDate(e.target.value)} className={inputCls} />
+                  <input type="date" value={completeDate} onChange={(e) => { setCompleteDate(e.target.value); scheduleAutoSave(); }} className={inputCls} />
                 </div>
               </div>
             </>
@@ -353,7 +351,7 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
             <label className="block text-xs text-zinc-500 mb-2">Rating</label>
             <div className="flex gap-1">
               {[1, 2, 3, 4, 5].map((star) => (
-                <button key={star} onClick={() => setRating(star === rating ? 0 : star)}
+                <button key={star} onClick={() => { setRating(star === rating ? 0 : star); scheduleAutoSave(); }}
                   className={`text-2xl transition-colors ${star <= rating ? "text-amber-400" : "text-zinc-700 hover:text-zinc-500"}`}>★</button>
               ))}
             </div>

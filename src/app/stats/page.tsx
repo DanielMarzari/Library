@@ -196,6 +196,25 @@ export default function StatsPage() {
       goalProjectedDate = projected.toLocaleDateString("en-US", { month: "long", year: "numeric" });
     }
 
+    // --- Scatter plot: reading speed vs rating ---
+    const scatterData: Array<{ title: string; pagesPerDay: number; rating: number; pages: number }> = [];
+    const MAX_PAGES_PER_DAY = 200;
+    read.forEach((b) => {
+      if (!b.start_date || !b.complete_date || !b.rating || b.rating <= 0) return;
+      const pages = b.reading_pages || b.pages || 0;
+      if (pages === 0) return;
+      const startDate = new Date(b.start_date);
+      const endDate = new Date(b.complete_date);
+      const daysDiff = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000));
+      const pagesPerDay = Math.min(pages / daysDiff, MAX_PAGES_PER_DAY);
+      scatterData.push({
+        title: b.title || "Unknown",
+        pagesPerDay,
+        rating: Math.min(b.rating, 5),
+        pages,
+      });
+    });
+
     // --- Top sources ---
     const sourceCounts: Record<string, number> = {};
     books.forEach((b) => {
@@ -226,6 +245,7 @@ export default function StatsPage() {
       avgDaysPerBook,
       topUserTopics,
       topAutoTopics,
+      scatterData,
       topSources,
       goalPct,
       goalRemaining,
@@ -449,6 +469,129 @@ export default function StatsPage() {
             <p className="text-[10px] text-zinc-600 text-center mt-1">Book Length (pages)</p>
           </div>
         </section>
+
+        {/* Reading Speed vs Rating scatter plot */}
+        {stats.scatterData.length > 0 && (
+          <section>
+            <h2 className="text-lg font-semibold text-zinc-100 mb-1">Reading Speed vs Rating</h2>
+            <p className="text-sm text-zinc-500 mb-3">Does reading faster correlate with enjoyment?</p>
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+              <div className="relative" style={{ height: 320 }}>
+                <svg viewBox="0 0 500 300" className="w-full h-full" preserveAspectRatio="xMidYMid meet">
+                  {/* Grid lines - vertical (pages per day) */}
+                  {[0, 0.25, 0.5, 0.75, 1].map((pct) => (
+                    <line
+                      key={`vgrid-${pct}`}
+                      x1={50 + pct * 400}
+                      y1="20"
+                      x2={50 + pct * 400}
+                      y2="260"
+                      stroke="#27272a"
+                      strokeWidth="1"
+                    />
+                  ))}
+
+                  {/* Grid lines - horizontal (rating) */}
+                  {[0, 0.25, 0.5, 0.75, 1].map((pct) => (
+                    <line
+                      key={`hgrid-${pct}`}
+                      x1="50"
+                      y1={260 - pct * 240}
+                      x2="450"
+                      y2={260 - pct * 240}
+                      stroke="#27272a"
+                      strokeWidth="1"
+                    />
+                  ))}
+
+                  {/* Axes */}
+                  <line x1="50" y1="260" x2="450" y2="260" stroke="#52525b" strokeWidth="2" />
+                  <line x1="50" y1="20" x2="50" y2="260" stroke="#52525b" strokeWidth="2" />
+
+                  {/* Data points */}
+                  {stats.scatterData.map((point, idx) => {
+                    const x = 50 + (point.pagesPerDay / 200) * 400;
+                    const y = 260 - ((point.rating - 1) / 4) * 240;
+
+                    // Color based on rating
+                    let color = "#ef4444"; // 1: red
+                    if (point.rating >= 2) color = "#f97316"; // 2: orange
+                    if (point.rating >= 3) color = "#eab308"; // 3: yellow
+                    if (point.rating >= 4) color = "#10b981"; // 4: emerald
+                    if (point.rating >= 5) color = "#3b82f6"; // 5: blue
+
+                    // Size proportional to pages (10-40 radius)
+                    const radius = 10 + (point.pages / 500) * 30;
+
+                    return (
+                      <g key={idx}>
+                        <circle
+                          cx={x}
+                          cy={y}
+                          r={Math.min(radius, 40)}
+                          fill={color}
+                          opacity="0.7"
+                          className="hover:opacity-100 transition-opacity cursor-pointer"
+                        >
+                          <title>{point.title} ({point.rating} stars, {point.pages} pages)</title>
+                        </circle>
+                      </g>
+                    );
+                  })}
+                </svg>
+
+                {/* Y-axis label (Rating) */}
+                <div className="absolute left-0 top-8 h-64 flex flex-col justify-between pointer-events-none">
+                  <span className="text-[9px] text-zinc-600 -ml-6">5★</span>
+                  <span className="text-[9px] text-zinc-600 -ml-6">3★</span>
+                  <span className="text-[9px] text-zinc-600 -ml-6">1★</span>
+                </div>
+
+                {/* X-axis labels (Pages per day) */}
+                <div className="absolute bottom-0 left-12 right-0 flex justify-between px-8 pointer-events-none">
+                  <span className="text-[9px] text-zinc-600">0</span>
+                  <span className="text-[9px] text-zinc-600">50</span>
+                  <span className="text-[9px] text-zinc-600">100</span>
+                  <span className="text-[9px] text-zinc-600">150</span>
+                  <span className="text-[9px] text-zinc-600">200+</span>
+                </div>
+              </div>
+
+              {/* Axis labels */}
+              <div className="flex justify-center mt-2">
+                <p className="text-[10px] text-zinc-600">Pages per Day →</p>
+              </div>
+              <div className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-12 text-[10px] text-zinc-600">
+                ↑ Rating
+              </div>
+
+              {/* Legend */}
+              <div className="flex flex-wrap gap-4 mt-4 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-red-500" />
+                  <span className="text-zinc-400">1★</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-orange-500" />
+                  <span className="text-zinc-400">2★</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                  <span className="text-zinc-400">3★</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                  <span className="text-zinc-400">4★</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-blue-500" />
+                  <span className="text-zinc-400">5★</span>
+                </div>
+              </div>
+              <p className="text-[10px] text-zinc-600 mt-2">Dot size represents book length (pages)</p>
+            </div>
+          </section>
+        )}
 
         {/* Top sources */}
         {stats.topSources.length > 0 && (

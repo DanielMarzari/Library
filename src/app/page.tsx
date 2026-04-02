@@ -13,7 +13,7 @@ import Link from "next/link";
 
 type FilterStatus = "all" | "not_read" | "reading" | "read" | "favorites";
 type ViewMode = "shelf" | "list";
-type SortMode = "recent" | "alpha" | "rating";
+type SortMode = "recent" | "alpha" | "rating" | "lcc" | "ddc";
 
 export default function Home() {
   const [books, setBooks] = useState<Book[]>([]);
@@ -92,6 +92,16 @@ export default function Home() {
         break;
       case "rating":
         sorted.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        break;
+      case "lcc":
+        sorted.sort((a, b) => (a.lcc || "ZZZ").localeCompare(b.lcc || "ZZZ"));
+        break;
+      case "ddc":
+        sorted.sort((a, b) => {
+          const aDdc = parseFloat(a.ddc || "9999");
+          const bDdc = parseFloat(b.ddc || "9999");
+          return aDdc - bDdc;
+        });
         break;
       case "recent":
       default:
@@ -214,6 +224,8 @@ export default function Home() {
     { label: "Recent", value: "recent" },
     { label: "A-Z", value: "alpha" },
     { label: "Rating", value: "rating" },
+    { label: "LCC", value: "lcc" },
+    { label: "DDC", value: "ddc" },
   ];
 
   return (
@@ -229,6 +241,18 @@ export default function Home() {
                 className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
               >
                 Stats
+              </Link>
+              <Link
+                href="/authors"
+                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                Authors
+              </Link>
+              <Link
+                href="/expertise"
+                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                Expert
               </Link>
               <Link
                 href="/setup"
