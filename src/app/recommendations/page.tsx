@@ -488,20 +488,30 @@ export default function RecommendationsPage() {
                     </div>
                   )}
 
-                  {/* Buttons */}
-                  <div className="mt-auto pt-3 border-t border-border-custom flex gap-2">
-                    <button
-                      onClick={() => handleAddToLibrary(rec)}
-                      className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-lg text-xs font-medium transition-colors"
-                    >
-                      Add to Library
-                    </button>
-
+                  {/* Shop Links */}
+                  <div className="mt-auto pt-3 border-t border-border-custom space-y-2">
+                    <div className="flex gap-1.5">
+                      {[
+                        { label: "Amazon", url: `https://www.amazon.com/s?k=${encodeURIComponent(rec.title + (rec.author ? " " + rec.author : ""))}&i=stripbooks` },
+                        { label: "AbeBooks", url: `https://www.abebooks.com/servlet/SearchResults?kn=${encodeURIComponent(rec.title + (rec.author ? " " + rec.author : ""))}` },
+                        { label: "Thriftbooks", url: `https://www.thriftbooks.com/browse/?b.search=${encodeURIComponent(rec.title + (rec.author ? " " + rec.author : ""))}` },
+                      ].map((store) => (
+                        <a
+                          key={store.label}
+                          href={store.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 text-center bg-surface-2 hover:bg-border-custom text-foreground px-2 py-1.5 rounded-lg text-[10px] font-medium transition-colors"
+                        >
+                          {store.label}
+                        </a>
+                      ))}
+                    </div>
                     <button
                       onClick={() => setDeleteConfirm(rec.id)}
-                      className="px-3 py-2 rounded-lg text-xs font-medium bg-surface-2 text-muted hover:bg-border-custom hover:text-foreground transition-colors"
+                      className="w-full px-3 py-1.5 rounded-lg text-[10px] font-medium bg-surface text-muted hover:bg-red-500/10 hover:text-red-400 transition-colors"
                     >
-                      Delete
+                      Remove
                     </button>
                   </div>
                 </div>

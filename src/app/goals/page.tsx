@@ -188,7 +188,7 @@ export default function GoalsPage() {
                     key={m.target}
                     className={`px-3 py-2.5 rounded-lg text-xs border transition-all ${
                       achieved
-                        ? "bg-emerald-950/80 border-emerald-700 text-emerald-200"
+                        ? "bg-emerald-500/15 border-emerald-500/40 text-foreground"
                         : isCurrent
                           ? "bg-surface-2 border-emerald-500 text-foreground ring-1 ring-emerald-500/30"
                           : "bg-surface-2/40 border-border-custom text-muted-2"
@@ -198,7 +198,7 @@ export default function GoalsPage() {
                       <span className={`text-base leading-none ${achieved ? "" : "grayscale opacity-40"}`}>{m.emoji}</span>
                       <div className="min-w-0">
                         <div className="font-semibold truncate">{m.label}</div>
-                        <div className={`text-[10px] truncate ${achieved ? "text-emerald-400" : "text-muted-2"}`}>
+                        <div className={`text-[10px] truncate ${achieved ? "text-emerald-500" : "text-muted-2"}`}>
                           {m.target} books
                         </div>
                       </div>
@@ -254,49 +254,38 @@ export default function GoalsPage() {
           </div>
         </section>
 
-        {/* Past Years — Award Summary */}
+        {/* Past Years — Compact Grid */}
         <section>
           <h2 className="text-lg font-semibold text-foreground mb-4">Past Years</h2>
-          <div className="space-y-3">
-            {stats.years
-              .filter((y) => y !== currentYear)
-              .map((year) => {
-                const count = stats.byYear[year] || 0;
-                const milestone = getCurrentMilestone(count);
-                return (
-                  <div
-                    key={year}
-                    className="bg-surface border border-border-custom rounded-xl px-5 py-4 flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-4">
-                      <span className="text-2xl">
+          {stats.years.filter((y) => y !== currentYear).length === 0 ? (
+            <div className="bg-surface border border-border-custom rounded-xl p-6 text-center text-muted">
+              No past year data yet. Keep reading!
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              {stats.years
+                .filter((y) => y !== currentYear)
+                .map((year) => {
+                  const count = stats.byYear[year] || 0;
+                  const milestone = getCurrentMilestone(count);
+                  return (
+                    <div
+                      key={year}
+                      className="bg-surface border border-border-custom rounded-xl p-4 text-center"
+                    >
+                      <span className="text-2xl block mb-1">
                         {milestone.top ? milestone.top.emoji : "○"}
                       </span>
-                      <div>
-                        <p className="font-bold text-foreground text-lg">{year}</p>
-                        <p className="text-sm text-muted">{count} books read</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      {milestone.top ? (
-                        <div>
-                          <p className="text-emerald-400 font-semibold text-sm">{milestone.top.label}</p>
-                          <p className="text-xs text-muted">{milestone.top.desc}</p>
-                        </div>
-                      ) : (
-                        <p className="text-xs text-muted-2">No milestone reached</p>
+                      <p className="font-bold text-foreground">{year}</p>
+                      <p className="text-sm text-muted">{count} books</p>
+                      {milestone.top && (
+                        <p className="text-emerald-500 text-xs font-medium mt-1">{milestone.top.label}</p>
                       )}
                     </div>
-                  </div>
-                );
-              })}
-
-            {stats.years.filter((y) => y !== currentYear).length === 0 && (
-              <div className="bg-surface border border-border-custom rounded-xl p-6 text-center text-muted">
-                No past year data yet. Keep reading!
-              </div>
-            )}
-          </div>
+                  );
+                })}
+            </div>
+          )}
         </section>
       </div>
     </div>

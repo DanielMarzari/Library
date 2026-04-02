@@ -15,6 +15,7 @@ interface AuthorData {
   ethnicity: string | null;
   nationality: string | null;
   religious_tradition: string | null;
+  gender: string | null;
   image_url: string | null;
   profile_url: string | null;
   id?: string;
@@ -31,20 +32,27 @@ interface EditingState {
 }
 
 const ETHNICITY_OPTIONS = [
-  "African / Black",
-  "Arab / Middle Eastern",
-  "East Asian",
-  "South Asian",
-  "Southeast Asian",
-  "European / White",
+  "Black / African",
+  "White / European",
   "Hispanic / Latino",
+  "Chinese",
+  "Japanese",
+  "Korean",
+  "Indian",
+  "Southeast Asian",
+  "Arab / Middle Eastern",
+  "Jewish",
   "Indigenous / Native",
-  "Mixed / Multiracial",
   "Pacific Islander",
   "Caribbean",
-  "Central Asian",
-  "Jewish",
+  "Mixed / Multiracial",
   "Other",
+];
+
+const GENDER_OPTIONS = [
+  "Male",
+  "Female",
+  "Non-binary",
 ];
 
 const NATIONALITY_OPTIONS = [
@@ -597,6 +605,7 @@ export default function AuthorsPage() {
                   ethnicity: null,
                   nationality: null,
                   religious_tradition: null,
+                  gender: null,
                   image_url: null,
                   profile_url: null,
                 });
@@ -638,6 +647,7 @@ export default function AuthorsPage() {
               author.ethnicity = metadata.ethnicity;
               author.nationality = metadata.nationality;
               author.religious_tradition = metadata.religious_tradition || null;
+              author.gender = metadata.gender || null;
               author.image_url = metadata.image_url;
               author.profile_url = metadata.profile_url || null;
               author.id = metadata.id;
@@ -691,7 +701,7 @@ export default function AuthorsPage() {
   }, []);
 
   const handleSaveMetadata = useCallback(
-    async (authorName: string, field: "ethnicity" | "nationality" | "religious_tradition", value: string | null) => {
+    async (authorName: string, field: "ethnicity" | "nationality" | "religious_tradition" | "gender", value: string | null) => {
       try {
         // Get current author data to preserve other fields
         const currentAuthor = authors.find((a) => a.name === authorName);
@@ -700,6 +710,7 @@ export default function AuthorsPage() {
           ethnicity: currentAuthor?.ethnicity ?? null,
           nationality: currentAuthor?.nationality ?? null,
           religious_tradition: currentAuthor?.religious_tradition ?? null,
+          gender: currentAuthor?.gender ?? null,
           image_url: currentAuthor?.image_url ?? null,
           profile_url: currentAuthor?.profile_url ?? null,
           [field]: value,
@@ -782,6 +793,78 @@ export default function AuthorsPage() {
         );
       } catch (error) {
         console.error("Error saving profile URL:", error);
+      }
+    },
+    [authors]
+  );
+
+  const [fetchingInfo, setFetchingInfo] = useState<Set<string>>(new Set());
+
+  const handleFetchAuthorInfo = useCallback(
+    async (authorName: string) => {
+      setFetchingInfo((prev) => new Set(prev).add(authorName));
+      try {
+        const res = await fetch("/api/fetch-author-info", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ authorName }),
+        });
+        const info = await res.json();
+        if (info.error) return;
+
+        const currentAuthor = authors.find((a) => a.name === authorName);
+        const updates: Record<string, unknown> = {};
+        let changed = false;
+
+        if (info.gender && !currentAuthor?.gender) {
+          updates.gender = info.gender;
+          changed = true;
+        }
+        if (info.nationality && !currentAuthor?.nationality) {
+          updates.nationality = info.nationality;
+          changed = true;
+        }
+        if (info.religion && !currentAuthor?.religious_tradition) {
+          updates.religious_tradition = info.religion;
+          changed = true;
+        }
+        if (info.image_url && !currentAuthor?.image_url) {
+          updates.image_url = info.image_url;
+          changed = true;
+        }
+
+        if (changed) {
+          const upsertData = {
+            name: authorName,
+            ethnicity: currentAuthor?.ethnicity ?? null,
+            nationality: currentAuthor?.nationality ?? null,
+            religious_tradition: currentAuthor?.religious_tradition ?? null,
+            gender: currentAuthor?.gender ?? null,
+            image_url: currentAuthor?.image_url ?? null,
+            profile_url: currentAuthor?.profile_url ?? null,
+            ...updates,
+          };
+
+          const { error } = await supabase
+            .from("authors")
+            .upsert([upsertData], { onConflict: "name" });
+
+          if (!error) {
+            setAuthors((prev) =>
+              prev.map((a) =>
+                a.name === authorName ? { ...a, ...updates } as AuthorData : a
+              )
+            );
+          }
+        }
+      } catch (err) {
+        console.error("Fetch author info error:", err);
+      } finally {
+        setFetchingInfo((prev) => {
+          const next = new Set(prev);
+          next.delete(authorName);
+          return next;
+        });
       }
     },
     [authors]
@@ -910,6 +993,15 @@ export default function AuthorsPage() {
 
                 {/* Badges */}
                 <div className="space-y-2 mb-4">
+                  {/* Gender Dropdown */}
+                  <DropdownSelector
+                    value={author.gender}
+                    options={GENDER_OPTIONS}
+                    onSelect={(value) => handleSaveMetadata(author.name, "gender", value)}
+                    onClear={() => handleSaveMetadata(author.name, "gender", null)}
+                    label="Gender"
+                  />
+
                   {/* Ethnicity Dropdown */}
                   <DropdownSelector
                     value={author.ethnicity}
@@ -942,6 +1034,15 @@ export default function AuthorsPage() {
                     value={author.profile_url}
                     onSave={(url) => handleSaveProfileUrl(author.name, url)}
                   />
+
+                  {/* Fetch from Wikipedia */}
+                  <button
+                    onClick={() => handleFetchAuthorInfo(author.name)}
+                    disabled={fetchingInfo.has(author.name)}
+                    className="w-full px-2 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 rounded text-xs font-medium transition-colors disabled:opacity-50"
+                  >
+                    {fetchingInfo.has(author.name) ? "Fetching..." : "Fetch from Wikipedia"}
+                  </button>
                 </div>
               </div>
             );
