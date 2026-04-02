@@ -42,6 +42,7 @@ const ETHNICITY_OPTIONS = [
   "European / White",
   "Hispanic / Latino",
   "Indigenous / Native",
+  "Biracial",
   "Mixed / Multiracial",
   "Pacific Islander",
   "Caribbean",
@@ -320,22 +321,38 @@ function ImageSearchModal({
         );
         const data = await response.json();
 
-        const imageUrls: string[] = [];
+        const candidateUrls: string[] = [];
         if (data.docs && Array.isArray(data.docs)) {
           for (const doc of data.docs) {
-            if (doc.key && imageUrls.length < 6) {
+            if (doc.key && candidateUrls.length < 12) {
               const olid = doc.key.replace("/authors/", "");
-              imageUrls.push(
-                `https://covers.openlibrary.org/a/olid/${olid}-M.jpg`
+              // ?default=false returns 404 instead of placeholder
+              candidateUrls.push(
+                `https://covers.openlibrary.org/a/olid/${olid}-M.jpg?default=false`
               );
             }
           }
         }
 
-        if (imageUrls.length === 0) {
+        // Validate each URL with HEAD request to filter out 404s
+        const validUrls: string[] = [];
+        await Promise.all(
+          candidateUrls.map(async (url) => {
+            try {
+              const res = await fetch(url, { method: "HEAD" });
+              if (res.ok) {
+                validUrls.push(url);
+              }
+            } catch {
+              // skip failed URLs
+            }
+          })
+        );
+
+        if (validUrls.length === 0) {
           setError("No images found for this author.");
         } else {
-          setImages(imageUrls);
+          setImages(validUrls.slice(0, 6));
         }
       } catch (err) {
         setError("Failed to fetch author images.");
@@ -525,12 +542,17 @@ export default function AuthorsPage() {
   const handleSaveMetadata = useCallback(
     async (authorName: string, field: "ethnicity" | "nationality", value: string | null) => {
       try {
-        const { error } = await supabase.from("authors").upsert([
-          {
-            name: authorName,
-            [field]: value,
-          },
-        ]);
+        // Get current author data to preserve other fields
+        const currentAuthor = authors.find((a) => a.name === authorName);
+        const upsertData: Record<string, unknown> = {
+          name: authorName,
+          ethnicity: currentAuthor?.ethnicity ?? null,
+          nationality: currentAuthor?.nationality ?? null,
+          image_url: currentAuthor?.image_url ?? null,
+          [field]: value,
+        };
+
+        const { error } = await supabase.from("authors").upsert([upsertData]);
 
         if (error) throw error;
 
@@ -545,18 +567,21 @@ export default function AuthorsPage() {
         console.error("Error saving author metadata:", error);
       }
     },
-    []
+    [authors]
   );
 
   const handleSaveImage = useCallback(
     async (authorName: string, imageUrl: string) => {
       try {
-        const { error } = await supabase.from("authors").upsert([
-          {
-            name: authorName,
-            image_url: imageUrl,
-          },
-        ]);
+        const currentAuthor = authors.find((a) => a.name === authorName);
+        const upsertData: Record<string, unknown> = {
+          name: authorName,
+          ethnicity: currentAuthor?.ethnicity ?? null,
+          nationality: currentAuthor?.nationality ?? null,
+          image_url: imageUrl,
+        };
+
+        const { error } = await supabase.from("authors").upsert([upsertData]);
 
         if (error) throw error;
 
@@ -573,7 +598,7 @@ export default function AuthorsPage() {
         console.error("Error saving author image:", error);
       }
     },
-    []
+    [authors]
   );
 
   if (loading) {

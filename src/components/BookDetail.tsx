@@ -155,9 +155,9 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
     const options: string[] = [];
 
     try {
-      // 1. Try ISBN first if available
+      // 1. Try ISBN first if available (with ?default=false to get 404 instead of placeholder)
       if (book.isbn) {
-        const isbnUrl = `https://covers.openlibrary.org/b/isbn/${book.isbn}-L.jpg`;
+        const isbnUrl = `https://covers.openlibrary.org/b/isbn/${book.isbn}-L.jpg?default=false`;
         options.push(isbnUrl);
       }
 
@@ -168,8 +168,8 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
         const olData = await olRes.json();
         if (olData.docs) {
           for (const doc of olData.docs) {
-            if (doc.cover_i && options.length < 10) {
-              options.push(`https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`);
+            if (doc.cover_i && options.length < 12) {
+              options.push(`https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg?default=false`);
             }
           }
         }
@@ -183,9 +183,8 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
         const gbData = await gbRes.json();
         if (gbData.items) {
           for (const item of gbData.items) {
-            if (item.volumeInfo?.imageLinks?.thumbnail && options.length < 10) {
+            if (item.volumeInfo?.imageLinks?.thumbnail && options.length < 12) {
               let imgUrl = item.volumeInfo.imageLinks.thumbnail;
-              // Replace zoom=1 with zoom=3 for higher resolution
               imgUrl = imgUrl.replace(/zoom=1/, "zoom=3");
               if (!options.includes(imgUrl)) {
                 options.push(imgUrl);
@@ -199,8 +198,26 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
     }
 
     // Deduplicate
-    const unique = Array.from(new Set(options));
-    setCoverOptions(unique.slice(0, 10));
+    const allCandidates = Array.from(new Set(options));
+
+    // Validate Open Library URLs with HEAD requests; Google Books URLs pass through
+    const validated: string[] = [];
+    await Promise.all(
+      allCandidates.map(async (url) => {
+        if (url.includes("covers.openlibrary.org")) {
+          try {
+            const res = await fetch(url, { method: "HEAD" });
+            if (res.ok) validated.push(url);
+          } catch {
+            // skip
+          }
+        } else {
+          validated.push(url);
+        }
+      })
+    );
+
+    setCoverOptions(validated.slice(0, 10));
     setCoverSearchLoading(false);
   };
 
