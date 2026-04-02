@@ -3,7 +3,7 @@
 import { useRef, useCallback } from "react";
 import { Book } from "@/types/book";
 
-type GridSize = "small" | "medium" | "large";
+type GridSize = "xs" | "small" | "medium" | "large" | "xl";
 
 interface BookShelfProps {
   books: Book[];
@@ -18,9 +18,11 @@ interface BookShelfProps {
 }
 
 const gridClasses: Record<GridSize, string> = {
+  xs:     "grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 2xl:grid-cols-14 gap-2",
   small:  "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 2xl:grid-cols-12 gap-3",
   medium: "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-4",
   large:  "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-5",
+  xl:     "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6",
 };
 
 const statusLabels: Record<Book["status"], string> = {
@@ -109,8 +111,8 @@ function ShelfBook({
       )}
 
       <div
-        className={`relative aspect-[2/3] rounded-md overflow-hidden shadow-lg shadow-black/40 transition-all group-hover:scale-105 group-hover:-translate-y-1 ${
-          selected ? "ring-2 ring-emerald-500 ring-offset-2 ring-offset-background" : book.favorite ? "ring-2 ring-red-500/70 ring-offset-1 ring-offset-background" : ""
+        className={`relative aspect-[2/3] rounded-md overflow-hidden transition-all group-hover:scale-105 group-hover:-translate-y-1 ${
+          selected ? "ring-2 ring-emerald-500 ring-offset-2 ring-offset-background shadow-lg shadow-black/40" : book.favorite ? "shadow-[0_0_12px_3px_rgba(234,179,8,0.45)]" : "shadow-lg shadow-black/40"
         }`}
       >
         {book._optimistic ? (

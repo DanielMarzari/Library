@@ -108,8 +108,8 @@ export default function GoalsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-950 text-zinc-200 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-zinc-700 border-t-emerald-500" />
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-border-custom border-t-emerald-500" />
       </div>
     );
   }
@@ -117,14 +117,14 @@ export default function GoalsPage() {
   const { currentMilestone, thisYearCount, projectedThisYear } = stats;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-200 p-6">
-      <div className="max-w-3xl mx-auto">
+    <div className="min-h-screen bg-background text-foreground p-6">
+      <div className="w-full mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold text-emerald-500">Reading Goals</h1>
           <Link
             href="/"
-            className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 rounded-lg text-zinc-200 transition-colors text-sm font-medium"
+            className="px-4 py-2 bg-surface hover:bg-surface-2 rounded-lg text-foreground transition-colors text-sm font-medium"
           >
             Back to Library
           </Link>
@@ -132,15 +132,15 @@ export default function GoalsPage() {
 
         {/* Current Year — Active Goal */}
         <section className="mb-10">
-          <h2 className="text-lg font-semibold text-zinc-100 mb-4">{currentYear} Progress</h2>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+          <h2 className="text-lg font-semibold text-foreground mb-4">{currentYear} Progress</h2>
+          <div className="bg-surface border border-border-custom rounded-xl p-6">
             {/* Current status */}
             <div className="flex items-center gap-4 mb-5">
               <div className="text-4xl">
                 {currentMilestone.top ? currentMilestone.top.emoji : "📖"}
               </div>
               <div>
-                <p className="text-2xl font-bold text-zinc-100">
+                <p className="text-2xl font-bold text-foreground">
                   {thisYearCount} books read
                 </p>
                 {currentMilestone.top && (
@@ -155,20 +155,20 @@ export default function GoalsPage() {
             {currentMilestone.next && (
               <div className="mb-6">
                 <div className="flex justify-between text-sm mb-2">
-                  <span className="text-zinc-400">
-                    Next: <span className="text-zinc-200 font-medium">{currentMilestone.next.emoji} {currentMilestone.next.label}</span> ({currentMilestone.next.desc})
+                  <span className="text-muted">
+                    Next: <span className="text-foreground font-medium">{currentMilestone.next.emoji} {currentMilestone.next.label}</span> ({currentMilestone.next.desc})
                   </span>
-                  <span className="text-zinc-300 font-medium">
+                  <span className="text-foreground font-medium">
                     {thisYearCount} / {currentMilestone.next.target}
                   </span>
                 </div>
-                <div className="w-full bg-zinc-800 rounded-full h-3">
+                <div className="w-full bg-surface-2 rounded-full h-3">
                   <div
                     className="bg-gradient-to-r from-emerald-600 to-emerald-400 h-3 rounded-full transition-all"
                     style={{ width: `${Math.min((thisYearCount / currentMilestone.next.target) * 100, 100)}%` }}
                   />
                 </div>
-                <p className="text-xs text-zinc-500 mt-2">
+                <p className="text-xs text-muted mt-2">
                   {currentMilestone.next.target - thisYearCount} more to go · Projected: {projectedThisYear} this year
                   {projectedThisYear >= currentMilestone.next.target && (
                     <span className="text-emerald-400 ml-2">On pace!</span>
@@ -178,7 +178,7 @@ export default function GoalsPage() {
             )}
 
             {/* Milestone grid — column-first layout */}
-            <p className="text-xs text-zinc-500 uppercase tracking-wide mb-3">All Milestones</p>
+            <p className="text-xs text-muted uppercase tracking-wide mb-3">All Milestones</p>
             <div className="grid grid-rows-6 grid-flow-col gap-2 auto-cols-fr">
               {MILESTONES.map((m) => {
                 const achieved = thisYearCount >= m.target;
@@ -190,15 +190,15 @@ export default function GoalsPage() {
                       achieved
                         ? "bg-emerald-950/80 border-emerald-700 text-emerald-200"
                         : isCurrent
-                          ? "bg-zinc-800 border-emerald-500 text-zinc-100 ring-1 ring-emerald-500/30"
-                          : "bg-zinc-800/40 border-zinc-800 text-zinc-600"
+                          ? "bg-surface-2 border-emerald-500 text-foreground ring-1 ring-emerald-500/30"
+                          : "bg-surface-2/40 border-border-custom text-muted-2"
                     }`}
                   >
                     <div className="flex items-center gap-2">
                       <span className={`text-base leading-none ${achieved ? "" : "grayscale opacity-40"}`}>{m.emoji}</span>
                       <div className="min-w-0">
                         <div className="font-semibold truncate">{m.label}</div>
-                        <div className={`text-[10px] truncate ${achieved ? "text-emerald-400" : "text-zinc-600"}`}>
+                        <div className={`text-[10px] truncate ${achieved ? "text-emerald-400" : "text-muted-2"}`}>
                           {m.target} books
                         </div>
                       </div>
@@ -212,39 +212,39 @@ export default function GoalsPage() {
 
         {/* Life Goal */}
         <section className="mb-10">
-          <h2 className="text-lg font-semibold text-zinc-100 mb-3">Life Goal: {LIFE_GOAL.toLocaleString()} Books</h2>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+          <h2 className="text-lg font-semibold text-foreground mb-3">Life Goal: {LIFE_GOAL.toLocaleString()} Books</h2>
+          <div className="bg-surface border border-border-custom rounded-xl p-5">
             <div className="flex items-end gap-3 mb-3">
               <span className="text-4xl font-bold text-amber-400">{stats.lifePct}%</span>
-              <span className="text-sm text-zinc-500 mb-1">{stats.totalRead} / {LIFE_GOAL.toLocaleString()}</span>
+              <span className="text-sm text-muted mb-1">{stats.totalRead} / {LIFE_GOAL.toLocaleString()}</span>
             </div>
-            <div className="w-full bg-zinc-800 rounded-full h-3 mb-4">
+            <div className="w-full bg-surface-2 rounded-full h-3 mb-4">
               <div
                 className="bg-gradient-to-r from-amber-600 to-amber-400 h-3 rounded-full transition-all"
                 style={{ width: `${Math.min(stats.lifePct, 100)}%` }}
               />
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
-              <div className="bg-zinc-800 rounded-lg p-3">
-                <p className="text-zinc-500 text-xs">Remaining</p>
-                <p className="text-zinc-100 font-bold text-lg">{stats.lifeRemaining}</p>
+              <div className="bg-surface-2 rounded-lg p-3">
+                <p className="text-muted text-xs">Remaining</p>
+                <p className="text-foreground font-bold text-lg">{stats.lifeRemaining}</p>
               </div>
-              <div className="bg-zinc-800 rounded-lg p-3">
-                <p className="text-zinc-500 text-xs">Avg Books / Year</p>
-                <p className="text-zinc-100 font-bold text-lg">{stats.avgBooksPerYear}</p>
+              <div className="bg-surface-2 rounded-lg p-3">
+                <p className="text-muted text-xs">Avg Books / Year</p>
+                <p className="text-foreground font-bold text-lg">{stats.avgBooksPerYear}</p>
               </div>
-              <div className="bg-zinc-800 rounded-lg p-3">
-                <p className="text-zinc-500 text-xs">On Track For</p>
+              <div className="bg-surface-2 rounded-lg p-3">
+                <p className="text-muted text-xs">On Track For</p>
                 <p className="text-amber-400 font-bold text-lg">
                   {stats.goalYear ? stats.goalYear : "—"}
                 </p>
               </div>
             </div>
             {stats.yearsToGoal !== null && stats.avgBooksPerYear > 0 && (
-              <p className="text-xs text-zinc-500 mt-3">
+              <p className="text-xs text-muted mt-3">
                 At {stats.avgBooksPerYear} books/year, you'll hit 1,000 in ~{stats.yearsToGoal} years ({stats.goalYear}).
                 {stats.lifeRemaining > 0 && (
-                  <span className="text-zinc-400">
+                  <span className="text-muted">
                     {" "}To reach it by {currentYear + 10}, you'd need ~{Math.ceil(stats.lifeRemaining / 10)} books/year.
                     To reach it by {currentYear + 5}, ~{Math.ceil(stats.lifeRemaining / 5)}/year.
                   </span>
@@ -256,7 +256,7 @@ export default function GoalsPage() {
 
         {/* Past Years — Award Summary */}
         <section>
-          <h2 className="text-lg font-semibold text-zinc-100 mb-4">Past Years</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Past Years</h2>
           <div className="space-y-3">
             {stats.years
               .filter((y) => y !== currentYear)
@@ -266,25 +266,25 @@ export default function GoalsPage() {
                 return (
                   <div
                     key={year}
-                    className="bg-zinc-900 border border-zinc-800 rounded-xl px-5 py-4 flex items-center justify-between"
+                    className="bg-surface border border-border-custom rounded-xl px-5 py-4 flex items-center justify-between"
                   >
                     <div className="flex items-center gap-4">
                       <span className="text-2xl">
                         {milestone.top ? milestone.top.emoji : "○"}
                       </span>
                       <div>
-                        <p className="font-bold text-zinc-100 text-lg">{year}</p>
-                        <p className="text-sm text-zinc-400">{count} books read</p>
+                        <p className="font-bold text-foreground text-lg">{year}</p>
+                        <p className="text-sm text-muted">{count} books read</p>
                       </div>
                     </div>
                     <div className="text-right">
                       {milestone.top ? (
                         <div>
                           <p className="text-emerald-400 font-semibold text-sm">{milestone.top.label}</p>
-                          <p className="text-xs text-zinc-500">{milestone.top.desc}</p>
+                          <p className="text-xs text-muted">{milestone.top.desc}</p>
                         </div>
                       ) : (
-                        <p className="text-xs text-zinc-600">No milestone reached</p>
+                        <p className="text-xs text-muted-2">No milestone reached</p>
                       )}
                     </div>
                   </div>
@@ -292,7 +292,7 @@ export default function GoalsPage() {
               })}
 
             {stats.years.filter((y) => y !== currentYear).length === 0 && (
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 text-center text-zinc-500">
+              <div className="bg-surface border border-border-custom rounded-xl p-6 text-center text-muted">
                 No past year data yet. Keep reading!
               </div>
             )}

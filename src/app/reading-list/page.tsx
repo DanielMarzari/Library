@@ -197,17 +197,17 @@ export default function ReadingListPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-zinc-950">
+    <div className="min-h-screen flex flex-col bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800">
-        <div className="max-w-3xl mx-auto px-4 py-4">
+      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border-custom">
+        <div className="w-full mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-2xl font-bold tracking-tight text-zinc-100">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
               Reading List
             </h1>
             <Link
               href="/"
-              className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+              className="bg-surface-2 hover:bg-border-custom text-foreground px-3 py-2 rounded-lg text-sm font-medium transition-colors"
             >
               Back to Library
             </Link>
@@ -222,7 +222,7 @@ export default function ReadingListPage() {
                 className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
                   selectedYear === year
                     ? "bg-emerald-600 text-white"
-                    : "bg-zinc-800 text-zinc-400 hover:text-zinc-200"
+                    : "bg-surface-2 text-muted hover:text-foreground"
                 }`}
               >
                 {year}
@@ -233,28 +233,28 @@ export default function ReadingListPage() {
         </div>
       </header>
 
-      <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-6">
+      <main className="flex-1 w-full mx-auto w-full px-4 py-6">
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-zinc-700 border-t-emerald-500" />
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-border-custom border-t-emerald-500" />
           </div>
         ) : (
           <>
             {/* Summary stats */}
-            <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 mb-6">
+            <div className="bg-surface border border-border-custom rounded-lg p-6 mb-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <p className="text-zinc-400 text-sm mb-1">Progress</p>
-                  <p className="text-2xl font-bold text-zinc-100">
+                  <p className="text-muted text-sm mb-1">Progress</p>
+                  <p className="text-2xl font-bold text-foreground">
                     {completedCount} of {totalCount}
                   </p>
-                  <p className="text-xs text-zinc-500 mt-1">
+                  <p className="text-xs text-muted mt-1">
                     {completionPercent}% complete
                   </p>
                 </div>
                 {totalCount > 0 && (
                   <div className="flex-1 ml-8">
-                    <div className="w-full bg-zinc-800 rounded-full h-3 overflow-hidden">
+                    <div className="w-full bg-surface-2 rounded-full h-3 overflow-hidden">
                       <div
                         className="bg-emerald-500 h-full transition-all duration-300"
                         style={{ width: `${completionPercent}%` }}
@@ -275,20 +275,20 @@ export default function ReadingListPage() {
               </button>
 
               {showAddDropdown && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl z-20">
-                  <div className="p-3 border-b border-zinc-800">
+                <div className="absolute top-full left-0 right-0 mt-2 bg-surface border border-border-custom rounded-lg shadow-xl z-20">
+                  <div className="p-3 border-b border-border-custom">
                     <input
                       type="text"
                       placeholder="Search books..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                      className="w-full bg-surface-2 border border-border-custom rounded px-3 py-2 text-sm text-foreground placeholder-muted focus:outline-none focus:ring-2 focus:ring-emerald-600"
                       autoFocus
                     />
                   </div>
                   <div className="max-h-96 overflow-y-auto">
                     {filteredAvailable.length === 0 ? (
-                      <div className="p-4 text-center text-zinc-500 text-sm">
+                      <div className="p-4 text-center text-muted text-sm">
                         {availableBooks.length === 0
                           ? "All books are already on a list or have been read"
                           : "No books match your search"}
@@ -298,12 +298,12 @@ export default function ReadingListPage() {
                         <button
                           key={book.id}
                           onClick={() => addBookToList(book.id)}
-                          className="w-full px-4 py-3 text-left border-b border-zinc-800 last:border-b-0 hover:bg-zinc-800/50 transition-colors"
+                          className="w-full px-4 py-3 text-left border-b border-border-custom last:border-b-0 hover:bg-surface-2/50 transition-colors"
                         >
-                          <p className="font-medium text-zinc-100 text-sm">
+                          <p className="font-medium text-foreground text-sm">
                             {book.title}
                           </p>
-                          <p className="text-xs text-zinc-500">{book.author}</p>
+                          <p className="text-xs text-muted">{book.author}</p>
                         </button>
                       ))
                     )}
@@ -316,10 +316,10 @@ export default function ReadingListPage() {
             {currentYearItems.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-4xl mb-4">📚</p>
-                <p className="text-zinc-500 text-lg mb-2">
+                <p className="text-muted text-lg mb-2">
                   No books on your {selectedYear} reading list
                 </p>
-                <p className="text-zinc-600 text-sm">
+                <p className="text-muted-2 text-sm">
                   Add some books to get started
                 </p>
               </div>
@@ -335,10 +335,10 @@ export default function ReadingListPage() {
                       draggable
                       onDragStart={() => setDraggedId(item.id)}
                       onDragEnd={() => setDraggedId(null)}
-                      className={`bg-zinc-900 border border-zinc-800 rounded-lg p-4 transition-colors ${
+                      className={`bg-surface border border-border-custom rounded-lg p-4 transition-colors ${
                         draggedId === item.id
-                          ? "opacity-50 bg-zinc-800"
-                          : "hover:border-zinc-700"
+                          ? "opacity-50 bg-surface-2"
+                          : "hover:border-border-custom"
                       }`}
                     >
                       <div className="flex gap-4">
@@ -347,7 +347,7 @@ export default function ReadingListPage() {
                           <img
                             src={item.book.cover_url}
                             alt={item.book.title}
-                            className="w-24 h-32 object-cover rounded bg-zinc-800 flex-shrink-0"
+                            className="w-24 h-32 object-cover rounded bg-surface-2 flex-shrink-0"
                           />
                         )}
 
@@ -356,10 +356,10 @@ export default function ReadingListPage() {
                           <div className="flex-1">
                             <div className="flex items-start justify-between mb-2">
                               <div>
-                                <p className="font-semibold text-zinc-100 text-sm">
+                                <p className="font-semibold text-foreground text-sm">
                                   {item.book?.title}
                                 </p>
-                                <p className="text-xs text-zinc-500">
+                                <p className="text-xs text-muted">
                                   {item.book?.author}
                                 </p>
                               </div>
@@ -391,7 +391,7 @@ export default function ReadingListPage() {
                                   </div>
                                 )}
                                 {!isCompleted && !isReading && (
-                                  <div className="flex items-center gap-1 px-2 py-1 bg-zinc-800 rounded text-zinc-400 text-xs font-medium">
+                                  <div className="flex items-center gap-1 px-2 py-1 bg-surface-2 rounded text-muted text-xs font-medium">
                                     <svg
                                       className="w-3.5 h-3.5"
                                       viewBox="0 0 16 16"
@@ -407,14 +407,14 @@ export default function ReadingListPage() {
 
                             {/* Book info */}
                             {item.book?.pages && (
-                              <p className="text-xs text-zinc-600 mt-2">
+                              <p className="text-xs text-muted-2 mt-2">
                                 {item.book.pages} pages
                               </p>
                             )}
 
                             {item.book?.rating && (
                               <div className="flex items-center gap-1 mt-2">
-                                <span className="text-xs text-zinc-400">
+                                <span className="text-xs text-muted">
                                   Rating:
                                 </span>
                                 <span className="text-xs font-medium text-amber-400">
@@ -426,19 +426,19 @@ export default function ReadingListPage() {
                           </div>
 
                           {/* Controls */}
-                          <div className="flex items-center justify-between mt-3 pt-3 border-t border-zinc-800">
-                            <div className="text-xs text-zinc-600">
+                          <div className="flex items-center justify-between mt-3 pt-3 border-t border-border-custom">
+                            <div className="text-xs text-muted-2">
                               Priority: {index + 1}
                             </div>
                             <div className="flex items-center gap-2">
                               {index > 0 && (
                                 <button
                                   onClick={() => movePriority(item.id, "up")}
-                                  className="p-1.5 hover:bg-zinc-800 rounded transition-colors"
+                                  className="p-1.5 hover:bg-surface-2 rounded transition-colors"
                                   title="Move up"
                                 >
                                   <svg
-                                    className="w-4 h-4 text-zinc-400"
+                                    className="w-4 h-4 text-muted"
                                     viewBox="0 0 16 16"
                                     fill="currentColor"
                                   >
@@ -449,11 +449,11 @@ export default function ReadingListPage() {
                               {index < currentYearItems.length - 1 && (
                                 <button
                                   onClick={() => movePriority(item.id, "down")}
-                                  className="p-1.5 hover:bg-zinc-800 rounded transition-colors"
+                                  className="p-1.5 hover:bg-surface-2 rounded transition-colors"
                                   title="Move down"
                                 >
                                   <svg
-                                    className="w-4 h-4 text-zinc-400"
+                                    className="w-4 h-4 text-muted"
                                     viewBox="0 0 16 16"
                                     fill="currentColor"
                                   >

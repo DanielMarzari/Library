@@ -367,26 +367,26 @@ export default function StatsPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-zinc-700 border-t-emerald-500" />
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-border-custom border-t-emerald-500" />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="sticky top-0 z-10 bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border-custom">
+        <div className="w-full mx-auto px-4 py-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold tracking-tight">Reading Stats</h1>
           <Link
             href="/"
-            className="text-zinc-400 hover:text-zinc-200 text-sm font-medium transition-colors"
+            className="text-muted hover:text-foreground text-sm font-medium transition-colors"
           >
             Back to Library
           </Link>
         </div>
       </header>
 
-      <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-6 space-y-8">
+      <main className="flex-1 w-full mx-auto w-full px-4 py-6 space-y-8">
         {/* Overview cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatCard label="Total Books" value={stats.total} />
@@ -397,23 +397,23 @@ export default function StatsPage() {
 
         {/* Percentages */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-            <p className="text-xs text-zinc-500 mb-2">Books Read</p>
+          <div className="bg-surface border border-border-custom rounded-xl p-4">
+            <p className="text-xs text-muted mb-2">Books Read</p>
             <div className="flex items-end gap-2">
               <span className="text-3xl font-bold text-emerald-400">{stats.pctBooksRead}%</span>
-              <span className="text-xs text-zinc-600 mb-1">{stats.readCount} / {stats.total}</span>
+              <span className="text-xs text-muted-2 mb-1">{stats.readCount} / {stats.total}</span>
             </div>
-            <div className="w-full bg-zinc-800 rounded-full h-2 mt-3">
+            <div className="w-full bg-surface-2 rounded-full h-2 mt-3">
               <div className="bg-emerald-600 h-2 rounded-full" style={{ width: `${stats.pctBooksRead}%` }} />
             </div>
           </div>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-            <p className="text-xs text-zinc-500 mb-2">Pages Read</p>
+          <div className="bg-surface border border-border-custom rounded-xl p-4">
+            <p className="text-xs text-muted mb-2">Pages Read</p>
             <div className="flex items-end gap-2">
               <span className="text-3xl font-bold text-blue-400">{stats.pctPagesRead}%</span>
-              <span className="text-xs text-zinc-600 mb-1">{(stats.readPages + stats.readingPages).toLocaleString()} / {stats.totalPages.toLocaleString()}</span>
+              <span className="text-xs text-muted-2 mb-1">{(stats.readPages + stats.readingPages).toLocaleString()} / {stats.totalPages.toLocaleString()}</span>
             </div>
-            <div className="w-full bg-zinc-800 rounded-full h-2 mt-3">
+            <div className="w-full bg-surface-2 rounded-full h-2 mt-3">
               <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${stats.pctPagesRead}%` }} />
             </div>
           </div>
@@ -421,19 +421,19 @@ export default function StatsPage() {
 
         {/* 1000 Book Life Goal */}
         <section>
-          <h2 className="text-lg font-semibold text-zinc-100 mb-3">Life Goal: {stats.lifeGoal.toLocaleString()} Books</h2>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+          <h2 className="text-lg font-semibold text-foreground mb-3">Life Goal: {stats.lifeGoal.toLocaleString()} Books</h2>
+          <div className="bg-surface border border-border-custom rounded-xl p-5">
             <div className="flex items-end gap-3 mb-3">
               <span className="text-4xl font-bold text-amber-400">{stats.goalPct}%</span>
-              <span className="text-sm text-zinc-500 mb-1">{stats.readCount} / {stats.lifeGoal.toLocaleString()}</span>
+              <span className="text-sm text-muted mb-1">{stats.readCount} / {stats.lifeGoal.toLocaleString()}</span>
             </div>
-            <div className="w-full bg-zinc-800 rounded-full h-3 mb-3">
+            <div className="w-full bg-surface-2 rounded-full h-3 mb-3">
               <div className="bg-gradient-to-r from-amber-600 to-amber-400 h-3 rounded-full transition-all" style={{ width: `${Math.min(parseFloat(stats.goalPct), 100)}%` }} />
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-zinc-400">{stats.goalRemaining} books to go</span>
+              <span className="text-muted">{stats.goalRemaining} books to go</span>
               {stats.goalProjectedDate && (
-                <span className="text-zinc-500">On track for <span className="text-amber-400 font-medium">{stats.goalProjectedDate}</span></span>
+                <span className="text-muted">On track for <span className="text-amber-400 font-medium">{stats.goalProjectedDate}</span></span>
               )}
             </div>
           </div>
@@ -441,8 +441,8 @@ export default function StatsPage() {
 
         {/* Reading rate */}
         <section>
-          <h2 className="text-lg font-semibold text-zinc-100 mb-3">
-            Reading Rate <span className="text-sm text-zinc-500 font-normal">(Jan {new Date().getFullYear() - 1} - Present)</span>
+          <h2 className="text-lg font-semibold text-foreground mb-3">
+            Reading Rate <span className="text-sm text-muted font-normal">(Jan {new Date().getFullYear() - 1} - Present)</span>
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             <StatCard label="Books Completed" value={stats.recentBooksCount} color="emerald" />
@@ -452,22 +452,22 @@ export default function StatsPage() {
             <StatCard label={`Projected ${new Date().getFullYear()}`} value={stats.projectedBooksThisYear} color="blue" />
           </div>
           {stats.avgDaysPerBook > 0 && (
-            <p className="text-sm text-zinc-500 mt-3">
-              Average time to finish a book: <span className="text-zinc-300 font-medium">{stats.avgDaysPerBook} days</span>
+            <p className="text-sm text-muted mt-3">
+              Average time to finish a book: <span className="text-foreground font-medium">{stats.avgDaysPerBook} days</span>
             </p>
           )}
         </section>
 
         {/* Reading Activity Heatmap */}
         <section>
-          <h2 className="text-lg font-semibold text-zinc-100 mb-3">Reading Activity Heatmap</h2>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+          <h2 className="text-lg font-semibold text-foreground mb-3">Reading Activity Heatmap</h2>
+          <div className="bg-surface border border-border-custom rounded-xl p-6">
             <ContributionHeatmap
               startDate={stats.heatmapStartDate}
               pagesPerDay={stats.pagesPerDay}
               maxPagesInDay={stats.maxPagesInDay}
             />
-            <p className="text-sm text-zinc-500 mt-4">
+            <p className="text-sm text-muted mt-4">
               {stats.totalHeatmapPages.toLocaleString()} pages across {stats.daysWithActivity.size} days in the last year
             </p>
           </div>
@@ -475,10 +475,10 @@ export default function StatsPage() {
 
         {/* Year-over-year cumulative chart */}
         <section>
-          <h2 className="text-lg font-semibold text-zinc-100 mb-3">
+          <h2 className="text-lg font-semibold text-foreground mb-3">
             Books Completed by Year
           </h2>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+          <div className="bg-surface border border-border-custom rounded-xl p-4">
             {/* Legend */}
             <div className="flex flex-wrap gap-3 mb-4">
               {stats.years.map((yr) => (
@@ -492,7 +492,7 @@ export default function StatsPage() {
                         : {}),
                     }}
                   />
-                  <span className="text-[10px] text-zinc-400 font-medium">{yr}</span>
+                  <span className="text-[10px] text-muted font-medium">{yr}</span>
                 </div>
               ))}
             </div>
@@ -537,42 +537,42 @@ export default function StatsPage() {
 
               {/* Y-axis labels */}
               <div className="absolute left-0 top-0 h-full flex flex-col justify-between pointer-events-none">
-                <span className="text-[9px] text-zinc-600">{stats.maxCumulative}</span>
-                <span className="text-[9px] text-zinc-600">{Math.round(stats.maxCumulative / 2)}</span>
-                <span className="text-[9px] text-zinc-600">0</span>
+                <span className="text-[9px] text-muted-2">{stats.maxCumulative}</span>
+                <span className="text-[9px] text-muted-2">{Math.round(stats.maxCumulative / 2)}</span>
+                <span className="text-[9px] text-muted-2">0</span>
               </div>
 
               {/* X-axis labels */}
               <div className="flex justify-between mt-1">
                 {[0, 10, 20, 30, 40, 52].map((w) => (
-                  <span key={w} className="text-[9px] text-zinc-600">
+                  <span key={w} className="text-[9px] text-muted-2">
                     {w}
                   </span>
                 ))}
               </div>
             </div>
-            <p className="text-[10px] text-zinc-600 text-center mt-1">Week of Year</p>
+            <p className="text-[10px] text-muted-2 text-center mt-1">Week of Year</p>
           </div>
         </section>
 
         {/* Ratio by book length */}
         <section>
-          <h2 className="text-lg font-semibold text-zinc-100 mb-3">
+          <h2 className="text-lg font-semibold text-foreground mb-3">
             Read / Unread Ratio by Book Length
           </h2>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+          <div className="bg-surface border border-border-custom rounded-xl p-4">
             <div className="flex items-center gap-4 mb-4 text-xs">
               <div className="flex items-center gap-1.5">
                 <div className="w-3 h-3 rounded-sm bg-emerald-500" />
-                <span className="text-zinc-400">Read</span>
+                <span className="text-muted">Read</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="w-3 h-3 rounded-sm bg-blue-500" />
-                <span className="text-zinc-400">Reading</span>
+                <span className="text-muted">Reading</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="w-3 h-3 rounded-sm bg-rose-400/60" />
-                <span className="text-zinc-400">Unread</span>
+                <span className="text-muted">Unread</span>
               </div>
             </div>
 
@@ -586,22 +586,22 @@ export default function StatsPage() {
                       <div className="bg-emerald-500 transition-all" style={{ flex: d.readPct }} />
                     </div>
                   ) : (
-                    <div className="w-full bg-zinc-800 h-2 rounded-t" />
+                    <div className="w-full bg-surface-2 h-2 rounded-t" />
                   )}
-                  <span className="text-[9px] text-zinc-500 mt-2 whitespace-nowrap">{d.label}</span>
+                  <span className="text-[9px] text-muted mt-2 whitespace-nowrap">{d.label}</span>
                 </div>
               ))}
             </div>
-            <p className="text-[10px] text-zinc-600 text-center mt-1">Book Length (pages)</p>
+            <p className="text-[10px] text-muted-2 text-center mt-1">Book Length (pages)</p>
           </div>
         </section>
 
         {/* Duration vs Book Length scatter plot */}
         {stats.scatterData.length > 0 && (
           <section>
-            <h2 className="text-lg font-semibold text-zinc-100 mb-1">Reading Duration vs Book Length</h2>
-            <p className="text-sm text-zinc-500 mb-3">How long do different sized books take? Dot size = rating.</p>
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+            <h2 className="text-lg font-semibold text-foreground mb-1">Reading Duration vs Book Length</h2>
+            <p className="text-sm text-muted mb-3">How long do different sized books take? Dot size = rating.</p>
+            <div className="bg-surface border border-border-custom rounded-xl p-4">
               <div className="relative" style={{ height: 320 }}>
                 <svg viewBox="0 0 520 310" className="w-full h-full" preserveAspectRatio="xMidYMid meet">
                   {/* Grid lines */}
@@ -653,16 +653,16 @@ export default function StatsPage() {
               </div>
 
               <div className="flex flex-wrap gap-3 mt-3 text-xs items-center">
-                <span className="text-zinc-500">Dot size = rating:</span>
+                <span className="text-muted">Dot size = rating:</span>
                 {[{r:1,c:"bg-red-500"},{r:2,c:"bg-orange-500"},{r:3,c:"bg-yellow-500"},{r:4,c:"bg-emerald-500"},{r:5,c:"bg-blue-500"}].map(({r,c}) => (
                   <div key={r} className="flex items-center gap-1">
                     <div className={`rounded-full ${c}`} style={{width: 4+r*2.5, height: 4+r*2.5}} />
-                    <span className="text-zinc-400">{r}★</span>
+                    <span className="text-muted">{r}★</span>
                   </div>
                 ))}
                 <div className="flex items-center gap-1">
-                  <div className="rounded-full bg-zinc-500" style={{width: 4, height: 4}} />
-                  <span className="text-zinc-500">unrated</span>
+                  <div className="rounded-full bg-muted" style={{width: 4, height: 4}} />
+                  <span className="text-muted">unrated</span>
                 </div>
               </div>
             </div>
@@ -671,17 +671,17 @@ export default function StatsPage() {
 
         {/* Author stats */}
         <section>
-          <h2 className="text-lg font-semibold text-zinc-100 mb-3">Authors</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-3">Authors</h2>
           <div className="grid grid-cols-2 gap-3 mb-4">
             <StatCard label="Unique Authors" value={stats.uniqueAuthors} />
             <StatCard label={`Books This Year (${new Date().getFullYear()})`} value={`${stats.booksThisYear} → ${stats.projectedBooksThisYear} proj.`} color="emerald" />
           </div>
           {stats.topAuthors.length > 0 && (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-2">
+            <div className="bg-surface border border-border-custom rounded-xl p-4 space-y-2">
               {stats.topAuthors.map(([author, counts]) => (
                 <div key={author} className="flex items-center justify-between">
-                  <span className="text-sm text-zinc-300 truncate mr-3">{author}</span>
-                  <span className="text-xs text-zinc-500 flex-shrink-0">{counts.books} books · {counts.read} read</span>
+                  <span className="text-sm text-foreground truncate mr-3">{author}</span>
+                  <span className="text-xs text-muted flex-shrink-0">{counts.books} books · {counts.read} read</span>
                 </div>
               ))}
             </div>
@@ -690,7 +690,7 @@ export default function StatsPage() {
 
         {/* Skill stats */}
         <section>
-          <h2 className="text-lg font-semibold text-zinc-100 mb-3">Skills</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-3">Skills</h2>
           <div className="grid grid-cols-2 gap-3">
             <StatCard label="Expert-level Skills (20+)" value={stats.expertSkills} color="emerald" />
             <StatCard label="Master-level Skills (50+)" value={stats.masterSkills} color="blue" />
@@ -700,12 +700,12 @@ export default function StatsPage() {
         {/* Top sources */}
         {stats.topSources.length > 0 && (
           <section>
-            <h2 className="text-lg font-semibold text-zinc-100 mb-3">Top Sources</h2>
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-2.5">
+            <h2 className="text-lg font-semibold text-foreground mb-3">Top Sources</h2>
+            <div className="bg-surface border border-border-custom rounded-xl p-4 space-y-2.5">
               {stats.topSources.map(([source, count]) => (
                 <div key={source} className="flex items-center justify-between">
-                  <span className="text-sm text-zinc-300">{source}</span>
-                  <span className="text-sm text-zinc-500">{count}</span>
+                  <span className="text-sm text-foreground">{source}</span>
+                  <span className="text-sm text-muted">{count}</span>
                 </div>
               ))}
             </div>
@@ -716,11 +716,11 @@ export default function StatsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {stats.topUserTopics.length > 0 && (
             <section>
-              <h2 className="text-lg font-semibold text-zinc-100 mb-3">Your Topics</h2>
+              <h2 className="text-lg font-semibold text-foreground mb-3">Your Topics</h2>
               <div className="flex flex-wrap gap-1.5">
                 {stats.topUserTopics.map(([topic, count]) => (
-                  <span key={topic} className="bg-zinc-800 text-zinc-300 px-2.5 py-1 rounded-full text-xs">
-                    {topic} <span className="text-zinc-500">({count})</span>
+                  <span key={topic} className="bg-surface-2 text-foreground px-2.5 py-1 rounded-full text-xs">
+                    {topic} <span className="text-muted">({count})</span>
                   </span>
                 ))}
               </div>
@@ -729,11 +729,11 @@ export default function StatsPage() {
 
           {stats.topAutoTopics.length > 0 && (
             <section>
-              <h2 className="text-lg font-semibold text-zinc-100 mb-3">Standard Subjects</h2>
+              <h2 className="text-lg font-semibold text-foreground mb-3">Standard Subjects</h2>
               <div className="flex flex-wrap gap-1.5">
                 {stats.topAutoTopics.map(([topic, count]) => (
-                  <span key={topic} className="bg-zinc-800/50 text-zinc-400 px-2.5 py-1 rounded-full text-xs">
-                    {topic} <span className="text-zinc-500">({count})</span>
+                  <span key={topic} className="bg-surface-2/50 text-muted px-2.5 py-1 rounded-full text-xs">
+                    {topic} <span className="text-muted">({count})</span>
                   </span>
                 ))}
               </div>
@@ -757,7 +757,7 @@ function ContributionHeatmap({
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
 
   const getColorClass = (pages: number) => {
-    if (pages === 0) return "bg-zinc-800";
+    if (pages === 0) return "bg-surface-2";
     const ratio = pages / maxPagesInDay;
     if (ratio >= 0.8) return "bg-emerald-400";
     if (ratio >= 0.6) return "bg-emerald-500";
@@ -766,7 +766,7 @@ function ContributionHeatmap({
   };
 
   const getHoverColor = (pages: number) => {
-    if (pages === 0) return "hover:bg-zinc-700";
+    if (pages === 0) return "hover:bg-border-custom";
     const ratio = pages / maxPagesInDay;
     if (ratio >= 0.8) return "hover:bg-emerald-300";
     if (ratio >= 0.6) return "hover:bg-emerald-400";
@@ -817,7 +817,7 @@ function ContributionHeatmap({
           {monthLabels.map((label, idx) => (
             <div
               key={`${label.month}-${idx}`}
-              className="text-xs text-zinc-500 font-medium"
+              className="text-xs text-muted font-medium"
               style={{
                 width: `${(label.weekIndex === monthLabels[idx + 1]?.weekIndex ? monthLabels[idx + 1].weekIndex - label.weekIndex : 4) * 14}px`,
               }}
@@ -830,7 +830,7 @@ function ContributionHeatmap({
         {/* Heatmap grid */}
         <div className="flex gap-1">
           {/* Day labels on left */}
-          <div className="flex flex-col justify-between pt-1 text-xs text-zinc-600 mr-1" style={{ width: "20px" }}>
+          <div className="flex flex-col justify-between pt-1 text-xs text-muted-2 mr-1" style={{ width: "20px" }}>
             {dayLabelRows.map((dayIdx) => (
               <div key={dayIdx} style={{ height: "12px", marginTop: dayIdx === 0 ? 0 : "2px" }}>
                 {dayLabels[dayLabelRows.indexOf(dayIdx)]}
@@ -851,7 +851,7 @@ function ContributionHeatmap({
                     <div
                       key={dateKey}
                       className={`w-3 h-3 rounded-sm cursor-pointer transition-colors ${
-                        isInRange ? `${getColorClass(pages)} ${getHoverColor(pages)}` : "bg-zinc-950"
+                        isInRange ? `${getColorClass(pages)} ${getHoverColor(pages)}` : "bg-background"
                       }`}
                       onMouseEnter={() => setHoveredDate(dateKey)}
                       onMouseLeave={() => setHoveredDate(null)}
@@ -872,8 +872,8 @@ function ContributionHeatmap({
 
       {/* Tooltip for hovered date */}
       {hoveredDate && pagesPerDay[hoveredDate] !== undefined && (
-        <div className="mt-3 text-sm text-zinc-400">
-          <span className="text-zinc-300 font-medium">
+        <div className="mt-3 text-sm text-muted">
+          <span className="text-foreground font-medium">
             {new Date(hoveredDate).toLocaleDateString("en-US", {
               weekday: "short",
               year: "numeric",
@@ -887,14 +887,14 @@ function ContributionHeatmap({
       )}
 
       {/* Legend */}
-      <div className="flex items-center gap-2 mt-4 pt-3 border-t border-zinc-800 text-xs">
-        <span className="text-zinc-500">Less</span>
-        <div className="w-3 h-3 rounded-sm bg-zinc-800" />
+      <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border-custom text-xs">
+        <span className="text-muted">Less</span>
+        <div className="w-3 h-3 rounded-sm bg-surface-2" />
         <div className="w-3 h-3 rounded-sm bg-emerald-950" />
         <div className="w-3 h-3 rounded-sm bg-emerald-700" />
         <div className="w-3 h-3 rounded-sm bg-emerald-500" />
         <div className="w-3 h-3 rounded-sm bg-emerald-400" />
-        <span className="text-zinc-500">More</span>
+        <span className="text-muted">More</span>
       </div>
     </div>
   );
@@ -912,12 +912,12 @@ function StatCard({
   const valueColor: Record<string, string> = {
     emerald: "text-emerald-400",
     blue: "text-blue-400",
-    default: "text-zinc-100",
+    default: "text-foreground",
   };
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-      <p className="text-xs text-zinc-500 mb-1">{label}</p>
+    <div className="bg-surface border border-border-custom rounded-xl p-4">
+      <p className="text-xs text-muted mb-1">{label}</p>
       <p className={`text-2xl font-bold ${valueColor[color]}`}>{value}</p>
     </div>
   );

@@ -173,7 +173,7 @@ export default function LendingPage() {
   };
 
   const getStatusColor = (dueDate: string | null, returnedDate: string | null) => {
-    if (returnedDate) return 'bg-zinc-800 border-zinc-700';
+    if (returnedDate) return 'bg-surface-2 border-border-custom';
 
     if (!dueDate) return 'bg-emerald-950 border-emerald-500';
 
@@ -212,7 +212,7 @@ export default function LendingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
+      <div className="min-h-screen bg-background text-white flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
           <p className="mt-4">Loading lending data...</p>
@@ -222,15 +222,15 @@ export default function LendingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
+    <div className="min-h-screen bg-background text-white">
       {/* Header */}
-      <div className="border-b border-zinc-800 bg-zinc-900">
-        <div className="max-w-6xl mx-auto px-4 py-6">
+      <div className="border-b border-border-custom bg-surface">
+        <div className="w-full mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link
                 href="/"
-                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-zinc-200 transition-colors text-sm font-medium"
+                className="px-4 py-2 bg-surface-2 hover:bg-border-custom rounded-lg text-foreground transition-colors text-sm font-medium"
               >
                 Back to Library
               </Link>
@@ -247,23 +247,23 @@ export default function LendingPage() {
       </div>
 
       {/* Summary Stats */}
-      <div className="border-b border-zinc-800 bg-zinc-900">
-        <div className="max-w-6xl mx-auto px-4 py-6">
+      <div className="border-b border-border-custom bg-surface">
+        <div className="w-full mx-auto px-4 py-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4">
-              <p className="text-zinc-400 text-sm">Total Books Out</p>
+            <div className="bg-surface-2 border border-border-custom rounded-lg p-4">
+              <p className="text-muted text-sm">Total Books Out</p>
               <p className="text-3xl font-bold text-emerald-500 mt-1">
                 {stats.totalOut}
               </p>
             </div>
-            <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4">
-              <p className="text-zinc-400 text-sm">Unique Borrowers</p>
+            <div className="bg-surface-2 border border-border-custom rounded-lg p-4">
+              <p className="text-muted text-sm">Unique Borrowers</p>
               <p className="text-3xl font-bold text-emerald-500 mt-1">
                 {stats.uniqueBorrowers}
               </p>
             </div>
-            <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4">
-              <p className="text-zinc-400 text-sm">Most Borrowed</p>
+            <div className="bg-surface-2 border border-border-custom rounded-lg p-4">
+              <p className="text-muted text-sm">Most Borrowed</p>
               <p className="text-lg font-bold text-emerald-500 mt-1 truncate">
                 {stats.mostBorrowedBook || 'N/A'}
               </p>
@@ -273,7 +273,7 @@ export default function LendingPage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="w-full mx-auto px-4 py-8">
         {/* Active Loans */}
         <section className="mb-12">
           <h2 className="text-2xl font-bold text-emerald-500 mb-6">
@@ -281,8 +281,8 @@ export default function LendingPage() {
           </h2>
 
           {activeLoans.length === 0 ? (
-            <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-8 text-center">
-              <p className="text-zinc-400">No books currently lent out</p>
+            <div className="bg-surface-2 border border-border-custom rounded-lg p-8 text-center">
+              <p className="text-muted">No books currently lent out</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
@@ -304,8 +304,8 @@ export default function LendingPage() {
                           className="w-20 h-28 rounded-lg object-cover"
                         />
                       ) : (
-                        <div className="w-20 h-24 bg-zinc-700 rounded-lg flex items-center justify-center">
-                          <span className="text-xs text-zinc-500">No cover</span>
+                        <div className="w-20 h-24 bg-border-custom rounded-lg flex items-center justify-center">
+                          <span className="text-xs text-muted">No cover</span>
                         </div>
                       )}
                     </div>
@@ -317,7 +317,7 @@ export default function LendingPage() {
                           <h3 className="text-lg font-bold">
                             {record.book?.title || 'Unknown Book'}
                           </h3>
-                          <p className="text-sm text-zinc-300">
+                          <p className="text-sm text-foreground">
                             {record.book?.author || 'Unknown Author'}
                           </p>
                         </div>
@@ -331,11 +331,11 @@ export default function LendingPage() {
 
                       <div className="grid grid-cols-2 gap-3 text-sm mb-4">
                         <div>
-                          <p className="text-zinc-400">Borrower</p>
+                          <p className="text-muted">Borrower</p>
                           <p className="font-semibold">{record.borrower_name}</p>
                         </div>
                         <div>
-                          <p className="text-zinc-400">Lent</p>
+                          <p className="text-muted">Lent</p>
                           <p className="font-semibold">
                             {new Date(record.lent_date).toLocaleDateString()} (
                             {getDaysOut(record.lent_date)} days out)
@@ -343,7 +343,7 @@ export default function LendingPage() {
                         </div>
                         {record.due_date && (
                           <div>
-                            <p className="text-zinc-400">Due</p>
+                            <p className="text-muted">Due</p>
                             <p
                               className={
                                 isOverdue(record.due_date, record.returned_date)
@@ -358,8 +358,8 @@ export default function LendingPage() {
                       </div>
 
                       {record.notes && (
-                        <div className="mb-4 p-3 bg-black/30 rounded text-sm text-zinc-300">
-                          <p className="text-zinc-400 text-xs mb-1">Notes</p>
+                        <div className="mb-4 p-3 bg-black/30 rounded text-sm text-foreground">
+                          <p className="text-muted text-xs mb-1">Notes</p>
                           {record.notes}
                         </div>
                       )}
@@ -390,7 +390,7 @@ export default function LendingPage() {
               {history.map((record) => (
                 <div
                   key={record.id}
-                  className="border border-zinc-700 bg-zinc-800 rounded-lg p-6 hover:border-zinc-600 transition-colors"
+                  className="border border-border-custom bg-surface-2 rounded-lg p-6 hover:border-border-custom transition-colors"
                 >
                   <div className="flex gap-6">
                     {/* Book Cover */}
@@ -402,8 +402,8 @@ export default function LendingPage() {
                           className="w-20 h-28 rounded-lg object-cover"
                         />
                       ) : (
-                        <div className="w-20 h-24 bg-zinc-700 rounded-lg flex items-center justify-center">
-                          <span className="text-xs text-zinc-500">No cover</span>
+                        <div className="w-20 h-24 bg-border-custom rounded-lg flex items-center justify-center">
+                          <span className="text-xs text-muted">No cover</span>
                         </div>
                       )}
                     </div>
@@ -414,31 +414,31 @@ export default function LendingPage() {
                         <h3 className="text-lg font-bold">
                           {record.book?.title || 'Unknown Book'}
                         </h3>
-                        <p className="text-sm text-zinc-400">
+                        <p className="text-sm text-muted">
                           {record.book?.author || 'Unknown Author'}
                         </p>
                       </div>
 
                       <div className="grid grid-cols-2 gap-3 text-sm mt-3">
                         <div>
-                          <p className="text-zinc-400">Borrower</p>
+                          <p className="text-muted">Borrower</p>
                           <p className="font-semibold">{record.borrower_name}</p>
                         </div>
                         <div>
-                          <p className="text-zinc-400">Lent</p>
+                          <p className="text-muted">Lent</p>
                           <p className="font-semibold">
                             {new Date(record.lent_date).toLocaleDateString()}
                           </p>
                         </div>
                         <div>
-                          <p className="text-zinc-400">Returned</p>
+                          <p className="text-muted">Returned</p>
                           <p className="font-semibold">
                             {new Date(record.returned_date!).toLocaleDateString()}
                           </p>
                         </div>
                         {record.due_date && (
                           <div>
-                            <p className="text-zinc-400">Due Date</p>
+                            <p className="text-muted">Due Date</p>
                             <p className="font-semibold">
                               {new Date(record.due_date).toLocaleDateString()}
                             </p>
@@ -447,8 +447,8 @@ export default function LendingPage() {
                       </div>
 
                       {record.notes && (
-                        <div className="mt-3 p-3 bg-zinc-700/50 rounded text-sm text-zinc-400">
-                          <p className="text-zinc-500 text-xs mb-1">Notes</p>
+                        <div className="mt-3 p-3 bg-border-custom/50 rounded text-sm text-muted">
+                          <p className="text-muted text-xs mb-1">Notes</p>
                           {record.notes}
                         </div>
                       )}
@@ -464,12 +464,12 @@ export default function LendingPage() {
       {/* Lend Book Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-zinc-900 border border-zinc-700 rounded-lg max-w-md w-full p-6">
+          <div className="bg-surface border border-border-custom rounded-lg max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold">Lend a Book</h2>
               <button
                 onClick={() => setShowModal(false)}
-                className="p-1 hover:bg-zinc-800 rounded transition-colors"
+                className="p-1 hover:bg-surface-2 rounded transition-colors"
               >
                 <span className="text-xl leading-none">×</span>
               </button>
@@ -478,7 +478,7 @@ export default function LendingPage() {
             <form onSubmit={handleLendBook} className="space-y-4">
               {/* Book Search/Select */}
               <div>
-                <label className="block text-sm font-semibold text-zinc-300 mb-2">
+                <label className="block text-sm font-semibold text-foreground mb-2">
                   Select Book
                 </label>
                 <input
@@ -486,11 +486,11 @@ export default function LendingPage() {
                   placeholder="Search books by title or author..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 mb-2"
+                  className="w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-white placeholder-muted focus:outline-none focus:border-emerald-500 mb-2"
                 />
 
                 {searchQuery && filteredBooks.length > 0 && (
-                  <div className="max-h-48 overflow-y-auto border border-zinc-700 rounded-lg bg-zinc-800">
+                  <div className="max-h-48 overflow-y-auto border border-border-custom rounded-lg bg-surface-2">
                     {filteredBooks.map((book) => (
                       <button
                         key={book.id}
@@ -499,10 +499,10 @@ export default function LendingPage() {
                           setSelectedBook(book);
                           setSearchQuery('');
                         }}
-                        className="w-full text-left px-3 py-2 hover:bg-zinc-700 border-b border-zinc-700 last:border-b-0 transition-colors"
+                        className="w-full text-left px-3 py-2 hover:bg-border-custom border-b border-border-custom last:border-b-0 transition-colors"
                       >
                         <p className="font-semibold text-sm">{book.title}</p>
-                        <p className="text-xs text-zinc-400">{book.author}</p>
+                        <p className="text-xs text-muted">{book.author}</p>
                       </button>
                     ))}
                   </div>
@@ -511,14 +511,14 @@ export default function LendingPage() {
                 {selectedBook && (
                   <div className="mt-2 p-3 bg-emerald-950 border border-emerald-500 rounded-lg">
                     <p className="text-sm font-semibold">{selectedBook.title}</p>
-                    <p className="text-xs text-zinc-400">{selectedBook.author}</p>
+                    <p className="text-xs text-muted">{selectedBook.author}</p>
                   </div>
                 )}
               </div>
 
               {/* Borrower Name */}
               <div>
-                <label className="block text-sm font-semibold text-zinc-300 mb-2">
+                <label className="block text-sm font-semibold text-foreground mb-2">
                   Borrower Name
                 </label>
                 <input
@@ -526,26 +526,26 @@ export default function LendingPage() {
                   value={borrowerName}
                   onChange={(e) => setBorrowerName(e.target.value)}
                   placeholder="Enter borrower's name"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-white placeholder-muted focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
               {/* Due Date */}
               <div>
-                <label className="block text-sm font-semibold text-zinc-300 mb-2">
+                <label className="block text-sm font-semibold text-foreground mb-2">
                   Due Date (Optional)
                 </label>
                 <input
                   type="date"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
               {/* Notes */}
               <div>
-                <label className="block text-sm font-semibold text-zinc-300 mb-2">
+                <label className="block text-sm font-semibold text-foreground mb-2">
                   Notes (Optional)
                 </label>
                 <textarea
@@ -553,7 +553,7 @@ export default function LendingPage() {
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Add any notes..."
                   rows={3}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 resize-none"
+                  className="w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-white placeholder-muted focus:outline-none focus:border-emerald-500 resize-none"
                 />
               </div>
 
@@ -562,14 +562,14 @@ export default function LendingPage() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg transition-colors"
+                  className="flex-1 bg-surface-2 hover:bg-border-custom text-white px-4 py-2 rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting || !selectedBook || !borrowerName.trim()}
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-zinc-700 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors font-semibold"
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-border-custom disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors font-semibold"
                 >
                   {submitting ? 'Lending...' : 'Lend Book'}
                 </button>

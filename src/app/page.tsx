@@ -13,7 +13,7 @@ import Link from "next/link";
 type FilterStatus = "all" | "not_read" | "reading" | "read" | "favorites";
 type SortMode = "recent" | "alpha" | "rating" | "lcc" | "ddc";
 type HeaderTab = "filter" | "sort";
-type GridSize = "small" | "medium" | "large";
+type GridSize = "xs" | "small" | "medium" | "large" | "xl";
 
 export default function Home() {
   const [books, setBooks] = useState<Book[]>([]);
@@ -326,7 +326,7 @@ export default function Home() {
                     <div>
                       <p className="text-[10px] uppercase tracking-wider text-muted-2 font-semibold mb-2">Book Size</p>
                       <div className="flex gap-1 bg-surface-2 rounded-lg p-0.5">
-                        {([["small", "S"], ["medium", "M"], ["large", "L"]] as const).map(([val, label]) => (
+                        {([["xs", "XS"], ["small", "S"], ["medium", "M"], ["large", "L"], ["xl", "XL"]] as const).map(([val, label]) => (
                           <button
                             key={val}
                             onClick={() => setGridSize(val)}

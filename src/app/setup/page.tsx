@@ -188,15 +188,15 @@ export default function SetupPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-zinc-700 border-t-emerald-500" />
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-border-custom border-t-emerald-500" />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="sticky top-0 z-10 bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800">
-        <div className="max-w-4xl mx-auto px-4 py-4">
+      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border-custom">
+        <div className="w-full mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-3">
             <h1 className="text-2xl font-bold tracking-tight">
               Complete Setup
@@ -205,10 +205,10 @@ export default function SetupPage() {
               <button
                 onClick={handleFetchCovers}
                 disabled={coverRunning || books.filter((b) => !b.cover_url && b.isbn).length === 0}
-                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                className="bg-surface-2 hover:bg-border-custom text-foreground px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5"
               >
                 {coverRunning ? (
-                  <><div className="animate-spin rounded-full h-3 w-3 border border-zinc-600 border-t-emerald-500" /> {coverProgress.done}/{coverProgress.total} ({coverProgress.found} found)</>
+                  <><div className="animate-spin rounded-full h-3 w-3 border border-border-custom border-t-emerald-500" /> {coverProgress.done}/{coverProgress.total} ({coverProgress.found} found)</>
                 ) : (
                   <>🖼️ Fetch Covers</>
                 )}
@@ -216,23 +216,23 @@ export default function SetupPage() {
               <button
                 onClick={handleBatchReimport}
                 disabled={batchRunning || filteredBooks.length === 0}
-                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                className="bg-surface-2 hover:bg-border-custom text-foreground px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5"
               >
                 {batchRunning ? (
-                  <><div className="animate-spin rounded-full h-3 w-3 border border-zinc-600 border-t-emerald-500" /> {batchProgress.done}/{batchProgress.total}</>
+                  <><div className="animate-spin rounded-full h-3 w-3 border border-border-custom border-t-emerald-500" /> {batchProgress.done}/{batchProgress.total}</>
                 ) : (
                   <>🔄 Batch Reimport</>
                 )}
               </button>
               <Link
                 href="/"
-                className="text-zinc-400 hover:text-zinc-200 text-sm font-medium transition-colors"
+                className="text-muted hover:text-foreground text-sm font-medium transition-colors"
               >
                 Back to Library
               </Link>
             </div>
           </div>
-          <p className="text-sm text-zinc-500 mb-4">
+          <p className="text-sm text-muted mb-4">
             Books missing data — tap to edit and fill in details.
           </p>
 
@@ -243,7 +243,7 @@ export default function SetupPage() {
               className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
                 selectedField === "any"
                   ? "bg-amber-600 text-white"
-                  : "bg-zinc-800 text-zinc-400 hover:text-zinc-200"
+                  : "bg-surface-2 text-muted hover:text-foreground"
               }`}
             >
               Any ({fieldCounts["any"]})
@@ -255,7 +255,7 @@ export default function SetupPage() {
                 className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
                   selectedField === f
                     ? "bg-amber-600 text-white"
-                    : "bg-zinc-800 text-zinc-400 hover:text-zinc-200"
+                    : "bg-surface-2 text-muted hover:text-foreground"
                 }`}
               >
                 {FIELD_LABELS[f]} ({fieldCounts[f]})
@@ -265,8 +265,8 @@ export default function SetupPage() {
         </div>
       </header>
 
-      <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-6">
-        <p className="text-xs text-zinc-600 mb-4">
+      <main className="flex-1 w-full mx-auto w-full px-4 py-6">
+        <p className="text-xs text-muted-2 mb-4">
           {filteredBooks.length} book{filteredBooks.length !== 1 ? "s" : ""}{" "}
           need attention
         </p>
@@ -278,7 +278,7 @@ export default function SetupPage() {
               <button
                 key={book.id}
                 onClick={() => setSelectedBook(book)}
-                className="w-full flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-xl p-3 hover:border-zinc-700 transition-colors text-left"
+                className="w-full flex items-center gap-3 bg-surface border border-border-custom rounded-xl p-3 hover:border-border-custom transition-colors text-left"
               >
                 {book.cover_url ? (
                   <img
@@ -287,15 +287,15 @@ export default function SetupPage() {
                     className="w-10 h-14 rounded object-cover flex-shrink-0"
                   />
                 ) : (
-                  <div className="w-10 h-14 rounded bg-zinc-800 flex items-center justify-center flex-shrink-0">
-                    <span className="text-zinc-600 text-[8px]">No Cover</span>
+                  <div className="w-10 h-14 rounded bg-surface-2 flex items-center justify-center flex-shrink-0">
+                    <span className="text-muted-2 text-[8px]">No Cover</span>
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-zinc-200 truncate">
+                  <p className="text-sm font-medium text-foreground truncate">
                     {book.title}
                   </p>
-                  <p className="text-xs text-zinc-500 truncate">
+                  <p className="text-xs text-muted truncate">
                     {book.author}
                   </p>
                   <div className="flex flex-wrap gap-1 mt-1.5">
@@ -317,7 +317,7 @@ export default function SetupPage() {
         {filteredBooks.length === 0 && (
           <div className="text-center py-20">
             <p className="text-4xl mb-4">✅</p>
-            <p className="text-zinc-400 text-lg">All books are complete!</p>
+            <p className="text-muted text-lg">All books are complete!</p>
           </div>
         )}
       </main>

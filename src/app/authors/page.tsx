@@ -14,7 +14,9 @@ interface AuthorData {
   averageRating: number | null;
   ethnicity: string | null;
   nationality: string | null;
+  religious_tradition: string | null;
   image_url: string | null;
+  profile_url: string | null;
   id?: string;
 }
 
@@ -151,6 +153,28 @@ const NATIONALITY_OPTIONS = [
   "Zimbabwean",
 ];
 
+const RELIGIOUS_TRADITION_OPTIONS = [
+  "Christian — Catholic",
+  "Christian — Protestant",
+  "Christian — Orthodox",
+  "Christian — Evangelical",
+  "Christian — Non-denominational",
+  "Jewish — Orthodox",
+  "Jewish — Conservative",
+  "Jewish — Reform",
+  "Muslim — Sunni",
+  "Muslim — Shia",
+  "Muslim — Sufi",
+  "Hindu",
+  "Buddhist",
+  "Sikh",
+  "Atheist / Agnostic",
+  "Spiritual / Non-religious",
+  "Mormon / LDS",
+  "Jehovah's Witness",
+  "Other",
+];
+
 const colorPalette = ["emerald", "blue", "purple", "pink", "amber", "cyan", "rose", "orange"];
 
 const getInitials = (name: string): string => {
@@ -227,25 +251,25 @@ function DropdownSelector({
     <div className="relative">
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="px-2 py-1 bg-zinc-800 rounded text-xs text-zinc-300 cursor-pointer hover:bg-zinc-700 transition-colors"
+        className="px-2 py-1 bg-surface-2 rounded text-xs text-foreground cursor-pointer hover:bg-border-custom transition-colors"
       >
         {value ? (
           <span>
             {label}: {value}
           </span>
         ) : (
-          <span className="text-zinc-500 italic">+ Add {label.toLowerCase()}</span>
+          <span className="text-muted italic">+ Add {label.toLowerCase()}</span>
         )}
       </div>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg">
+        <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-surface-2 border border-border-custom rounded-lg shadow-lg">
           <input
             type="text"
             placeholder={`Search ${label.toLowerCase()}...`}
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            className="w-full px-3 py-2 bg-zinc-750 text-xs text-zinc-200 placeholder-zinc-500 border-b border-zinc-700 focus:outline-none"
+            className="w-full px-3 py-2 bg-surface-2 text-xs text-foreground placeholder-muted border-b border-border-custom focus:outline-none"
             autoFocus
           />
           <div className="max-h-48 overflow-y-auto">
@@ -254,17 +278,17 @@ function DropdownSelector({
                 <div
                   key={option}
                   onClick={() => handleSelect(option)}
-                  className="px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 cursor-pointer"
+                  className="px-3 py-2 text-xs text-foreground hover:bg-border-custom cursor-pointer"
                 >
                   {option}
                 </div>
               ))
             ) : (
-              <div className="px-3 py-2 text-xs text-zinc-500 italic">No matches</div>
+              <div className="px-3 py-2 text-xs text-muted italic">No matches</div>
             )}
           </div>
           {value && (
-            <div className="border-t border-zinc-700 px-3 py-2">
+            <div className="border-t border-border-custom px-3 py-2">
               <button
                 onClick={handleClear}
                 className="text-xs text-red-400 hover:text-red-300 transition-colors"
@@ -284,6 +308,73 @@ function DropdownSelector({
             setSearchInput("");
           }}
         />
+      )}
+    </div>
+  );
+}
+
+// Profile URL Input Component
+function ProfileUrlInput({
+  value,
+  onSave,
+}: {
+  value: string | null;
+  onSave: (url: string | null) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [inputValue, setInputValue] = useState(value || "");
+
+  const handleSave = () => {
+    const trimmed = inputValue.trim();
+    onSave(trimmed || null);
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") handleSave();
+    if (e.key === "Escape") {
+      setInputValue(value || "");
+      setIsEditing(false);
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <div className="flex gap-1">
+        <input
+          type="url"
+          placeholder="Profile URL..."
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={handleSave}
+          className="flex-1 min-w-0 px-2 py-1 bg-surface-2 border border-border-custom rounded text-xs text-foreground placeholder-muted focus:outline-none focus:border-emerald-500"
+          autoFocus
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onClick={() => {
+        setInputValue(value || "");
+        setIsEditing(true);
+      }}
+      className="px-2 py-1 bg-surface-2 rounded text-xs cursor-pointer hover:bg-border-custom transition-colors truncate"
+    >
+      {value ? (
+        <a
+          href={value}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="text-blue-400 hover:text-blue-300 underline"
+        >
+          Profile ↗
+        </a>
+      ) : (
+        <span className="text-muted italic">+ Add profile URL</span>
       )}
     </div>
   );
@@ -415,21 +506,21 @@ function ImageSearchModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 max-w-2xl w-full mx-4">
+      <div className="bg-surface border border-border-custom rounded-lg p-6 w-full w-full mx-4">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-bold text-zinc-100">
+          <h2 className="text-lg font-bold text-foreground">
             Find photo for {authorName}
           </h2>
           <button
             onClick={onClose}
-            className="text-zinc-400 hover:text-zinc-200 text-2xl leading-none"
+            className="text-muted hover:text-foreground text-2xl leading-none"
           >
             ×
           </button>
         </div>
 
         {loading ? (
-          <div className="text-center py-8 text-zinc-400">
+          <div className="text-center py-8 text-muted">
             Loading images...
           </div>
         ) : error ? (
@@ -442,17 +533,17 @@ function ImageSearchModal({
                 onClick={() => onSelectImage(img.url)}
                 className="cursor-pointer group"
               >
-                <div className="relative overflow-hidden rounded-lg border border-zinc-700 hover:border-emerald-500 transition-colors">
+                <div className="relative overflow-hidden rounded-lg border border-border-custom hover:border-emerald-500 transition-colors">
                   <img
                     src={img.url}
                     alt={`Author ${index + 1}`}
-                    className="w-full h-36 object-cover bg-zinc-800"
+                    className="w-full h-36 object-cover bg-surface-2"
                     onError={(e) => {
                       ((e.target as HTMLImageElement).closest("div.group") as HTMLElement).style.display = "none";
                     }}
                   />
                   <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1">
-                    <span className="text-[10px] text-zinc-300">{img.label}</span>
+                    <span className="text-[10px] text-foreground">{img.label}</span>
                   </div>
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
                     <span className="text-white font-semibold text-sm opacity-0 group-hover:opacity-100 transition-opacity">Select</span>
@@ -505,7 +596,9 @@ export default function AuthorsPage() {
                   averageRating: null,
                   ethnicity: null,
                   nationality: null,
+                  religious_tradition: null,
                   image_url: null,
+                  profile_url: null,
                 });
               }
 
@@ -544,7 +637,9 @@ export default function AuthorsPage() {
             if (author) {
               author.ethnicity = metadata.ethnicity;
               author.nationality = metadata.nationality;
+              author.religious_tradition = metadata.religious_tradition || null;
               author.image_url = metadata.image_url;
+              author.profile_url = metadata.profile_url || null;
               author.id = metadata.id;
             }
           });
@@ -596,7 +691,7 @@ export default function AuthorsPage() {
   }, []);
 
   const handleSaveMetadata = useCallback(
-    async (authorName: string, field: "ethnicity" | "nationality", value: string | null) => {
+    async (authorName: string, field: "ethnicity" | "nationality" | "religious_tradition", value: string | null) => {
       try {
         // Get current author data to preserve other fields
         const currentAuthor = authors.find((a) => a.name === authorName);
@@ -604,7 +699,9 @@ export default function AuthorsPage() {
           name: authorName,
           ethnicity: currentAuthor?.ethnicity ?? null,
           nationality: currentAuthor?.nationality ?? null,
+          religious_tradition: currentAuthor?.religious_tradition ?? null,
           image_url: currentAuthor?.image_url ?? null,
+          profile_url: currentAuthor?.profile_url ?? null,
           [field]: value,
         };
 
@@ -634,7 +731,9 @@ export default function AuthorsPage() {
           name: authorName,
           ethnicity: currentAuthor?.ethnicity ?? null,
           nationality: currentAuthor?.nationality ?? null,
+          religious_tradition: currentAuthor?.religious_tradition ?? null,
           image_url: imageUrl,
+          profile_url: currentAuthor?.profile_url ?? null,
         };
 
         const { error } = await supabase.from("authors").upsert([upsertData], { onConflict: "name" });
@@ -657,25 +756,56 @@ export default function AuthorsPage() {
     [authors]
   );
 
+  const handleSaveProfileUrl = useCallback(
+    async (authorName: string, url: string | null) => {
+      try {
+        const currentAuthor = authors.find((a) => a.name === authorName);
+        const upsertData: Record<string, unknown> = {
+          name: authorName,
+          ethnicity: currentAuthor?.ethnicity ?? null,
+          nationality: currentAuthor?.nationality ?? null,
+          religious_tradition: currentAuthor?.religious_tradition ?? null,
+          image_url: currentAuthor?.image_url ?? null,
+          profile_url: url,
+        };
+
+        const { error } = await supabase.from("authors").upsert([upsertData], { onConflict: "name" });
+
+        if (error) throw error;
+
+        setAuthors((prev) =>
+          prev.map((author) =>
+            author.name === authorName
+              ? { ...author, profile_url: url }
+              : author
+          )
+        );
+      } catch (error) {
+        console.error("Error saving profile URL:", error);
+      }
+    },
+    [authors]
+  );
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-950 text-zinc-200 flex items-center justify-center">
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
         <div className="text-lg">Loading authors...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-200 p-6">
+    <div className="min-h-screen bg-background text-foreground p-6">
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-4xl font-bold text-emerald-500">
-            Authors <span className="text-zinc-400 text-lg">({filteredAndSortedAuthors.length})</span>
+            Authors <span className="text-muted text-lg">({filteredAndSortedAuthors.length})</span>
           </h1>
           <Link
             href="/"
-            className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 rounded-lg text-zinc-200 transition-colors"
+            className="px-4 py-2 bg-surface hover:bg-surface-2 rounded-lg text-foreground transition-colors"
           >
             Back to Library
           </Link>
@@ -688,7 +818,7 @@ export default function AuthorsPage() {
             placeholder="Filter authors by name..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+            className="w-full px-4 py-2 bg-surface border border-border-custom rounded-lg text-foreground placeholder-muted focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
           />
         </div>
 
@@ -698,8 +828,8 @@ export default function AuthorsPage() {
             onClick={() => handleSort("bookCount")}
             className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
               sortConfig.key === "bookCount"
-                ? "bg-emerald-500 text-zinc-950"
-                : "bg-zinc-900 text-zinc-200 hover:bg-zinc-800"
+                ? "bg-emerald-500 text-background"
+                : "bg-surface text-foreground hover:bg-surface-2"
             }`}
           >
             Books {sortConfig.key === "bookCount" && (sortConfig.direction === "desc" ? "↓" : "↑")}
@@ -708,8 +838,8 @@ export default function AuthorsPage() {
             onClick={() => handleSort("name")}
             className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
               sortConfig.key === "name"
-                ? "bg-emerald-500 text-zinc-950"
-                : "bg-zinc-900 text-zinc-200 hover:bg-zinc-800"
+                ? "bg-emerald-500 text-background"
+                : "bg-surface text-foreground hover:bg-surface-2"
             }`}
           >
             Name {sortConfig.key === "name" && (sortConfig.direction === "desc" ? "↓" : "↑")}
@@ -718,8 +848,8 @@ export default function AuthorsPage() {
             onClick={() => handleSort("averageRating")}
             className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
               sortConfig.key === "averageRating"
-                ? "bg-emerald-500 text-zinc-950"
-                : "bg-zinc-900 text-zinc-200 hover:bg-zinc-800"
+                ? "bg-emerald-500 text-background"
+                : "bg-surface text-foreground hover:bg-surface-2"
             }`}
           >
             Rating {sortConfig.key === "averageRating" && (sortConfig.direction === "desc" ? "↓" : "↑")}
@@ -729,11 +859,11 @@ export default function AuthorsPage() {
 
       {/* Cards Grid */}
       {filteredAndSortedAuthors.length === 0 ? (
-        <div className="p-8 text-center text-zinc-400">
+        <div className="p-8 text-center text-muted">
           {searchTerm ? "No authors match your search." : "No authors found."}
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
           {filteredAndSortedAuthors.map((author) => {
             const avatarColor = getAvatarColor(author.name);
             const colorClasses = getColorClasses(avatarColor);
@@ -742,7 +872,7 @@ export default function AuthorsPage() {
             return (
               <div
                 key={author.name}
-                className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 hover:border-zinc-700 transition-colors relative focus-within:z-50"
+                className="bg-surface rounded-xl border border-border-custom p-4 hover:border-border-custom transition-colors relative focus-within:z-50"
               >
                 {/* Avatar */}
                 <div className="flex justify-center mb-4">
@@ -754,7 +884,7 @@ export default function AuthorsPage() {
                       <img
                         src={author.image_url}
                         alt={author.name}
-                        className="w-16 h-16 rounded-full object-cover border border-zinc-700 group-hover:border-emerald-500 transition-colors"
+                        className="w-16 h-16 rounded-full object-cover border border-border-custom group-hover:border-emerald-500 transition-colors"
                       />
                     ) : (
                       <div
@@ -767,13 +897,13 @@ export default function AuthorsPage() {
                 </div>
 
                 {/* Author Name */}
-                <h3 className="text-center font-bold text-zinc-100 mb-3 text-sm break-words">
+                <h3 className="text-center font-bold text-foreground mb-3 text-sm break-words">
                   {author.name}
                 </h3>
 
                 {/* Stats */}
-                <div className="text-center text-xs text-zinc-400 mb-4">
-                  <div className="font-semibold text-zinc-300">
+                <div className="text-center text-xs text-muted mb-4">
+                  <div className="font-semibold text-foreground">
                     {author.bookCount} books · {author.readCount} read · {author.averageRating !== null ? author.averageRating.toFixed(1) : "—"}★ avg
                   </div>
                 </div>
@@ -796,6 +926,21 @@ export default function AuthorsPage() {
                     onSelect={(value) => handleSaveMetadata(author.name, "nationality", value)}
                     onClear={() => handleSaveMetadata(author.name, "nationality", null)}
                     label="Nationality"
+                  />
+
+                  {/* Religious Tradition Dropdown */}
+                  <DropdownSelector
+                    value={author.religious_tradition}
+                    options={RELIGIOUS_TRADITION_OPTIONS}
+                    onSelect={(value) => handleSaveMetadata(author.name, "religious_tradition", value)}
+                    onClear={() => handleSaveMetadata(author.name, "religious_tradition", null)}
+                    label="Tradition"
+                  />
+
+                  {/* Profile URL */}
+                  <ProfileUrlInput
+                    value={author.profile_url}
+                    onSave={(url) => handleSaveProfileUrl(author.name, url)}
                   />
                 </div>
               </div>

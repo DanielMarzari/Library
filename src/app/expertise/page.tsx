@@ -34,11 +34,11 @@ const TIERS: Tier[] = [
     name: 'Familiar',
     minBooks: 2,
     maxBooks: 9,
-    color: 'zinc',
-    bgColor: 'bg-zinc-800',
-    badgeBg: 'bg-zinc-700/40',
-    badgeText: 'text-zinc-300',
-    progressColor: 'bg-zinc-600',
+    color: 'gray',
+    bgColor: 'bg-surface-2',
+    badgeBg: 'bg-border-custom/40',
+    badgeText: 'text-foreground',
+    progressColor: 'bg-muted-2',
   },
   {
     name: 'Knowledgeable',
@@ -191,17 +191,17 @@ export default function SkillsPage() {
   }));
 
   return (
-    <div className="min-h-screen bg-zinc-950">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-zinc-900 border-b border-zinc-800 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
+      <div className="bg-surface border-b border-border-custom sticky top-0 z-10">
+        <div className="w-full mx-auto px-6 py-6 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-zinc-100">Skills</h1>
-            <p className="text-zinc-400 mt-1">Track your knowledge across topics</p>
+            <h1 className="text-3xl font-bold text-foreground">Skills</h1>
+            <p className="text-muted mt-1">Track your knowledge across topics</p>
           </div>
           <Link
             href="/"
-            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 rounded-lg transition text-sm font-medium"
+            className="px-4 py-2 bg-surface-2 hover:bg-border-custom text-foreground rounded-lg transition text-sm font-medium"
           >
             ← Back to Library
           </Link>
@@ -209,10 +209,10 @@ export default function SkillsPage() {
       </div>
 
       {/* Topic Source Toggle */}
-      <div className="bg-zinc-900/50 border-b border-zinc-800">
-        <div className="max-w-6xl mx-auto px-6 py-4">
+      <div className="bg-surface/50 border-b border-border-custom">
+        <div className="w-full mx-auto px-6 py-4">
           <div className="flex items-center gap-3">
-            <span className="text-sm text-zinc-400">View topics from:</span>
+            <span className="text-sm text-muted">View topics from:</span>
             <div className="flex gap-2">
               {(['combined', 'user', 'auto'] as const).map((source) => (
                 <button
@@ -221,7 +221,7 @@ export default function SkillsPage() {
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
                     topicSource === source
                       ? 'bg-blue-600 text-white'
-                      : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                      : 'bg-surface-2 text-foreground hover:bg-border-custom'
                   }`}
                 >
                   {source === 'combined'
@@ -237,32 +237,32 @@ export default function SkillsPage() {
       </div>
 
       {/* Content */}
-      <div className="max-w-6xl mx-auto px-6 py-8">
+      <div className="w-full mx-auto px-6 py-8">
         {loading ? (
           <div className="text-center py-12">
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-            <p className="text-zinc-400 mt-4">Loading your skills...</p>
+            <p className="text-muted mt-4">Loading your skills...</p>
           </div>
         ) : topics.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-zinc-400 text-lg">
+            <p className="text-muted text-lg">
               No skills tracked yet. Start reading to build your knowledge!
             </p>
           </div>
         ) : (
           <>
             {/* Summary Stats */}
-            <div className="mb-8 bg-zinc-900 rounded-lg border border-zinc-800 p-6">
-              <h2 className="text-sm font-semibold text-zinc-400 uppercase mb-4">Summary</h2>
+            <div className="mb-8 bg-surface rounded-lg border border-border-custom p-6">
+              <h2 className="text-sm font-semibold text-muted uppercase mb-4">Summary</h2>
               <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
                 <div>
-                  <p className="text-2xl font-bold text-zinc-100">{totalSkills}</p>
-                  <p className="text-xs text-zinc-500 mt-1">Skills Tracked</p>
+                  <p className="text-2xl font-bold text-foreground">{totalSkills}</p>
+                  <p className="text-xs text-muted mt-1">Skills Tracked</p>
                 </div>
                 {statsByTier.map(({ tier, count }) => (
                   <div key={tier}>
-                    <p className="text-2xl font-bold text-zinc-100">{count}</p>
-                    <p className="text-xs text-zinc-500 mt-1">{tier}</p>
+                    <p className="text-2xl font-bold text-foreground">{count}</p>
+                    <p className="text-xs text-muted mt-1">{tier}</p>
                   </div>
                 ))}
               </div>
@@ -283,10 +283,10 @@ export default function SkillsPage() {
                       return (
                         <div
                           key={topic.topic}
-                          className={`${topicTier.bgColor} rounded-lg p-6 border border-zinc-800 transition hover:border-zinc-700`}
+                          className={`${topicTier.bgColor} rounded-lg p-6 border border-border-custom transition hover:border-border-custom`}
                         >
                           <div className="flex items-start justify-between mb-4">
-                            <h3 className="text-lg font-semibold text-zinc-100">
+                            <h3 className="text-lg font-semibold text-foreground">
                               {topic.topic}
                             </h3>
                             <span
@@ -297,7 +297,7 @@ export default function SkillsPage() {
                           </div>
 
                           <div className="mb-4">
-                            <div className="w-full bg-zinc-800 rounded-full h-3 overflow-hidden">
+                            <div className="w-full bg-surface-2 rounded-full h-3 overflow-hidden">
                               <div
                                 className={`h-full ${topicTier.progressColor} transition-all duration-300`}
                                 style={{ width: `${topic.progressPercent}%` }}
@@ -306,13 +306,13 @@ export default function SkillsPage() {
                           </div>
 
                           <div className="flex items-baseline justify-between">
-                            <p className="text-sm text-zinc-400">
-                              <span className="font-semibold text-zinc-100">{topic.readBooks}</span>
+                            <p className="text-sm text-muted">
+                              <span className="font-semibold text-foreground">{topic.readBooks}</span>
                               {topic.tier === 'Scholar'
                                 ? ' books read'
                                 : ` / ${topic.nextTierThreshold} books`}
                             </p>
-                            <p className="text-xs text-zinc-500">
+                            <p className="text-xs text-muted">
                               {topic.totalBooks} total
                             </p>
                           </div>

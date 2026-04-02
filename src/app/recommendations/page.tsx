@@ -190,15 +190,15 @@ export default function RecommendationsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800">
-        <div className="max-w-4xl mx-auto px-4 py-4">
+      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border-custom">
+        <div className="w-full mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-2xl font-bold tracking-tight">Recommendations</h1>
             <Link
               href="/"
-              className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+              className="bg-surface-2 hover:bg-border-custom text-foreground px-3 py-2 rounded-lg text-sm font-medium transition-colors"
             >
               ← Back to Library
             </Link>
@@ -207,17 +207,17 @@ export default function RecommendationsPage() {
       </header>
 
       {/* Main content */}
-      <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-6">
+      <main className="flex-1 w-full mx-auto w-full px-4 py-6">
         {/* Add Recommendation Form */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 mb-8">
-          <h2 className="text-lg font-semibold text-zinc-100 mb-4">
+        <div className="bg-surface border border-border-custom rounded-lg p-6 mb-8">
+          <h2 className="text-lg font-semibold text-foreground mb-4">
             Add a Recommendation
           </h2>
 
           <div className="space-y-4">
             {/* Search Input */}
             <div className="relative">
-              <label className="block text-sm font-medium text-zinc-300 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 Search by Title or ISBN
               </label>
               <input
@@ -225,14 +225,14 @@ export default function RecommendationsPage() {
                 placeholder="Enter book title or ISBN..."
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                className="w-full bg-surface-2 border border-border-custom rounded-lg px-4 py-2.5 text-sm text-foreground placeholder-muted focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
               />
 
               {/* Search Results Dropdown */}
               {showSearchResults && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-surface-2 border border-border-custom rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
                   {searching ? (
-                    <div className="p-3 text-center text-zinc-400 text-sm">
+                    <div className="p-3 text-center text-muted text-sm">
                       Searching...
                     </div>
                   ) : searchResults.length > 0 ? (
@@ -243,18 +243,18 @@ export default function RecommendationsPage() {
                           setSelectedResult(result);
                           setShowSearchResults(false);
                         }}
-                        className="w-full text-left px-4 py-2.5 hover:bg-zinc-700 border-b border-zinc-700 last:border-0 transition-colors"
+                        className="w-full text-left px-4 py-2.5 hover:bg-border-custom border-b border-border-custom last:border-0 transition-colors"
                       >
-                        <div className="font-medium text-zinc-100 text-sm">
+                        <div className="font-medium text-foreground text-sm">
                           {result.title}
                         </div>
-                        <div className="text-xs text-zinc-400">
+                        <div className="text-xs text-muted">
                           {result.author || "Unknown author"}
                         </div>
                       </button>
                     ))
                   ) : (
-                    <div className="p-3 text-center text-zinc-400 text-sm">
+                    <div className="p-3 text-center text-muted text-sm">
                       No results found
                     </div>
                   )}
@@ -264,7 +264,7 @@ export default function RecommendationsPage() {
 
             {/* Selected Book */}
             {selectedResult && (
-              <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4">
+              <div className="bg-surface-2 border border-border-custom rounded-lg p-4">
                 <div className="flex items-start gap-4">
                   {selectedResult.cover_url && (
                     <img
@@ -274,21 +274,21 @@ export default function RecommendationsPage() {
                     />
                   )}
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-zinc-100 text-sm mb-1">
+                    <h3 className="font-semibold text-foreground text-sm mb-1">
                       {selectedResult.title}
                     </h3>
-                    <p className="text-xs text-zinc-400 mb-3">
+                    <p className="text-xs text-muted mb-3">
                       {selectedResult.author || "Unknown author"}
                     </p>
                     {selectedResult.description && (
-                      <p className="text-xs text-zinc-500 line-clamp-2">
+                      <p className="text-xs text-muted line-clamp-2">
                         {selectedResult.description}
                       </p>
                     )}
                   </div>
                   <button
                     onClick={() => setSelectedResult(null)}
-                    className="text-zinc-400 hover:text-zinc-200 text-sm"
+                    className="text-muted hover:text-foreground text-sm"
                   >
                     ✕
                   </button>
@@ -298,7 +298,7 @@ export default function RecommendationsPage() {
 
             {/* Recommended By */}
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 Recommended By
               </label>
               <input
@@ -306,13 +306,13 @@ export default function RecommendationsPage() {
                 placeholder="e.g., Sarah, Uncle Mike, Twitter..."
                 value={recommendedBy}
                 onChange={(e) => setRecommendedBy(e.target.value)}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                className="w-full bg-surface-2 border border-border-custom rounded-lg px-4 py-2.5 text-sm text-foreground placeholder-muted focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
               />
             </div>
 
             {/* Notes */}
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 Notes (Why should I read it?)
               </label>
               <textarea
@@ -320,7 +320,7 @@ export default function RecommendationsPage() {
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent resize-none"
+                className="w-full bg-surface-2 border border-border-custom rounded-lg px-4 py-2.5 text-sm text-foreground placeholder-muted focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent resize-none"
               />
             </div>
 
@@ -328,7 +328,7 @@ export default function RecommendationsPage() {
             <button
               onClick={() => handleAddRecommendation()}
               disabled={!selectedResult || addingLoading}
-              className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
+              className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-border-custom disabled:text-muted text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
             >
               {addingLoading ? "Adding..." : "+ Add Recommendation"}
             </button>
@@ -338,13 +338,13 @@ export default function RecommendationsPage() {
         {/* Recommendations List */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-zinc-700 border-t-emerald-500" />
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-border-custom border-t-emerald-500" />
           </div>
         ) : recommendations.length === 0 ? (
           <div className="text-center py-20">
             <p className="text-5xl mb-4">💭</p>
-            <p className="text-zinc-400 text-lg mb-2">No recommendations yet</p>
-            <p className="text-zinc-600 text-sm">
+            <p className="text-muted text-lg mb-2">No recommendations yet</p>
+            <p className="text-muted-2 text-sm">
               Add books people have recommended to you
             </p>
           </div>
@@ -353,34 +353,34 @@ export default function RecommendationsPage() {
             {recommendations.map((rec) => (
               <div
                 key={rec.id}
-                className="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden hover:border-zinc-700 transition-colors flex flex-col"
+                className="bg-surface border border-border-custom rounded-lg overflow-hidden hover:border-border-custom transition-colors flex flex-col"
               >
                 {/* Cover Image */}
                 {rec.cover_url ? (
                   <img
                     src={rec.cover_url}
                     alt={rec.title}
-                    className="w-full h-48 object-cover bg-zinc-800"
+                    className="w-full h-48 object-cover bg-surface-2"
                   />
                 ) : (
-                  <div className="w-full h-48 bg-gradient-to-br from-zinc-800 to-zinc-900 flex items-center justify-center">
+                  <div className="w-full h-48 bg-gradient-to-br from-surface-2 to-surface flex items-center justify-center">
                     <span className="text-4xl">📖</span>
                   </div>
                 )}
 
                 {/* Content */}
                 <div className="p-4 flex flex-col flex-1">
-                  <h3 className="font-semibold text-zinc-100 text-sm line-clamp-2 mb-1">
+                  <h3 className="font-semibold text-foreground text-sm line-clamp-2 mb-1">
                     {rec.title}
                   </h3>
 
                   {rec.author && (
-                    <p className="text-xs text-zinc-400 mb-3">{rec.author}</p>
+                    <p className="text-xs text-muted mb-3">{rec.author}</p>
                   )}
 
                   {rec.recommended_by && (
                     <div className="mb-2">
-                      <p className="text-xs text-zinc-500 mb-1">
+                      <p className="text-xs text-muted mb-1">
                         Recommended by:
                       </p>
                       <p className="text-xs text-emerald-400 font-medium">
@@ -391,15 +391,15 @@ export default function RecommendationsPage() {
 
                   {rec.notes && (
                     <div className="mb-3">
-                      <p className="text-xs text-zinc-500 mb-1">Notes:</p>
-                      <p className="text-xs text-zinc-300 line-clamp-2">
+                      <p className="text-xs text-muted mb-1">Notes:</p>
+                      <p className="text-xs text-foreground line-clamp-2">
                         {rec.notes}
                       </p>
                     </div>
                   )}
 
                   {/* Buttons */}
-                  <div className="mt-auto pt-3 border-t border-zinc-800 flex gap-2">
+                  <div className="mt-auto pt-3 border-t border-border-custom flex gap-2">
                     <button
                       onClick={() => handleAddToLibrary(rec)}
                       className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-lg text-xs font-medium transition-colors"
@@ -409,7 +409,7 @@ export default function RecommendationsPage() {
 
                     <button
                       onClick={() => setDeleteConfirm(rec.id)}
-                      className="px-3 py-2 rounded-lg text-xs font-medium bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200 transition-colors"
+                      className="px-3 py-2 rounded-lg text-xs font-medium bg-surface-2 text-muted hover:bg-border-custom hover:text-foreground transition-colors"
                     >
                       Delete
                     </button>
@@ -419,7 +419,7 @@ export default function RecommendationsPage() {
                 {/* Delete Confirmation */}
                 {deleteConfirm === rec.id && (
                   <div className="absolute inset-0 bg-black/70 rounded-lg flex items-center justify-center z-10 flex flex-col gap-2 p-4">
-                    <p className="text-sm text-zinc-100 text-center">
+                    <p className="text-sm text-foreground text-center">
                       Remove this recommendation?
                     </p>
                     <div className="flex gap-2 w-full">
@@ -431,7 +431,7 @@ export default function RecommendationsPage() {
                       </button>
                       <button
                         onClick={() => setDeleteConfirm(null)}
-                        className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-white px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+                        className="flex-1 bg-border-custom hover:bg-surface-2 text-white px-3 py-2 rounded-lg text-xs font-medium transition-colors"
                       >
                         Cancel
                       </button>
