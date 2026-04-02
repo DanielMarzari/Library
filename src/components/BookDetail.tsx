@@ -270,29 +270,27 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
               <div className="h-40 w-28 rounded-lg bg-zinc-700 flex items-center justify-center cursor-pointer hover:bg-zinc-600"><span className="text-zinc-500 text-xs">No Cover</span></div>
             )}
           </button>
-          <div className="absolute top-3 right-3 flex gap-2">
-            <button onClick={() => { setFavorite(!favorite); scheduleAutoSave(); }} className={`bg-black/40 rounded-full w-8 h-8 flex items-center justify-center text-sm ${favorite ? "text-red-500" : "text-zinc-500 hover:text-zinc-200"}`} title={favorite ? "Remove from favorites" : "Add to favorites"}>
+          <div className="absolute top-3 right-3 grid grid-cols-2 gap-1.5">
+            <button onClick={() => { setFavorite(!favorite); scheduleAutoSave(); }} className={`bg-black/40 backdrop-blur-sm rounded-full w-8 h-8 flex items-center justify-center text-sm ${favorite ? "text-red-500" : "text-zinc-400 hover:text-zinc-200"}`} title={favorite ? "Remove from favorites" : "Add to favorites"}>
               {favorite ? "❤" : "♡"}
             </button>
-            <a href={`https://annas-archive.gl/search?q=${encodeURIComponent(book.title)}`} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-zinc-200 bg-black/40 rounded-full w-8 h-8 flex items-center justify-center text-sm" title="Find PDF">
+            <button onClick={() => setEditing(!editing)} className="text-zinc-400 hover:text-zinc-200 bg-black/40 backdrop-blur-sm rounded-full w-8 h-8 flex items-center justify-center" title="Edit">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+            </button>
+            <a href={`https://annas-archive.gl/search?q=${encodeURIComponent(book.title)}`} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-zinc-200 bg-black/40 backdrop-blur-sm rounded-full w-8 h-8 flex items-center justify-center text-[10px] font-bold" title="Find PDF">
               PDF
             </a>
-            <button onClick={() => setEditing(!editing)} className="text-zinc-400 hover:text-zinc-200 bg-black/40 rounded-full w-8 h-8 flex items-center justify-center text-sm">✏️</button>
-            <button onClick={() => { if (saveTimeoutRef.current) { clearTimeout(saveTimeoutRef.current); doSave(); } onUpdated(); }} className="text-zinc-400 hover:text-zinc-200 bg-black/40 rounded-full w-8 h-8 flex items-center justify-center">×</button>
+            <button onClick={handleRefresh} disabled={refreshing} className="text-zinc-400 hover:text-zinc-200 bg-black/40 backdrop-blur-sm rounded-full w-8 h-8 flex items-center justify-center disabled:opacity-50" title="Refresh from Open Library">
+              {refreshing ? (
+                <div className="animate-spin rounded-full h-3.5 w-3.5 border border-zinc-600 border-t-emerald-500" />
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+              )}
+            </button>
           </div>
         </div>
 
         <div className="p-6 space-y-5">
-          {/* Refresh button - always visible */}
-          <button onClick={handleRefresh} disabled={refreshing}
-            className="w-full bg-zinc-800 hover:bg-zinc-700 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-            {refreshing ? (
-              <><div className="animate-spin rounded-full h-3 w-3 border border-zinc-600 border-t-emerald-500" /> Refreshing...</>
-            ) : (
-              <>🔄 Refresh from Open Library</>
-            )}
-          </button>
-
           {editing ? (
             <>
               <div>
