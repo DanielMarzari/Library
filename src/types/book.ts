@@ -13,6 +13,7 @@ export interface Book {
   start_page?: number;
   end_page?: number;
   reading_pages?: number;
+  current_page?: number;
   start_date?: string;
   complete_date?: string;
   source?: string;

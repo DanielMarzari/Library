@@ -107,10 +107,14 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
   const handleAddUpdate = async () => {
     const cp = parseInt(currentPage);
     if (!cp || cp < 0) return;
-    const lastPage = updates.length > 0 ? updates[0].current_page : 0;
+    const lastPage = updates.length > 0 ? updates[0].current_page : (book.current_page || 0);
     const pagesRead = Math.max(cp - lastPage, 0);
     const { error } = await supabase.from("reading_updates").insert({ book_id: book.id, current_page: cp, pages_read: pagesRead, notes: updateNotes.trim() || null });
-    if (!error) { setCurrentPage(""); setUpdateNotes(""); setShowAddUpdate(false); loadUpdates(); }
+    if (!error) {
+      // Also update current_page on the book
+      await supabase.from("books").update({ current_page: cp, updated_at: new Date().toISOString() }).eq("id", book.id);
+      setCurrentPage(""); setUpdateNotes(""); setShowAddUpdate(false); loadUpdates();
+    }
   };
 
   const handleDelete = async () => {
@@ -323,18 +327,20 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
                 <label className="text-xs text-zinc-500">Reading Progress</label>
                 <button onClick={() => setShowAddUpdate(!showAddUpdate)} className="text-xs text-emerald-500 hover:text-emerald-400">+ Log Progress</button>
               </div>
-              {readingSpeed && (
+              {(readingSpeed || (book.current_page && book.current_page > 0)) && (
                 <div className="bg-zinc-800/50 rounded-lg px-3 py-2 mb-3 text-xs text-zinc-400">
-                  📊 ~{readingSpeed} pages/day
-                  {(displayPages || book.pages) && updates.length > 0 && (
-                    <span className="ml-2 text-zinc-500">({updates[0].current_page}/{displayPages || book.pages} pages)</span>
+                  {readingSpeed && <>📊 ~{readingSpeed} pages/day </>}
+                  {(displayPages || book.pages) && (
+                    <span className={readingSpeed ? "ml-2 text-zinc-500" : ""}>
+                      ({updates.length > 0 ? updates[0].current_page : book.current_page || 0}/{displayPages || book.pages} pages)
+                    </span>
                   )}
                 </div>
               )}
-              {(displayPages || book.pages) && updates.length > 0 && (
+              {(displayPages || book.pages) && (updates.length > 0 || (book.current_page && book.current_page > 0)) && (
                 <div className="w-full bg-zinc-800 rounded-full h-2 mb-3">
                   <div className="bg-emerald-600 h-2 rounded-full transition-all"
-                    style={{ width: `${Math.min((updates[0].current_page / (displayPages || book.pages || 1)) * 100, 100)}%` }} />
+                    style={{ width: `${Math.min(((updates.length > 0 ? updates[0].current_page : book.current_page || 0) / (displayPages || book.pages || 1)) * 100, 100)}%` }} />
                 </div>
               )}
               {showAddUpdate && (
