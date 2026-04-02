@@ -31,7 +31,7 @@ export default function Home() {
     let ignore = false;
 
     const load = async () => {
-      setLoading(true);
+      if (refreshKey === 0) setLoading(true);
       let query = supabase
         .from("books")
         .select("*")
@@ -423,6 +423,7 @@ export default function Home() {
           onClose={() => setSelectedBook(null)}
           onUpdated={() => {
             setSelectedBook(null);
+            // Background refetch — no loading flash
             refetch();
           }}
           onDeleted={() => {
