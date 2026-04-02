@@ -5,10 +5,14 @@ export const dynamic = "force-dynamic";
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { Book } from "@/types/book";
+import { BookShelf } from "@/components/BookShelf";
 import { BookCard } from "@/components/BookCard";
+import { BookDetail } from "@/components/BookDetail";
 import { AddBookModal } from "@/components/AddBookModal";
+import { IsbnScanner } from "@/components/IsbnScanner";
 
 type FilterStatus = "all" | "want_to_read" | "reading" | "read";
+type ViewMode = "shelf" | "list";
 
 export default function Home() {
   const [books, setBooks] = useState<Book[]>([]);
@@ -16,6 +20,9 @@ export default function Home() {
   const [filter, setFilter] = useState<FilterStatus>("all");
   const [search, setSearch] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("shelf");
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
@@ -93,12 +100,23 @@ export default function Home() {
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-2xl font-bold tracking-tight">My Library</h1>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            >
-              + Add Book
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Scan button */}
+              <button
+                onClick={() => setShowScanner(true)}
+                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                title="Scan ISBN"
+              >
+                📷
+              </button>
+              {/* Add button */}
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                + Add
+              </button>
+            </div>
           </div>
 
           {/* Search */}
@@ -110,21 +128,49 @@ export default function Home() {
             className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent mb-3"
           />
 
-          {/* Filter tabs */}
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {filterButtons.map((f) => (
+          {/* Filter tabs + view toggle */}
+          <div className="flex items-center justify-between">
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {filterButtons.map((f) => (
+                <button
+                  key={f.value}
+                  onClick={() => setFilter(f.value)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                    filter === f.value
+                      ? "bg-emerald-600 text-white"
+                      : "bg-zinc-800 text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            {/* View toggle */}
+            <div className="flex gap-1 bg-zinc-800 rounded-lg p-0.5 ml-2 flex-shrink-0">
               <button
-                key={f.value}
-                onClick={() => setFilter(f.value)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
-                  filter === f.value
-                    ? "bg-emerald-600 text-white"
-                    : "bg-zinc-800 text-zinc-400 hover:text-zinc-200"
+                onClick={() => setViewMode("shelf")}
+                className={`px-2 py-1 rounded text-xs transition-colors ${
+                  viewMode === "shelf"
+                    ? "bg-zinc-700 text-zinc-100"
+                    : "text-zinc-500 hover:text-zinc-300"
                 }`}
+                title="Shelf view"
               >
-                {f.label}
+                📚
               </button>
-            ))}
+              <button
+                onClick={() => setViewMode("list")}
+                className={`px-2 py-1 rounded text-xs transition-colors ${
+                  viewMode === "list"
+                    ? "bg-zinc-700 text-zinc-100"
+                    : "text-zinc-500 hover:text-zinc-300"
+                }`}
+                title="List view"
+              >
+                ☰
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -137,11 +183,31 @@ export default function Home() {
           </div>
         ) : books.length === 0 ? (
           <div className="text-center py-20">
+            <p className="text-5xl mb-4">📚</p>
             <p className="text-zinc-500 text-lg mb-2">No books yet</p>
-            <p className="text-zinc-600 text-sm">
-              Tap &quot;+ Add Book&quot; to start building your library
+            <p className="text-zinc-600 text-sm mb-6">
+              Start building your library
             </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => setShowScanner(true)}
+                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
+              >
+                📷 Scan ISBN
+              </button>
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
+              >
+                + Add Manually
+              </button>
+            </div>
           </div>
+        ) : viewMode === "shelf" ? (
+          <BookShelf
+            books={books}
+            onBookTap={(book) => setSelectedBook(book)}
+          />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             {books.map((book) => (
@@ -156,12 +222,37 @@ export default function Home() {
         )}
       </main>
 
-      {/* Add Book Modal */}
+      {/* Modals */}
       {showAddModal && (
         <AddBookModal
           onClose={() => setShowAddModal(false)}
           onAdded={() => {
             setShowAddModal(false);
+            refetch();
+          }}
+        />
+      )}
+
+      {showScanner && (
+        <IsbnScanner
+          onClose={() => setShowScanner(false)}
+          onAdded={() => {
+            setShowScanner(false);
+            refetch();
+          }}
+        />
+      )}
+
+      {selectedBook && (
+        <BookDetail
+          book={selectedBook}
+          onClose={() => setSelectedBook(null)}
+          onUpdated={() => {
+            setSelectedBook(null);
+            refetch();
+          }}
+          onDeleted={() => {
+            setSelectedBook(null);
             refetch();
           }}
         />
