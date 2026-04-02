@@ -98,6 +98,29 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
     setRefreshing(false);
   };
 
+  // Duplicate this book
+  const handleDuplicate = async () => {
+    try {
+      const { id, created_at, ...rest } = book as any;
+      const duplicate = {
+        ...rest,
+        title: `${book.title} (copy)`,
+        status: "not_read" as const,
+        rating: null,
+        start_date: null,
+        complete_date: null,
+        favorite: false,
+      };
+      const { error } = await supabase.from("books").insert(duplicate);
+      if (!error) {
+        onUpdated();
+        onClose();
+      }
+    } catch (err) {
+      console.error("Duplicate error:", err);
+    }
+  };
+
   // Ref always holds the latest field values so doSave can read them without re-creating
   const valuesRef = useRef({ title, author, coverUrl, pages, introPages, startPage, endPage, status, rating, startDate, completeDate, source, volume, lcc, ddc, editTopics, autoTopics, favorite });
   valuesRef.current = { title, author, coverUrl, pages, introPages, startPage, endPage, status, rating, startDate, completeDate, source, volume, lcc, ddc, editTopics, autoTopics, favorite };
@@ -286,6 +309,9 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
               ) : (
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
               )}
+            </button>
+            <button onClick={handleDuplicate} className="text-muted hover:text-foreground bg-black/40 backdrop-blur-sm rounded-full w-8 h-8 flex items-center justify-center" title="Duplicate book">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V4a2 2 0 0 1 2-2h12"/></svg>
             </button>
           </div>
         </div>
