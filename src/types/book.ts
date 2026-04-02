@@ -9,11 +9,19 @@ export interface Book {
   rating?: number;
   notes?: string;
   pages?: number;
+  intro_pages?: number;
+  start_page?: number;
+  end_page?: number;
+  reading_pages?: number; // computed: end_page - start_page + 1 + intro_pages
   start_date?: string;
   complete_date?: string;
+  source?: string;
+  lcc?: string;
+  ddc?: string;
+  topics?: string[];
   created_at: string;
   updated_at: string;
-  _optimistic?: boolean; // client-only flag for loading state
+  _optimistic?: boolean;
 }
 
 export interface ReadingUpdate {
