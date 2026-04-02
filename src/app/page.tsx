@@ -6,13 +6,11 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { Book } from "@/types/book";
 import { BookShelf } from "@/components/BookShelf";
-import { BookCard } from "@/components/BookCard";
 import { BookDetail } from "@/components/BookDetail";
 import { AddBookSheet } from "@/components/AddBookSheet";
 import Link from "next/link";
 
 type FilterStatus = "all" | "not_read" | "reading" | "read" | "favorites";
-type ViewMode = "shelf" | "list";
 type SortMode = "recent" | "alpha" | "rating" | "lcc" | "ddc";
 
 export default function Home() {
@@ -23,7 +21,6 @@ export default function Home() {
   const [sortMode, setSortMode] = useState<SortMode>("recent");
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>("shelf");
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Multi-select state
@@ -116,8 +113,6 @@ export default function Home() {
         });
         break;
     }
-    // Always pin favorites to top
-    sorted.sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0));
     return sorted;
   }, [books, sortMode]);
 
@@ -252,7 +247,7 @@ export default function Home() {
                 href="/expertise"
                 className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
               >
-                Expert
+                Skills
               </Link>
               <Link
                 href="/setup"
@@ -294,48 +289,20 @@ export default function Home() {
               ))}
             </div>
 
-            <div className="flex gap-1 ml-2 flex-shrink-0">
-              {/* Sort */}
-              <div className="flex gap-0.5 bg-zinc-800 rounded-lg p-0.5">
-                {sortButtons.map((s) => (
-                  <button
-                    key={s.value}
-                    onClick={() => setSortMode(s.value)}
-                    className={`px-2 py-1 rounded text-[10px] transition-colors ${
-                      sortMode === s.value
-                        ? "bg-zinc-700 text-zinc-100"
-                        : "text-zinc-500 hover:text-zinc-300"
-                    }`}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-              {/* View */}
-              <div className="flex gap-0.5 bg-zinc-800 rounded-lg p-0.5">
+            <div className="flex gap-0.5 bg-zinc-800 rounded-lg p-0.5 ml-2 flex-shrink-0">
+              {sortButtons.map((s) => (
                 <button
-                  onClick={() => setViewMode("shelf")}
-                  className={`px-2 py-1 rounded text-xs transition-colors ${
-                    viewMode === "shelf"
+                  key={s.value}
+                  onClick={() => setSortMode(s.value)}
+                  className={`px-2 py-1 rounded text-[10px] transition-colors ${
+                    sortMode === s.value
                       ? "bg-zinc-700 text-zinc-100"
                       : "text-zinc-500 hover:text-zinc-300"
                   }`}
-                  title="Shelf view"
                 >
-                  📚
+                  {s.label}
                 </button>
-                <button
-                  onClick={() => setViewMode("list")}
-                  className={`px-2 py-1 rounded text-xs transition-colors ${
-                    viewMode === "list"
-                      ? "bg-zinc-700 text-zinc-100"
-                      : "text-zinc-500 hover:text-zinc-300"
-                  }`}
-                  title="List view"
-                >
-                  ☰
-                </button>
-              </div>
+              ))}
             </div>
           </div>
         </div>
@@ -406,7 +373,7 @@ export default function Home() {
               + Add Book
             </button>
           </div>
-        ) : viewMode === "shelf" ? (
+        ) : (
           <BookShelf
             books={sortedBooks}
             onBookTap={(book) => setSelectedBook(book)}
@@ -415,18 +382,8 @@ export default function Home() {
             onStartSelect={handleStartSelect}
             selectMode={selectMode}
             sortMode={sortMode}
+            flatGrid={filter === "all" || filter === "favorites"}
           />
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {sortedBooks.map((book) => (
-              <BookCard
-                key={book.id}
-                book={book}
-                onDelete={handleDelete}
-                onStatusChange={handleStatusChange}
-              />
-            ))}
-          </div>
         )}
       </main>
 

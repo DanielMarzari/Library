@@ -11,6 +11,7 @@ interface BookShelfProps {
   onStartSelect: (id: string) => void;
   selectMode: boolean;
   sortMode?: string;
+  flatGrid?: boolean;
 }
 
 const statusLabels: Record<Book["status"], string> = {
@@ -84,10 +85,7 @@ function ShelfBook({
         book._optimistic ? "animate-pulse pointer-events-none" : ""
       }`}
     >
-      {/* Favorite indicator */}
-      {book.favorite && !selectMode && (
-        <div className="absolute -top-1 -left-1 z-10 text-red-500 text-xs drop-shadow">❤</div>
-      )}
+      {/* (favorite indicated via border below) */}
       {/* Selection indicator */}
       {selectMode && (
         <div
@@ -103,7 +101,7 @@ function ShelfBook({
 
       <div
         className={`relative aspect-[2/3] rounded-md overflow-hidden shadow-lg shadow-black/40 transition-all group-hover:scale-105 group-hover:-translate-y-1 ${
-          selected ? "ring-2 ring-emerald-500 ring-offset-2 ring-offset-zinc-950" : ""
+          selected ? "ring-2 ring-emerald-500 ring-offset-2 ring-offset-zinc-950" : book.favorite ? "ring-2 ring-red-500/70 ring-offset-1 ring-offset-zinc-950" : ""
         }`}
       >
         {book._optimistic ? (
@@ -166,9 +164,10 @@ export function BookShelf({
   onStartSelect,
   selectMode,
   sortMode,
+  flatGrid,
 }: BookShelfProps) {
-  // When sorting by alpha or rating, show flat grid (no grouping)
-  const flatMode = sortMode === "alpha" || sortMode === "rating";
+  // When sorting by alpha/rating/lcc/ddc, or flat grid forced, show flat grid (no grouping)
+  const flatMode = flatGrid || sortMode === "alpha" || sortMode === "rating" || sortMode === "lcc" || sortMode === "ddc";
 
   const grouped = books.reduce(
     (acc, book) => {

@@ -196,24 +196,62 @@ export default function StatsPage() {
       goalProjectedDate = projected.toLocaleDateString("en-US", { month: "long", year: "numeric" });
     }
 
-    // --- Scatter plot: reading speed vs rating ---
-    const scatterData: Array<{ title: string; pagesPerDay: number; rating: number; pages: number }> = [];
-    const MAX_PAGES_PER_DAY = 200;
+    // --- Scatter plot: duration vs book length, sized by rating ---
+    const scatterData: Array<{ title: string; days: number; pages: number; rating: number }> = [];
     read.forEach((b) => {
-      if (!b.start_date || !b.complete_date || !b.rating || b.rating <= 0) return;
+      if (!b.start_date || !b.complete_date) return;
       const pages = b.reading_pages || b.pages || 0;
       if (pages === 0) return;
       const startDate = new Date(b.start_date);
       const endDate = new Date(b.complete_date);
-      const daysDiff = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000));
-      const pagesPerDay = Math.min(pages / daysDiff, MAX_PAGES_PER_DAY);
+      const days = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000));
       scatterData.push({
         title: b.title || "Unknown",
-        pagesPerDay,
-        rating: Math.min(b.rating, 5),
-        pages,
+        days: Math.min(days, 365),
+        pages: Math.min(pages, 1000),
+        rating: b.rating || 0,
       });
     });
+    const maxScatterDays = Math.max(...scatterData.map((d) => d.days), 30);
+    const maxScatterPages = Math.max(...scatterData.map((d) => d.pages), 100);
+
+    // --- Projected books this year ---
+    const thisYearStart = new Date(now.getFullYear(), 0, 1);
+    const booksThisYear = read.filter(
+      (b) => b.complete_date && new Date(b.complete_date) >= thisYearStart
+    ).length;
+    const daysSoFarThisYear = Math.max(1, Math.ceil((now.getTime() - thisYearStart.getTime()) / 86400000));
+    const projectedBooksThisYear = Math.round((booksThisYear / daysSoFarThisYear) * 365);
+
+    // --- Author stats ---
+    const authorCounts: Record<string, { books: number; read: number }> = {};
+    books.forEach((b) => {
+      if (!b.author) return;
+      b.author.split(",").map((a) => a.trim()).filter(Boolean).forEach((name) => {
+        if (!authorCounts[name]) authorCounts[name] = { books: 0, read: 0 };
+        authorCounts[name].books++;
+        if (b.status === "read") authorCounts[name].read++;
+      });
+    });
+    const uniqueAuthors = Object.keys(authorCounts).length;
+    const topAuthors = Object.entries(authorCounts)
+      .sort((a, b) => b[1].books - a[1].books)
+      .slice(0, 8);
+
+    // --- Skill/topic stats ---
+    const allTopicCounts: Record<string, { total: number; read: number }> = {};
+    books.forEach((b) => {
+      const allT = new Set<string>();
+      b.topics?.forEach((t) => allT.add(t));
+      b.auto_topics?.forEach((t) => allT.add(t));
+      allT.forEach((t) => {
+        if (!allTopicCounts[t]) allTopicCounts[t] = { total: 0, read: 0 };
+        allTopicCounts[t].total++;
+        if (b.status === "read") allTopicCounts[t].read++;
+      });
+    });
+    const expertSkills = Object.values(allTopicCounts).filter((t) => t.read >= 20).length;
+    const masterSkills = Object.values(allTopicCounts).filter((t) => t.read >= 50).length;
 
     // --- Top sources ---
     const sourceCounts: Record<string, number> = {};
@@ -246,6 +284,14 @@ export default function StatsPage() {
       topUserTopics,
       topAutoTopics,
       scatterData,
+      maxScatterDays,
+      maxScatterPages,
+      projectedBooksThisYear,
+      booksThisYear,
+      uniqueAuthors,
+      topAuthors,
+      expertSkills,
+      masterSkills,
       topSources,
       goalPct,
       goalRemaining,
@@ -334,11 +380,12 @@ export default function StatsPage() {
           <h2 className="text-lg font-semibold text-zinc-100 mb-3">
             Reading Rate <span className="text-sm text-zinc-500 font-normal">(Jan {new Date().getFullYear() - 1} - Present)</span>
           </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             <StatCard label="Books Completed" value={stats.recentBooksCount} color="emerald" />
             <StatCard label="Books / Month" value={stats.booksPerMonth} />
             <StatCard label="Books / Week" value={stats.booksPerWeek} />
             <StatCard label="Pages / Day" value={stats.pagesPerDay} />
+            <StatCard label={`Projected ${new Date().getFullYear()}`} value={stats.projectedBooksThisYear} color="blue" />
           </div>
           {stats.avgDaysPerBook > 0 && (
             <p className="text-sm text-zinc-500 mt-3">
@@ -470,128 +517,106 @@ export default function StatsPage() {
           </div>
         </section>
 
-        {/* Reading Speed vs Rating scatter plot */}
+        {/* Duration vs Book Length scatter plot */}
         {stats.scatterData.length > 0 && (
           <section>
-            <h2 className="text-lg font-semibold text-zinc-100 mb-1">Reading Speed vs Rating</h2>
-            <p className="text-sm text-zinc-500 mb-3">Does reading faster correlate with enjoyment?</p>
+            <h2 className="text-lg font-semibold text-zinc-100 mb-1">Reading Duration vs Book Length</h2>
+            <p className="text-sm text-zinc-500 mb-3">How long do different sized books take? Dot size = rating.</p>
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
               <div className="relative" style={{ height: 320 }}>
-                <svg viewBox="0 0 500 300" className="w-full h-full" preserveAspectRatio="xMidYMid meet">
-                  {/* Grid lines - vertical (pages per day) */}
+                <svg viewBox="0 0 520 310" className="w-full h-full" preserveAspectRatio="xMidYMid meet">
+                  {/* Grid lines */}
                   {[0, 0.25, 0.5, 0.75, 1].map((pct) => (
-                    <line
-                      key={`vgrid-${pct}`}
-                      x1={50 + pct * 400}
-                      y1="20"
-                      x2={50 + pct * 400}
-                      y2="260"
-                      stroke="#27272a"
-                      strokeWidth="1"
-                    />
-                  ))}
-
-                  {/* Grid lines - horizontal (rating) */}
-                  {[0, 0.25, 0.5, 0.75, 1].map((pct) => (
-                    <line
-                      key={`hgrid-${pct}`}
-                      x1="50"
-                      y1={260 - pct * 240}
-                      x2="450"
-                      y2={260 - pct * 240}
-                      stroke="#27272a"
-                      strokeWidth="1"
-                    />
+                    <g key={`grid-${pct}`}>
+                      <line x1={60 + pct * 420} y1="20" x2={60 + pct * 420} y2="270" stroke="#27272a" strokeWidth="1" />
+                      <line x1="60" y1={270 - pct * 250} x2="480" y2={270 - pct * 250} stroke="#27272a" strokeWidth="1" />
+                    </g>
                   ))}
 
                   {/* Axes */}
-                  <line x1="50" y1="260" x2="450" y2="260" stroke="#52525b" strokeWidth="2" />
-                  <line x1="50" y1="20" x2="50" y2="260" stroke="#52525b" strokeWidth="2" />
+                  <line x1="60" y1="270" x2="480" y2="270" stroke="#52525b" strokeWidth="2" />
+                  <line x1="60" y1="20" x2="60" y2="270" stroke="#52525b" strokeWidth="2" />
 
-                  {/* Data points */}
-                  {stats.scatterData.map((point, idx) => {
-                    const x = 50 + (point.pagesPerDay / 200) * 400;
-                    const y = 260 - ((point.rating - 1) / 4) * 240;
+                  {/* Y-axis labels (pages) */}
+                  {[0, 0.25, 0.5, 0.75, 1].map((pct) => (
+                    <text key={`yl-${pct}`} x="55" y={273 - pct * 250} textAnchor="end" fill="#52525b" fontSize="9" dominantBaseline="middle">
+                      {Math.round(pct * stats.maxScatterPages)}
+                    </text>
+                  ))}
 
-                    // Color based on rating
-                    let color = "#ef4444"; // 1: red
-                    if (point.rating >= 2) color = "#f97316"; // 2: orange
-                    if (point.rating >= 3) color = "#eab308"; // 3: yellow
-                    if (point.rating >= 4) color = "#10b981"; // 4: emerald
-                    if (point.rating >= 5) color = "#3b82f6"; // 5: blue
+                  {/* X-axis labels (days) */}
+                  {[0, 0.25, 0.5, 0.75, 1].map((pct) => (
+                    <text key={`xl-${pct}`} x={60 + pct * 420} y="285" textAnchor="middle" fill="#52525b" fontSize="9">
+                      {Math.round(pct * stats.maxScatterDays)}d
+                    </text>
+                  ))}
 
-                    // Size proportional to pages (10-40 radius)
-                    const radius = 10 + (point.pages / 500) * 30;
+                  {/* Data points — unrated first, rated on top */}
+                  {stats.scatterData
+                    .sort((a, b) => a.rating - b.rating)
+                    .map((point, idx) => {
+                    const x = 60 + (point.days / stats.maxScatterDays) * 420;
+                    const y = 270 - (point.pages / stats.maxScatterPages) * 250;
+                    const radius = point.rating > 0 ? 4 + point.rating * 2.5 : 4;
+                    const color = point.rating >= 5 ? "#3b82f6" : point.rating >= 4 ? "#10b981" : point.rating >= 3 ? "#eab308" : point.rating >= 2 ? "#f97316" : point.rating >= 1 ? "#ef4444" : "#52525b";
 
                     return (
-                      <g key={idx}>
-                        <circle
-                          cx={x}
-                          cy={y}
-                          r={Math.min(radius, 40)}
-                          fill={color}
-                          opacity="0.7"
-                          className="hover:opacity-100 transition-opacity cursor-pointer"
-                        >
-                          <title>{point.title} ({point.rating} stars, {point.pages} pages)</title>
-                        </circle>
-                      </g>
+                      <circle key={idx} cx={x} cy={y} r={radius} fill={color} opacity="0.65" className="hover:opacity-100 cursor-pointer">
+                        <title>{point.title} — {point.days} days, {point.pages} pages{point.rating > 0 ? `, ${point.rating}★` : ""}</title>
+                      </circle>
                     );
                   })}
+
+                  {/* Axis titles */}
+                  <text x="270" y="302" textAnchor="middle" fill="#71717a" fontSize="10">Days to Read →</text>
+                  <text x="15" y="145" textAnchor="middle" fill="#71717a" fontSize="10" transform="rotate(-90, 15, 145)">Pages ↑</text>
                 </svg>
-
-                {/* Y-axis label (Rating) */}
-                <div className="absolute left-0 top-8 h-64 flex flex-col justify-between pointer-events-none">
-                  <span className="text-[9px] text-zinc-600 -ml-6">5★</span>
-                  <span className="text-[9px] text-zinc-600 -ml-6">3★</span>
-                  <span className="text-[9px] text-zinc-600 -ml-6">1★</span>
-                </div>
-
-                {/* X-axis labels (Pages per day) */}
-                <div className="absolute bottom-0 left-12 right-0 flex justify-between px-8 pointer-events-none">
-                  <span className="text-[9px] text-zinc-600">0</span>
-                  <span className="text-[9px] text-zinc-600">50</span>
-                  <span className="text-[9px] text-zinc-600">100</span>
-                  <span className="text-[9px] text-zinc-600">150</span>
-                  <span className="text-[9px] text-zinc-600">200+</span>
-                </div>
               </div>
 
-              {/* Axis labels */}
-              <div className="flex justify-center mt-2">
-                <p className="text-[10px] text-zinc-600">Pages per Day →</p>
-              </div>
-              <div className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-12 text-[10px] text-zinc-600">
-                ↑ Rating
-              </div>
-
-              {/* Legend */}
-              <div className="flex flex-wrap gap-4 mt-4 text-xs">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-red-500" />
-                  <span className="text-zinc-400">1★</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-orange-500" />
-                  <span className="text-zinc-400">2★</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-yellow-500" />
-                  <span className="text-zinc-400">3★</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-emerald-500" />
-                  <span className="text-zinc-400">4★</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-blue-500" />
-                  <span className="text-zinc-400">5★</span>
+              <div className="flex flex-wrap gap-3 mt-3 text-xs items-center">
+                <span className="text-zinc-500">Dot size = rating:</span>
+                {[{r:1,c:"bg-red-500"},{r:2,c:"bg-orange-500"},{r:3,c:"bg-yellow-500"},{r:4,c:"bg-emerald-500"},{r:5,c:"bg-blue-500"}].map(({r,c}) => (
+                  <div key={r} className="flex items-center gap-1">
+                    <div className={`rounded-full ${c}`} style={{width: 4+r*2.5, height: 4+r*2.5}} />
+                    <span className="text-zinc-400">{r}★</span>
+                  </div>
+                ))}
+                <div className="flex items-center gap-1">
+                  <div className="rounded-full bg-zinc-500" style={{width: 4, height: 4}} />
+                  <span className="text-zinc-500">unrated</span>
                 </div>
               </div>
-              <p className="text-[10px] text-zinc-600 mt-2">Dot size represents book length (pages)</p>
             </div>
           </section>
         )}
+
+        {/* Author stats */}
+        <section>
+          <h2 className="text-lg font-semibold text-zinc-100 mb-3">Authors</h2>
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <StatCard label="Unique Authors" value={stats.uniqueAuthors} />
+            <StatCard label={`Books This Year (${new Date().getFullYear()})`} value={`${stats.booksThisYear} → ${stats.projectedBooksThisYear} proj.`} color="emerald" />
+          </div>
+          {stats.topAuthors.length > 0 && (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-2">
+              {stats.topAuthors.map(([author, counts]) => (
+                <div key={author} className="flex items-center justify-between">
+                  <span className="text-sm text-zinc-300 truncate mr-3">{author}</span>
+                  <span className="text-xs text-zinc-500 flex-shrink-0">{counts.books} books · {counts.read} read</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Skill stats */}
+        <section>
+          <h2 className="text-lg font-semibold text-zinc-100 mb-3">Skills</h2>
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard label="Expert-level Skills (20+)" value={stats.expertSkills} color="emerald" />
+            <StatCard label="Master-level Skills (50+)" value={stats.masterSkills} color="blue" />
+          </div>
+        </section>
 
         {/* Top sources */}
         {stats.topSources.length > 0 && (
