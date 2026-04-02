@@ -275,10 +275,10 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
               {favorite ? "❤" : "♡"}
             </button>
             <button onClick={() => setEditing(!editing)} className="text-zinc-400 hover:text-zinc-200 bg-black/40 backdrop-blur-sm rounded-full w-8 h-8 flex items-center justify-center" title="Edit">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 3a2.85 2.83 0 1 0-4 4L16.5 20.5 22 22l-1.5-5.5Z"/><path d="m9 5-4 4"/></svg>
             </button>
-            <a href={`https://annas-archive.gl/search?q=${encodeURIComponent(book.title)}`} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-zinc-200 bg-black/40 backdrop-blur-sm rounded-full w-8 h-8 flex items-center justify-center text-[10px] font-bold" title="Find PDF">
-              PDF
+            <a href={`https://annas-archive.gl/search?q=${encodeURIComponent(book.title)}`} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-zinc-200 bg-black/40 backdrop-blur-sm rounded-full w-8 h-8 flex items-center justify-center" title="Find PDF">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
             </a>
             <button onClick={handleRefresh} disabled={refreshing} className="text-zinc-400 hover:text-zinc-200 bg-black/40 backdrop-blur-sm rounded-full w-8 h-8 flex items-center justify-center disabled:opacity-50" title="Refresh from Open Library">
               {refreshing ? (
