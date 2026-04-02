@@ -7,6 +7,13 @@ import { supabase } from "@/lib/supabase";
 import { Book } from "@/types/book";
 import Link from "next/link";
 
+interface ReadingUpdate {
+  id: string;
+  book_id: string;
+  pages_read: number;
+  created_at: string;
+}
+
 // Colors for each year in the cumulative chart
 const YEAR_COLORS: Record<number, string> = {
   2016: "#9ca3af",
@@ -35,6 +42,7 @@ const LENGTH_BUCKETS = [
 
 export default function StatsPage() {
   const [books, setBooks] = useState<Book[]>([]);
+  const [readingUpdates, setReadingUpdates] = useState<ReadingUpdate[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -47,6 +55,22 @@ export default function StatsPage() {
       if (!ignore) {
         if (!error && data) setBooks(data);
         setLoading(false);
+      }
+    };
+    load();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+    const load = async () => {
+      const { data, error } = await supabase
+        .from("reading_updates")
+        .select("*");
+      if (!ignore) {
+        if (!error && data) setReadingUpdates(data as ReadingUpdate[]);
       }
     };
     load();
@@ -146,7 +170,7 @@ export default function StatsPage() {
       (s, b) => s + (b.reading_pages || b.pages || 0),
       0
     );
-    const pagesPerDay = Math.round(recentPages / daysSinceJan1);
+    const avgPagesPerDay = Math.round(recentPages / daysSinceJan1);
 
     // Avg days per book
     const booksWithDates = read.filter((b) => b.start_date && b.complete_date);
@@ -223,6 +247,41 @@ export default function StatsPage() {
     const daysSoFarThisYear = Math.max(1, Math.ceil((now.getTime() - thisYearStart.getTime()) / 86400000));
     const projectedBooksThisYear = Math.round((booksThisYear / daysSoFarThisYear) * 365);
 
+    // --- Reading heatmap (last 12 months) ---
+    const heatmapStartDate = new Date(now);
+    heatmapStartDate.setFullYear(heatmapStartDate.getFullYear() - 1);
+
+    // Normalize dates to start of day for comparison
+    const pagesPerDay: Record<string, number> = {};
+    const daysWithActivity = new Set<string>();
+
+    // Add pages from reading_updates
+    readingUpdates.forEach((update) => {
+      const date = new Date(update.created_at);
+      if (date >= heatmapStartDate && date <= now) {
+        const dateKey = date.toISOString().split('T')[0];
+        pagesPerDay[dateKey] = (pagesPerDay[dateKey] || 0) + update.pages_read;
+        daysWithActivity.add(dateKey);
+      }
+    });
+
+    // Add completion dates (if no reading_updates that day)
+    read.forEach((b) => {
+      if (b.complete_date) {
+        const date = new Date(b.complete_date);
+        if (date >= heatmapStartDate && date <= now) {
+          const dateKey = date.toISOString().split('T')[0];
+          if (!pagesPerDay[dateKey]) {
+            pagesPerDay[dateKey] = b.reading_pages || b.pages || 0;
+          }
+          daysWithActivity.add(dateKey);
+        }
+      }
+    });
+
+    const totalHeatmapPages = Object.values(pagesPerDay).reduce((a, b) => a + b, 0);
+    const maxPagesInDay = Math.max(...Object.values(pagesPerDay), 1);
+
     // --- Author stats ---
     const authorCounts: Record<string, { books: number; read: number }> = {};
     books.forEach((b) => {
@@ -279,6 +338,7 @@ export default function StatsPage() {
       recentBooksCount: recentBooks.length,
       booksPerMonth: booksPerMonth.toFixed(1),
       booksPerWeek: booksPerWeek.toFixed(1),
+      avgPagesPerDay,
       pagesPerDay,
       avgDaysPerBook,
       topUserTopics,
@@ -297,8 +357,12 @@ export default function StatsPage() {
       goalRemaining,
       goalProjectedDate,
       lifeGoal: LIFE_GOAL,
+      heatmapStartDate,
+      totalHeatmapPages,
+      maxPagesInDay,
+      daysWithActivity,
     };
-  }, [books]);
+  }, [books, readingUpdates]);
 
   if (loading) {
     return (
@@ -384,7 +448,7 @@ export default function StatsPage() {
             <StatCard label="Books Completed" value={stats.recentBooksCount} color="emerald" />
             <StatCard label="Books / Month" value={stats.booksPerMonth} />
             <StatCard label="Books / Week" value={stats.booksPerWeek} />
-            <StatCard label="Pages / Day" value={stats.pagesPerDay} />
+            <StatCard label="Pages / Day" value={stats.avgPagesPerDay} />
             <StatCard label={`Projected ${new Date().getFullYear()}`} value={stats.projectedBooksThisYear} color="blue" />
           </div>
           {stats.avgDaysPerBook > 0 && (
@@ -392,6 +456,21 @@ export default function StatsPage() {
               Average time to finish a book: <span className="text-zinc-300 font-medium">{stats.avgDaysPerBook} days</span>
             </p>
           )}
+        </section>
+
+        {/* Reading Activity Heatmap */}
+        <section>
+          <h2 className="text-lg font-semibold text-zinc-100 mb-3">Reading Activity Heatmap</h2>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+            <ContributionHeatmap
+              startDate={stats.heatmapStartDate}
+              pagesPerDay={stats.pagesPerDay}
+              maxPagesInDay={stats.maxPagesInDay}
+            />
+            <p className="text-sm text-zinc-500 mt-4">
+              {stats.totalHeatmapPages.toLocaleString()} pages across {stats.daysWithActivity.size} days in the last year
+            </p>
+          </div>
         </section>
 
         {/* Year-over-year cumulative chart */}
@@ -662,6 +741,161 @@ export default function StatsPage() {
           )}
         </div>
       </main>
+    </div>
+  );
+}
+
+function ContributionHeatmap({
+  startDate,
+  pagesPerDay,
+  maxPagesInDay,
+}: {
+  startDate: Date;
+  pagesPerDay: Record<string, number>;
+  maxPagesInDay: number;
+}) {
+  const [hoveredDate, setHoveredDate] = useState<string | null>(null);
+
+  const getColorClass = (pages: number) => {
+    if (pages === 0) return "bg-zinc-800";
+    const ratio = pages / maxPagesInDay;
+    if (ratio >= 0.8) return "bg-emerald-400";
+    if (ratio >= 0.6) return "bg-emerald-500";
+    if (ratio >= 0.35) return "bg-emerald-700";
+    return "bg-emerald-950";
+  };
+
+  const getHoverColor = (pages: number) => {
+    if (pages === 0) return "hover:bg-zinc-700";
+    const ratio = pages / maxPagesInDay;
+    if (ratio >= 0.8) return "hover:bg-emerald-300";
+    if (ratio >= 0.6) return "hover:bg-emerald-400";
+    if (ratio >= 0.35) return "hover:bg-emerald-600";
+    return "hover:bg-emerald-900";
+  };
+
+  // Generate 52 weeks of dates
+  const weeks: Array<Date[]> = [];
+  const currentDate = new Date(startDate);
+
+  // Start from Sunday
+  const dayOfWeek = currentDate.getDay();
+  currentDate.setDate(currentDate.getDate() - dayOfWeek);
+
+  for (let week = 0; week < 53; week++) {
+    const weekDays: Date[] = [];
+    for (let day = 0; day < 7; day++) {
+      weekDays.push(new Date(currentDate));
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    weeks.push(weekDays);
+  }
+
+  // Month labels with positions
+  const monthLabels: Array<{ month: string; weekIndex: number }> = [];
+  let lastMonth = -1;
+  weeks.forEach((week, weekIdx) => {
+    const month = week[0].getMonth();
+    if (month !== lastMonth) {
+      monthLabels.push({
+        month: week[0].toLocaleDateString("en-US", { month: "short" }),
+        weekIndex: weekIdx,
+      });
+      lastMonth = month;
+    }
+  });
+
+  // Day labels
+  const dayLabels = ["Mon", "Wed", "Fri"];
+  const dayLabelRows = [1, 3, 5]; // Indices for Mon, Wed, Fri
+
+  return (
+    <div className="overflow-x-auto">
+      <div className="inline-block">
+        {/* Month labels */}
+        <div className="flex" style={{ marginLeft: "30px" }}>
+          {monthLabels.map((label, idx) => (
+            <div
+              key={`${label.month}-${idx}`}
+              className="text-xs text-zinc-500 font-medium"
+              style={{
+                width: `${(label.weekIndex === monthLabels[idx + 1]?.weekIndex ? monthLabels[idx + 1].weekIndex - label.weekIndex : 4) * 14}px`,
+              }}
+            >
+              {label.month}
+            </div>
+          ))}
+        </div>
+
+        {/* Heatmap grid */}
+        <div className="flex gap-1">
+          {/* Day labels on left */}
+          <div className="flex flex-col justify-between pt-1 text-xs text-zinc-600 mr-1" style={{ width: "20px" }}>
+            {dayLabelRows.map((dayIdx) => (
+              <div key={dayIdx} style={{ height: "12px", marginTop: dayIdx === 0 ? 0 : "2px" }}>
+                {dayLabels[dayLabelRows.indexOf(dayIdx)]}
+              </div>
+            ))}
+          </div>
+
+          {/* Weeks grid */}
+          <div className="flex gap-1">
+            {weeks.map((week, weekIdx) => (
+              <div key={weekIdx} className="flex flex-col gap-1">
+                {week.map((date, dayIdx) => {
+                  const dateKey = date.toISOString().split("T")[0];
+                  const pages = pagesPerDay[dateKey] || 0;
+                  const isInRange = date >= startDate && date <= new Date();
+
+                  return (
+                    <div
+                      key={dateKey}
+                      className={`w-3 h-3 rounded-sm cursor-pointer transition-colors ${
+                        isInRange ? `${getColorClass(pages)} ${getHoverColor(pages)}` : "bg-zinc-950"
+                      }`}
+                      onMouseEnter={() => setHoveredDate(dateKey)}
+                      onMouseLeave={() => setHoveredDate(null)}
+                      title={`${new Date(dateKey).toLocaleDateString("en-US", {
+                        weekday: "short",
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      })}: ${pages} pages`}
+                    />
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Tooltip for hovered date */}
+      {hoveredDate && pagesPerDay[hoveredDate] !== undefined && (
+        <div className="mt-3 text-sm text-zinc-400">
+          <span className="text-zinc-300 font-medium">
+            {new Date(hoveredDate).toLocaleDateString("en-US", {
+              weekday: "short",
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            })}
+          </span>
+          {": "}
+          {pagesPerDay[hoveredDate]} pages
+        </div>
+      )}
+
+      {/* Legend */}
+      <div className="flex items-center gap-2 mt-4 pt-3 border-t border-zinc-800 text-xs">
+        <span className="text-zinc-500">Less</span>
+        <div className="w-3 h-3 rounded-sm bg-zinc-800" />
+        <div className="w-3 h-3 rounded-sm bg-emerald-950" />
+        <div className="w-3 h-3 rounded-sm bg-emerald-700" />
+        <div className="w-3 h-3 rounded-sm bg-emerald-500" />
+        <div className="w-3 h-3 rounded-sm bg-emerald-400" />
+        <span className="text-zinc-500">More</span>
+      </div>
     </div>
   );
 }

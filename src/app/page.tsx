@@ -238,6 +238,12 @@ export default function Home() {
                 Stats
               </Link>
               <Link
+                href="/goals"
+                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                Goals
+              </Link>
+              <Link
                 href="/authors"
                 className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
               >
@@ -248,6 +254,18 @@ export default function Home() {
                 className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
               >
                 Skills
+              </Link>
+              <Link
+                href="/recommendations"
+                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                Recs
+              </Link>
+              <Link
+                href="/lending"
+                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                Lending
               </Link>
               <Link
                 href="/setup"

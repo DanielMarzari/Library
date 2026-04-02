@@ -58,13 +58,10 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
     setResults([]);
     setSelected(null);
 
-    const found = await searchBooks(clean, 5);
+    const found = await searchBooks(clean, 8);
     if (found.length === 0) {
       setError(`No books found for: ${clean}`);
       setSearchingIsbn(clean); // keep ISBN visible for manual use
-      setSearching(false);
-    } else if (found.length === 1) {
-      await selectBook(found[0]);
       setSearching(false);
     } else {
       setResults(found);
