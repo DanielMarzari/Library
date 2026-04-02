@@ -182,6 +182,20 @@ export default function StatsPage() {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 15);
 
+    // --- 1000 book life goal ---
+    const LIFE_GOAL = 1000;
+    const goalPct = ((read.length / LIFE_GOAL) * 100).toFixed(1);
+    const goalRemaining = LIFE_GOAL - read.length;
+    // Projected completion: use recent rate (booksPerMonth)
+    let goalProjectedDate: string | null = null;
+    const monthlyRate = recentBooks.length / (daysSinceJan1 / 30.44);
+    if (monthlyRate > 0 && goalRemaining > 0) {
+      const monthsLeft = goalRemaining / monthlyRate;
+      const projected = new Date();
+      projected.setMonth(projected.getMonth() + Math.ceil(monthsLeft));
+      goalProjectedDate = projected.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    }
+
     // --- Top sources ---
     const sourceCounts: Record<string, number> = {};
     books.forEach((b) => {
@@ -213,6 +227,10 @@ export default function StatsPage() {
       topUserTopics,
       topAutoTopics,
       topSources,
+      goalPct,
+      goalRemaining,
+      goalProjectedDate,
+      lifeGoal: LIFE_GOAL,
     };
   }, [books]);
 
@@ -270,6 +288,26 @@ export default function StatsPage() {
             </div>
           </div>
         </div>
+
+        {/* 1000 Book Life Goal */}
+        <section>
+          <h2 className="text-lg font-semibold text-zinc-100 mb-3">Life Goal: {stats.lifeGoal.toLocaleString()} Books</h2>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+            <div className="flex items-end gap-3 mb-3">
+              <span className="text-4xl font-bold text-amber-400">{stats.goalPct}%</span>
+              <span className="text-sm text-zinc-500 mb-1">{stats.readCount} / {stats.lifeGoal.toLocaleString()}</span>
+            </div>
+            <div className="w-full bg-zinc-800 rounded-full h-3 mb-3">
+              <div className="bg-gradient-to-r from-amber-600 to-amber-400 h-3 rounded-full transition-all" style={{ width: `${Math.min(parseFloat(stats.goalPct), 100)}%` }} />
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-zinc-400">{stats.goalRemaining} books to go</span>
+              {stats.goalProjectedDate && (
+                <span className="text-zinc-500">On track for <span className="text-amber-400 font-medium">{stats.goalProjectedDate}</span></span>
+              )}
+            </div>
+          </div>
+        </section>
 
         {/* Reading rate */}
         <section>

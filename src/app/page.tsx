@@ -95,7 +95,15 @@ export default function Home() {
         break;
       case "recent":
       default:
-        // Already sorted by created_at desc from DB
+        // Sort read books by complete_date desc, others by created_at desc
+        sorted.sort((a, b) => {
+          if (a.status === "read" && b.status === "read") {
+            const aDate = a.complete_date || "0";
+            const bDate = b.complete_date || "0";
+            return bDate.localeCompare(aDate);
+          }
+          return 0; // preserve DB order for non-read books
+        });
         break;
     }
     // Always pin favorites to top

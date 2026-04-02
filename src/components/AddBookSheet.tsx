@@ -38,12 +38,12 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
   // Manual entry fields
   const [manTitle, setManTitle] = useState("");
   const [manAuthor, setManAuthor] = useState("");
+  const [manIsbn, setManIsbn] = useState("");
   const [manPages, setManPages] = useState("");
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerContainerId = "isbn-scanner";
 
-  // Source suggestions filtered by input
   const filteredSources = recentSources.filter(
     (s) => s.toLowerCase().includes(source.toLowerCase()) && s !== source
   );
@@ -139,20 +139,13 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
     const ep = parseInt(endPage) || null;
 
     const newBook: Partial<Book> = {
-      title: book.title,
-      author: book.author,
-      isbn: book.isbn,
-      cover_url: book.cover_url || undefined,
-      description: book.description || undefined,
-      pages: book.pages || undefined,
-      status,
-      source: source.trim() || undefined,
-      volume: volume.trim() || undefined,
-      lcc: book.lcc || undefined,
-      ddc: book.ddc || undefined,
+      title: book.title, author: book.author, isbn: book.isbn,
+      cover_url: book.cover_url || undefined, description: book.description || undefined,
+      pages: book.pages || undefined, status,
+      source: source.trim() || undefined, volume: volume.trim() || undefined,
+      lcc: book.lcc || undefined, ddc: book.ddc || undefined,
       topics: editTopics.length > 0 ? editTopics : undefined,
     };
-
     onAdded(newBook);
 
     await supabase.from("books").insert({
@@ -176,6 +169,7 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
 
     const newBook: Partial<Book> = {
       title: manTitle.trim(), author: manAuthor.trim(), status,
+      isbn: manIsbn.trim() || undefined,
       source: source.trim() || undefined, volume: volume.trim() || undefined,
       pages: manPages ? parseInt(manPages) : undefined,
     };
@@ -183,6 +177,7 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
 
     await supabase.from("books").insert({
       title: manTitle.trim(), author: manAuthor.trim(), status,
+      isbn: manIsbn.trim() || null,
       pages: manPages ? parseInt(manPages) : null,
       intro_pages: ip || 0, start_page: sp, end_page: ep,
       source: source.trim() || null, volume: volume.trim() || null,
@@ -204,8 +199,8 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
   const inputCls = "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600";
   const numInputCls = "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600";
 
-  // Shared fields for source, volume, pages, topics, status
-  const SharedFields = () => (
+  // Shared fields rendered inline (NOT as a sub-component) to avoid focus loss
+  const sharedFields = (
     <>
       {/* Source with auto-suggest */}
       <div className="relative">
@@ -411,16 +406,10 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
                   {selected.isbn && <span>ISBN: {selected.isbn}</span>}
                   {selected.pages && <span>{selected.pages} pages</span>}
                 </div>
-                {(selected.lcc || selected.ddc) && (
-                  <div className="flex flex-wrap gap-2 text-[10px] text-zinc-600 mt-1">
-                    {selected.lcc && <span>LCC: {selected.lcc}</span>}
-                    {selected.ddc && <span>DDC: {selected.ddc}</span>}
-                  </div>
-                )}
               </div>
             </div>
 
-            <SharedFields />
+            {sharedFields}
 
             <div className="flex gap-3">
               <button onClick={handleAdd} disabled={saving}
@@ -444,11 +433,15 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
               <input type="text" value={manAuthor} onChange={(e) => setManAuthor(e.target.value)} placeholder="Author name" className={inputCls} />
             </div>
             <div>
+              <label className="block text-xs text-zinc-500 mb-1">ISBN</label>
+              <input type="text" inputMode="numeric" value={manIsbn} onChange={(e) => setManIsbn(e.target.value)} placeholder="978..." className={inputCls} />
+            </div>
+            <div>
               <label className="block text-xs text-zinc-500 mb-1">Total Pages</label>
               <input type="text" inputMode="numeric" pattern="[0-9]*" value={manPages} onChange={(e) => setManPages(e.target.value)} placeholder="Page count" className={inputCls} />
             </div>
 
-            <SharedFields />
+            {sharedFields}
 
             <div className="flex gap-3">
               <button onClick={handleManualAdd} disabled={saving || !manTitle.trim() || !manAuthor.trim()}

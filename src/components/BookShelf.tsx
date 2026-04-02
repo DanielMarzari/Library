@@ -86,7 +86,7 @@ function ShelfBook({
     >
       {/* Favorite indicator */}
       {book.favorite && !selectMode && (
-        <div className="absolute -top-1 -left-1 z-10 text-amber-400 text-xs drop-shadow">★</div>
+        <div className="absolute -top-1 -left-1 z-10 text-red-500 text-xs drop-shadow">❤</div>
       )}
       {/* Selection indicator */}
       {selectMode && (

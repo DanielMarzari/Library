@@ -2,10 +2,11 @@
 
 export const dynamic = "force-dynamic";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { Book } from "@/types/book";
 import { BookDetail } from "@/components/BookDetail";
+import { searchBooks, enrichBook } from "@/lib/bookLookup";
 import Link from "next/link";
 
 type MissingField =
@@ -118,6 +119,45 @@ export default function SetupPage() {
     );
   };
 
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [batchProgress, setBatchProgress] = useState({ done: 0, total: 0 });
+
+  const handleBatchReimport = useCallback(async () => {
+    if (batchRunning) return;
+    setBatchRunning(true);
+    const toProcess = filteredBooks.slice(0, 50); // limit batch size
+    setBatchProgress({ done: 0, total: toProcess.length });
+    for (let i = 0; i < toProcess.length; i++) {
+      const book = toProcess[i];
+      try {
+        const query = book.isbn || book.title;
+        const found = await searchBooks(query, 1);
+        if (found.length > 0) {
+          const enriched = await enrichBook(found[0]);
+          const updates: Record<string, unknown> = {};
+          if (enriched.cover_url && !book.cover_url) updates.cover_url = enriched.cover_url;
+          if (enriched.lcc && !book.lcc) updates.lcc = enriched.lcc;
+          if (enriched.ddc && !book.ddc) updates.ddc = enriched.ddc;
+          if (enriched.pages && !book.end_page) updates.end_page = enriched.pages;
+          if (enriched.pages && !book.pages) updates.pages = enriched.pages;
+          if (enriched.topics?.length && (!book.auto_topics || book.auto_topics.length === 0)) updates.auto_topics = enriched.topics;
+          if (enriched.isbn && !book.isbn) updates.isbn = enriched.isbn;
+          if (Object.keys(updates).length > 0) {
+            updates.updated_at = new Date().toISOString();
+            await supabase.from("books").update(updates).eq("id", book.id);
+          }
+        }
+      } catch (e) {
+        // skip failures
+      }
+      setBatchProgress({ done: i + 1, total: toProcess.length });
+      // Rate limit
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    setBatchRunning(false);
+    setRefreshKey((k) => k + 1);
+  }, [filteredBooks, batchRunning]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -134,12 +174,25 @@ export default function SetupPage() {
             <h1 className="text-2xl font-bold tracking-tight">
               Complete Setup
             </h1>
-            <Link
-              href="/"
-              className="text-zinc-400 hover:text-zinc-200 text-sm font-medium transition-colors"
-            >
-              Back to Library
-            </Link>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleBatchReimport}
+                disabled={batchRunning || filteredBooks.length === 0}
+                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {batchRunning ? (
+                  <><div className="animate-spin rounded-full h-3 w-3 border border-zinc-600 border-t-emerald-500" /> {batchProgress.done}/{batchProgress.total}</>
+                ) : (
+                  <>🔄 Batch Reimport</>
+                )}
+              </button>
+              <Link
+                href="/"
+                className="text-zinc-400 hover:text-zinc-200 text-sm font-medium transition-colors"
+              >
+                Back to Library
+              </Link>
+            </div>
           </div>
           <p className="text-sm text-zinc-500 mb-4">
             Books missing data — tap to edit and fill in details.

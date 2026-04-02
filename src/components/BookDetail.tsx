@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { Book, ReadingUpdate } from "@/types/book";
 import { enrichBook, searchBooks } from "@/lib/bookLookup";
@@ -39,8 +39,10 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
   const [topicInput, setTopicInput] = useState("");
   const [autoTopics, setAutoTopics] = useState<string[]>(book.auto_topics || []);
   const [favorite, setFavorite] = useState(book.favorite || false);
-  const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [refreshing, setRefreshing] = useState(false);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(false);
 
   const [updates, setUpdates] = useState<ReadingUpdate[]>([]);
   const [showAddUpdate, setShowAddUpdate] = useState(false);
@@ -80,8 +82,8 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
     setRefreshing(false);
   };
 
-  const handleSave = async () => {
-    setSaving(true);
+  const doSave = useCallback(async () => {
+    setSaveStatus("saving");
     const { error } = await supabase.from("books").update({
       title: title.trim(), author: author.trim(),
       cover_url: coverUrl.trim() || null,
@@ -98,9 +100,28 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
       favorite,
       updated_at: new Date().toISOString(),
     }).eq("id", book.id);
-    if (!error) { setEditing(false); onUpdated(); }
-    setSaving(false);
-  };
+    if (!error) {
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 1500);
+    } else {
+      setSaveStatus("idle");
+    }
+  }, [book.id, title, author, coverUrl, pages, introPages, startPage, endPage, status, rating, startDate, completeDate, source, volume, lcc, ddc, editTopics, autoTopics, favorite]);
+
+  // Auto-save with debounce
+  useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      doSave();
+    }, 1200);
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [title, author, coverUrl, pages, introPages, startPage, endPage, status, rating, startDate, completeDate, source, volume, lcc, ddc, editTopics, autoTopics, favorite]);
 
   const handleStatusChange = async (newStatus: Book["status"]) => {
     setStatus(newStatus);
@@ -147,7 +168,7 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { if (saveTimeoutRef.current) { clearTimeout(saveTimeoutRef.current); doSave(); } onUpdated(); }} />
       <div className="relative bg-zinc-900 border border-zinc-800 rounded-t-2xl sm:rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         {/* Cover */}
         <div className="relative h-48 bg-gradient-to-b from-zinc-800 to-zinc-900 flex items-center justify-center">
@@ -157,27 +178,27 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
             <div className="h-40 w-28 rounded-lg bg-zinc-700 flex items-center justify-center"><span className="text-zinc-500 text-xs">No Cover</span></div>
           )}
           <div className="absolute top-3 right-3 flex gap-2">
-            <button onClick={() => setFavorite(!favorite)} className={`bg-black/40 rounded-full w-8 h-8 flex items-center justify-center text-sm ${favorite ? "text-amber-400" : "text-zinc-500 hover:text-zinc-200"}`} title={favorite ? "Remove from favorites" : "Add to favorites"}>
-              {favorite ? "★" : "☆"}
+            <button onClick={() => setFavorite(!favorite)} className={`bg-black/40 rounded-full w-8 h-8 flex items-center justify-center text-sm ${favorite ? "text-red-500" : "text-zinc-500 hover:text-zinc-200"}`} title={favorite ? "Remove from favorites" : "Add to favorites"}>
+              {favorite ? "❤" : "♡"}
             </button>
             <button onClick={() => setEditing(!editing)} className="text-zinc-400 hover:text-zinc-200 bg-black/40 rounded-full w-8 h-8 flex items-center justify-center text-sm">✏️</button>
-            <button onClick={onClose} className="text-zinc-400 hover:text-zinc-200 bg-black/40 rounded-full w-8 h-8 flex items-center justify-center">×</button>
+            <button onClick={() => { if (saveTimeoutRef.current) { clearTimeout(saveTimeoutRef.current); doSave(); } onUpdated(); }} className="text-zinc-400 hover:text-zinc-200 bg-black/40 rounded-full w-8 h-8 flex items-center justify-center">×</button>
           </div>
         </div>
 
         <div className="p-6 space-y-5">
+          {/* Refresh button - always visible */}
+          <button onClick={handleRefresh} disabled={refreshing}
+            className="w-full bg-zinc-800 hover:bg-zinc-700 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+            {refreshing ? (
+              <><div className="animate-spin rounded-full h-3 w-3 border border-zinc-600 border-t-emerald-500" /> Refreshing...</>
+            ) : (
+              <>🔄 Refresh from Open Library</>
+            )}
+          </button>
+
           {editing ? (
             <>
-              {/* Refresh button */}
-              <button onClick={handleRefresh} disabled={refreshing}
-                className="w-full bg-zinc-800 hover:bg-zinc-700 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-                {refreshing ? (
-                  <><div className="animate-spin rounded-full h-3 w-3 border border-zinc-600 border-t-emerald-500" /> Refreshing...</>
-                ) : (
-                  <>🔄 Refresh from Open Library</>
-                )}
-              </button>
-
               <div>
                 <label className="block text-xs text-zinc-500 mb-1">Title</label>
                 <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} />
@@ -387,11 +408,11 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
           )}
 
           {/* Actions */}
-          <div className="flex gap-3">
-            <button onClick={handleSave} disabled={saving}
-              className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
-              {saving ? "Saving..." : "Save Changes"}
-            </button>
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-zinc-500">
+              {saveStatus === "saving" && <span className="text-amber-400">Saving...</span>}
+              {saveStatus === "saved" && <span className="text-emerald-400">Saved</span>}
+            </div>
             <button onClick={handleDelete}
               className="px-4 py-2.5 rounded-lg text-sm font-medium text-red-400 bg-red-950/30 hover:bg-red-950/50 transition-colors">Remove</button>
           </div>
