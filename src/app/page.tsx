@@ -8,8 +8,8 @@ import { Book } from "@/types/book";
 import { BookShelf } from "@/components/BookShelf";
 import { BookCard } from "@/components/BookCard";
 import { BookDetail } from "@/components/BookDetail";
-import { AddBookModal } from "@/components/AddBookModal";
-import { IsbnScanner } from "@/components/IsbnScanner";
+import { AddBookSheet } from "@/components/AddBookSheet";
+import Link from "next/link";
 
 type FilterStatus = "all" | "not_read" | "reading" | "read";
 type ViewMode = "shelf" | "list";
@@ -19,11 +19,14 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterStatus>("all");
   const [search, setSearch] = useState("");
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showScanner, setShowScanner] = useState(false);
+  const [showAddSheet, setShowAddSheet] = useState(false);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("shelf");
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Multi-select state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const selectMode = selectedIds.size > 0;
 
   useEffect(() => {
     let ignore = false;
@@ -51,13 +54,14 @@ export default function Home() {
         if (error) {
           console.error("Error fetching books:", error);
         } else {
-          // Keep any optimistic books that haven't been confirmed yet
           setBooks((prev) => {
             const optimistic = prev.filter((b) => b._optimistic);
             const real = data || [];
-            // Remove optimistic books that now exist in real data (match by title)
             const stillPending = optimistic.filter(
-              (ob) => !real.some((rb) => rb.title === ob.title && rb.author === ob.author)
+              (ob) =>
+                !real.some(
+                  (rb) => rb.title === ob.title && rb.author === ob.author
+                )
             );
             return [...stillPending, ...real];
           });
@@ -76,7 +80,6 @@ export default function Home() {
     setRefreshKey((k) => k + 1);
   }, []);
 
-  // Optimistic add from scanner: show book immediately, then refetch
   const handleOptimisticAdd = useCallback(
     (partialBook: Partial<Book>) => {
       const optimisticBook: Book = {
@@ -94,9 +97,7 @@ export default function Home() {
       };
 
       setBooks((prev) => [optimisticBook, ...prev]);
-      setShowScanner(false);
-
-      // Refetch after a short delay to pick up the real DB record
+      setShowAddSheet(false);
       setTimeout(() => refetch(), 1500);
     },
     [refetch]
@@ -121,6 +122,51 @@ export default function Home() {
     }
   };
 
+  // Multi-select handlers
+  const handleStartSelect = useCallback((id: string) => {
+    setSelectedIds(new Set([id]));
+  }, []);
+
+  const handleToggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`Delete ${selectedIds.size} book(s)?`)) return;
+    const ids = [...selectedIds];
+    const { error } = await supabase.from("books").delete().in("id", ids);
+    if (!error) {
+      setBooks((prev) => prev.filter((b) => !selectedIds.has(b.id)));
+      clearSelection();
+    }
+  };
+
+  const handleBulkStatus = async (status: Book["status"]) => {
+    const ids = [...selectedIds];
+    const { error } = await supabase
+      .from("books")
+      .update({ status, updated_at: new Date().toISOString() })
+      .in("id", ids);
+    if (!error) {
+      setBooks((prev) =>
+        prev.map((b) => (selectedIds.has(b.id) ? { ...b, status } : b))
+      );
+      clearSelection();
+    }
+  };
+
   const filterButtons: { label: string; value: FilterStatus }[] = [
     { label: "All", value: "all" },
     { label: "Not Read", value: "not_read" },
@@ -136,18 +182,17 @@ export default function Home() {
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-2xl font-bold tracking-tight">My Library</h1>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowScanner(true)}
+              <Link
+                href="/stats"
                 className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-                title="Scan ISBN"
               >
-                📷
-              </button>
+                Stats
+              </Link>
               <button
-                onClick={() => setShowAddModal(true)}
+                onClick={() => setShowAddSheet(true)}
                 className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
               >
-                + Add
+                + Add Book
               </button>
             </div>
           </div>
@@ -205,6 +250,51 @@ export default function Home() {
         </div>
       </header>
 
+      {/* Bulk action bar */}
+      {selectMode && (
+        <div className="sticky top-[145px] z-10 bg-zinc-900/95 backdrop-blur-md border-b border-zinc-700 px-4 py-3">
+          <div className="max-w-4xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={clearSelection}
+                className="text-zinc-400 hover:text-zinc-200 text-sm"
+              >
+                Cancel
+              </button>
+              <span className="text-sm text-zinc-300 font-medium">
+                {selectedIds.size} selected
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleBulkStatus("not_read")}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-700 text-zinc-300 hover:bg-zinc-600 transition-colors"
+              >
+                Not Read
+              </button>
+              <button
+                onClick={() => handleBulkStatus("reading")}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-colors"
+              >
+                Reading
+              </button>
+              <button
+                onClick={() => handleBulkStatus("read")}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 transition-colors"
+              >
+                Read
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main content */}
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-6">
         {loading ? (
@@ -215,26 +305,24 @@ export default function Home() {
           <div className="text-center py-20">
             <p className="text-5xl mb-4">📚</p>
             <p className="text-zinc-500 text-lg mb-2">No books yet</p>
-            <p className="text-zinc-600 text-sm mb-6">Start building your library</p>
-            <div className="flex gap-3 justify-center">
-              <button
-                onClick={() => setShowScanner(true)}
-                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
-              >
-                📷 Scan ISBN
-              </button>
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
-              >
-                + Add Manually
-              </button>
-            </div>
+            <p className="text-zinc-600 text-sm mb-6">
+              Start building your library
+            </p>
+            <button
+              onClick={() => setShowAddSheet(true)}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
+            >
+              + Add Book
+            </button>
           </div>
         ) : viewMode === "shelf" ? (
           <BookShelf
             books={books}
             onBookTap={(book) => setSelectedBook(book)}
+            selectedIds={selectedIds}
+            onToggleSelect={handleToggleSelect}
+            onStartSelect={handleStartSelect}
+            selectMode={selectMode}
           />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
@@ -250,20 +338,15 @@ export default function Home() {
         )}
       </main>
 
-      {showAddModal && (
-        <AddBookModal
-          onClose={() => setShowAddModal(false)}
-          onAdded={() => {
-            setShowAddModal(false);
-            refetch();
-          }}
-        />
-      )}
-
-      {showScanner && (
-        <IsbnScanner
-          onClose={() => setShowScanner(false)}
+      {showAddSheet && (
+        <AddBookSheet
+          onClose={() => setShowAddSheet(false)}
           onAdded={handleOptimisticAdd}
+          recentSources={[
+            ...new Set(
+              books.map((b) => b.source).filter(Boolean) as string[]
+            ),
+          ]}
         />
       )}
 

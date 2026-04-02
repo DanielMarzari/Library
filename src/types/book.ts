@@ -7,12 +7,12 @@ export interface Book {
   description?: string;
   status: "not_read" | "reading" | "read";
   rating?: number;
-  notes?: string;
+  volume?: string;
   pages?: number;
   intro_pages?: number;
   start_page?: number;
   end_page?: number;
-  reading_pages?: number; // computed: end_page - start_page + 1 + intro_pages
+  reading_pages?: number;
   start_date?: string;
   complete_date?: string;
   source?: string;
