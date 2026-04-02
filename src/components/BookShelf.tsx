@@ -3,6 +3,8 @@
 import { useRef, useCallback } from "react";
 import { Book } from "@/types/book";
 
+type GridSize = "small" | "medium" | "large";
+
 interface BookShelfProps {
   books: Book[];
   onBookTap: (book: Book) => void;
@@ -12,7 +14,14 @@ interface BookShelfProps {
   selectMode: boolean;
   sortMode?: string;
   flatGrid?: boolean;
+  gridSize?: GridSize;
 }
+
+const gridClasses: Record<GridSize, string> = {
+  small:  "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 2xl:grid-cols-12 gap-3",
+  medium: "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-4",
+  large:  "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-5",
+};
 
 const statusLabels: Record<Book["status"], string> = {
   not_read: "Not Read",
@@ -92,7 +101,7 @@ function ShelfBook({
           className={`absolute -top-1 -right-1 z-10 w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] ${
             selected
               ? "bg-emerald-500 border-emerald-400 text-white"
-              : "bg-zinc-800 border-zinc-600 text-transparent"
+              : "bg-surface-2 border-border-custom text-transparent"
           }`}
         >
           ✓
@@ -105,9 +114,9 @@ function ShelfBook({
         }`}
       >
         {book._optimistic ? (
-          <div className="w-full h-full bg-zinc-800 flex flex-col items-center justify-center p-2">
-            <div className="animate-spin rounded-full h-5 w-5 border-2 border-zinc-600 border-t-emerald-500 mb-2" />
-            <span className="text-[10px] text-zinc-500">Adding...</span>
+          <div className="w-full h-full bg-surface-2 flex flex-col items-center justify-center p-2">
+            <div className="animate-spin rounded-full h-5 w-5 border-2 border-border-custom border-t-emerald-500 mb-2" />
+            <span className="text-[10px] text-muted">Adding...</span>
           </div>
         ) : book.cover_url ? (
           <img
@@ -116,11 +125,11 @@ function ShelfBook({
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-zinc-700 to-zinc-800 flex flex-col items-center justify-center p-2 text-center">
-            <span className="text-[10px] font-semibold text-zinc-300 leading-tight line-clamp-3">
+          <div className="w-full h-full bg-gradient-to-br from-border-custom to-surface-2 flex flex-col items-center justify-center p-2 text-center">
+            <span className="text-[10px] font-semibold text-foreground leading-tight line-clamp-3">
               {book.title}
             </span>
-            <span className="text-[9px] text-zinc-500 mt-1 line-clamp-1">
+            <span className="text-[9px] text-muted mt-1 line-clamp-1">
               {book.author}
             </span>
           </div>
@@ -136,7 +145,7 @@ function ShelfBook({
               <span
                 key={star}
                 className={`text-[8px] ${
-                  star <= book.rating! ? "text-amber-400" : "text-zinc-600"
+                  star <= book.rating! ? "text-amber-400" : "text-muted-2"
                 }`}
               >
                 ★
@@ -165,6 +174,7 @@ export function BookShelf({
   selectMode,
   sortMode,
   flatGrid,
+  gridSize = "medium",
 }: BookShelfProps) {
   // When sorting by alpha/rating/lcc/ddc, or flat grid forced, show flat grid (no grouping)
   const flatMode = flatGrid || sortMode === "alpha" || sortMode === "rating" || sortMode === "lcc" || sortMode === "ddc";
@@ -194,16 +204,16 @@ export function BookShelf({
             {!flatMode && (
               <div className="flex items-center gap-2 mb-4 px-1">
                 <span className="text-lg">{statusEmoji[status as Book["status"]]}</span>
-                <h2 className="text-lg font-semibold text-zinc-100">
+                <h2 className="text-lg font-semibold text-foreground">
                   {statusLabels[status as Book["status"]]}
                 </h2>
-                <span className="text-xs text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded-full">
+                <span className="text-xs text-muted bg-surface-2 px-2 py-0.5 rounded-full">
                   {sectionBooks.length}
                 </span>
               </div>
             )}
 
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-4 px-1">
+            <div className={`grid ${gridClasses[gridSize]} px-1`}>
               {sectionBooks.map((book) => (
                 <ShelfBook
                   key={book.id}

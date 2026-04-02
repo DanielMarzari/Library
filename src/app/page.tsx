@@ -13,6 +13,7 @@ import Link from "next/link";
 type FilterStatus = "all" | "not_read" | "reading" | "read" | "favorites";
 type SortMode = "recent" | "alpha" | "rating" | "lcc" | "ddc";
 type HeaderTab = "filter" | "sort";
+type GridSize = "small" | "medium" | "large";
 
 export default function Home() {
   const [books, setBooks] = useState<Book[]>([]);
@@ -28,7 +29,16 @@ export default function Home() {
   const [showNav, setShowNav] = useState(false);
   const [headerTab, setHeaderTab] = useState<HeaderTab>("filter");
   const [theme, setTheme] = useState<"system" | "light" | "dark">("system");
+  const [gridSize, setGridSize] = useState<GridSize>("medium");
   const navRef = useRef<HTMLDivElement>(null);
+
+  // Load persisted preferences
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("library-theme") as "system" | "light" | "dark" | null;
+    if (savedTheme) setTheme(savedTheme);
+    const savedGrid = localStorage.getItem("library-grid-size") as GridSize | null;
+    if (savedGrid) setGridSize(savedGrid);
+  }, []);
 
   // Apply theme class to <html>
   useEffect(() => {
@@ -38,7 +48,12 @@ export default function Home() {
     } else {
       root.setAttribute("data-theme", theme);
     }
+    localStorage.setItem("library-theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem("library-grid-size", gridSize);
+  }, [gridSize]);
 
   // Multi-select state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -291,20 +306,38 @@ export default function Home() {
                   <Link href="/setup" className={navLinkCls} onClick={() => setShowNav(false)}>Setup</Link>
 
                   <div className="border-t border-border-custom my-1.5" />
-                  <div className="px-3 py-2">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-2 font-semibold mb-2">Theme</p>
-                    <div className="flex gap-1 bg-surface-2 rounded-lg p-0.5">
-                      {([["system", "Auto"], ["light", "Light"], ["dark", "Dark"]] as const).map(([val, label]) => (
-                        <button
-                          key={val}
-                          onClick={() => setTheme(val)}
-                          className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
-                            theme === val ? "bg-background text-foreground shadow-sm" : "text-muted-2 hover:text-muted"
-                          }`}
-                        >
-                          {label}
-                        </button>
-                      ))}
+                  <div className="px-3 py-2 space-y-3">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-2 font-semibold mb-2">Theme</p>
+                      <div className="flex gap-1 bg-surface-2 rounded-lg p-0.5">
+                        {([["system", "Auto"], ["light", "Light"], ["dark", "Dark"]] as const).map(([val, label]) => (
+                          <button
+                            key={val}
+                            onClick={() => setTheme(val)}
+                            className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                              theme === val ? "bg-background text-foreground shadow-sm" : "text-muted-2 hover:text-muted"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-2 font-semibold mb-2">Book Size</p>
+                      <div className="flex gap-1 bg-surface-2 rounded-lg p-0.5">
+                        {([["small", "S"], ["medium", "M"], ["large", "L"]] as const).map(([val, label]) => (
+                          <button
+                            key={val}
+                            onClick={() => setGridSize(val)}
+                            className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                              gridSize === val ? "bg-background text-foreground shadow-sm" : "text-muted-2 hover:text-muted"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -468,6 +501,7 @@ export default function Home() {
             selectMode={selectMode}
             sortMode={sortMode}
             flatGrid={filter === "all" || filter === "favorites"}
+            gridSize={gridSize}
           />
         )}
       </main>

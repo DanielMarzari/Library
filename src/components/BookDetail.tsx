@@ -254,35 +254,35 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
   })();
 
   const displayPages = book.reading_pages || computedReadingPages || book.pages;
-  const inputCls = "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600";
-  const numCls = "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600";
+  const inputCls = "w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600";
+  const numCls = "w-full bg-surface-2 border border-border-custom rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600";
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { if (saveTimeoutRef.current) { clearTimeout(saveTimeoutRef.current); doSave(); } onUpdated(); }} />
-      <div className="relative bg-zinc-900 border border-zinc-800 rounded-t-2xl sm:rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div className="relative bg-surface border border-border-custom rounded-t-2xl sm:rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         {/* Cover */}
-        <div className="relative h-48 bg-gradient-to-b from-zinc-800 to-zinc-900 flex items-center justify-center">
+        <div className="relative h-48 bg-gradient-to-b from-surface-2 to-surface flex items-center justify-center">
           <button onClick={() => { setShowCoverSearch(true); searchCovers(); }} className="focus:outline-none hover:opacity-75 transition-opacity" title="Search for cover image">
             {(coverUrl || book.cover_url) ? (
               <img src={coverUrl || book.cover_url} alt={book.title} className="h-40 rounded-lg shadow-xl shadow-black/50 object-cover cursor-pointer" />
             ) : (
-              <div className="h-40 w-28 rounded-lg bg-zinc-700 flex items-center justify-center cursor-pointer hover:bg-zinc-600"><span className="text-zinc-500 text-xs">No Cover</span></div>
+              <div className="h-40 w-28 rounded-lg bg-border-custom flex items-center justify-center cursor-pointer hover:bg-surface-2"><span className="text-muted text-xs">No Cover</span></div>
             )}
           </button>
           <div className="absolute top-3 right-3 grid grid-cols-2 gap-1.5">
-            <button onClick={() => { setFavorite(!favorite); scheduleAutoSave(); }} className={`bg-black/40 backdrop-blur-sm rounded-full w-8 h-8 flex items-center justify-center text-sm ${favorite ? "text-red-500" : "text-zinc-400 hover:text-zinc-200"}`} title={favorite ? "Remove from favorites" : "Add to favorites"}>
+            <button onClick={() => { setFavorite(!favorite); scheduleAutoSave(); }} className={`bg-black/40 backdrop-blur-sm rounded-full w-8 h-8 flex items-center justify-center text-sm ${favorite ? "text-red-500" : "text-muted hover:text-foreground"}`} title={favorite ? "Remove from favorites" : "Add to favorites"}>
               {favorite ? "❤" : "♡"}
             </button>
-            <button onClick={() => setEditing(!editing)} className="text-zinc-400 hover:text-zinc-200 bg-black/40 backdrop-blur-sm rounded-full w-8 h-8 flex items-center justify-center" title="Edit">
+            <button onClick={() => setEditing(!editing)} className="text-muted hover:text-foreground bg-black/40 backdrop-blur-sm rounded-full w-8 h-8 flex items-center justify-center" title="Edit">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 3a2.85 2.83 0 1 0-4 4L16.5 20.5 22 22l-1.5-5.5Z"/><path d="m9 5-4 4"/></svg>
             </button>
-            <a href={`https://annas-archive.gl/search?q=${encodeURIComponent(book.title)}`} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-zinc-200 bg-black/40 backdrop-blur-sm rounded-full w-8 h-8 flex items-center justify-center" title="Find PDF">
+            <a href={`https://annas-archive.gl/search?q=${encodeURIComponent(book.title)}`} target="_blank" rel="noopener noreferrer" className="text-muted hover:text-foreground bg-black/40 backdrop-blur-sm rounded-full w-8 h-8 flex items-center justify-center" title="Find PDF">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
             </a>
-            <button onClick={handleRefresh} disabled={refreshing} className="text-zinc-400 hover:text-zinc-200 bg-black/40 backdrop-blur-sm rounded-full w-8 h-8 flex items-center justify-center disabled:opacity-50" title="Refresh from Open Library">
+            <button onClick={handleRefresh} disabled={refreshing} className="text-muted hover:text-foreground bg-black/40 backdrop-blur-sm rounded-full w-8 h-8 flex items-center justify-center disabled:opacity-50" title="Refresh from Open Library">
               {refreshing ? (
-                <div className="animate-spin rounded-full h-3.5 w-3.5 border border-zinc-600 border-t-emerald-500" />
+                <div className="animate-spin rounded-full h-3.5 w-3.5 border border-border-custom border-t-emerald-500" />
               ) : (
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
               )}
@@ -294,34 +294,34 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
           {editing ? (
             <>
               <div>
-                <label className="block text-xs text-zinc-500 mb-1">Title</label>
+                <label className="block text-xs text-muted mb-1">Title</label>
                 <input type="text" value={title} onChange={(e) => { setTitle(e.target.value); scheduleAutoSave(); }} className={inputCls} />
               </div>
               <div>
-                <label className="block text-xs text-zinc-500 mb-1">Author</label>
+                <label className="block text-xs text-muted mb-1">Author</label>
                 <input type="text" value={author} onChange={(e) => { setAuthor(e.target.value); scheduleAutoSave(); }} className={inputCls} />
               </div>
               <div>
-                <label className="block text-xs text-zinc-500 mb-1">Cover Image URL</label>
+                <label className="block text-xs text-muted mb-1">Cover Image URL</label>
                 <input type="text" value={coverUrl} onChange={(e) => { setCoverUrl(e.target.value); scheduleAutoSave(); }} placeholder="https://..." className={inputCls} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-zinc-500 mb-1">Volume</label>
+                  <label className="block text-xs text-muted mb-1">Volume</label>
                   <input type="text" value={volume} onChange={(e) => { setVolume(e.target.value); scheduleAutoSave(); }} placeholder="Vol. 1" className={inputCls} />
                 </div>
                 <div className="relative">
-                  <label className="block text-xs text-zinc-500 mb-1">Source</label>
+                  <label className="block text-xs text-muted mb-1">Source</label>
                   <input type="text" value={source}
                     onChange={(e) => { setSource(e.target.value); setShowSourceSuggestions(true); scheduleAutoSave(); }}
                     onFocus={() => setShowSourceSuggestions(true)}
                     onBlur={() => setTimeout(() => setShowSourceSuggestions(false), 200)}
                     placeholder="Gift, Library..." className={inputCls} />
                   {showSourceSuggestions && recentSources.filter((s) => s.toLowerCase().includes(source.toLowerCase()) && s !== source).length > 0 && (
-                    <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-zinc-800 border border-zinc-700 rounded-lg overflow-hidden shadow-lg">
+                    <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-surface-2 border border-border-custom rounded-lg overflow-hidden shadow-lg">
                       {recentSources.filter((s) => s.toLowerCase().includes(source.toLowerCase()) && s !== source).slice(0, 5).map((s) => (
                         <button key={s} onMouseDown={() => { setSource(s); setShowSourceSuggestions(false); scheduleAutoSave(); }}
-                          className="w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-700 transition-colors">
+                          className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-border-custom transition-colors">
                           {s}
                         </button>
                       ))}
@@ -332,48 +332,48 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
 
               {/* Page details */}
               <div>
-                <label className="block text-xs text-zinc-500 mb-1">Page Details</label>
+                <label className="block text-xs text-muted mb-1">Page Details</label>
                 <div className="grid grid-cols-4 gap-2">
                   <div>
-                    <label className="block text-[10px] text-zinc-600 mb-0.5">Total</label>
+                    <label className="block text-[10px] text-muted-2 mb-0.5">Total</label>
                     <input type="text" inputMode="numeric" pattern="[0-9]*" value={pages} onChange={(e) => { setPages(e.target.value); scheduleAutoSave(); }} onFocus={(e) => e.target.select()} placeholder="—" className={numCls} />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-zinc-600 mb-0.5">Intro</label>
+                    <label className="block text-[10px] text-muted-2 mb-0.5">Intro</label>
                     <input type="text" inputMode="numeric" pattern="[0-9]*" value={introPages} onChange={(e) => { setIntroPages(e.target.value); recalcPages(e.target.value, startPage, endPage); scheduleAutoSave(); }} onFocus={(e) => e.target.select()} placeholder="0" className={numCls} />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-zinc-600 mb-0.5">Start</label>
+                    <label className="block text-[10px] text-muted-2 mb-0.5">Start</label>
                     <input type="text" inputMode="numeric" pattern="[0-9]*" value={startPage} onChange={(e) => { setStartPage(e.target.value); recalcPages(introPages, e.target.value, endPage); scheduleAutoSave(); }} onFocus={(e) => e.target.select()} placeholder="1" className={numCls} />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-zinc-600 mb-0.5">End</label>
+                    <label className="block text-[10px] text-muted-2 mb-0.5">End</label>
                     <input type="text" inputMode="numeric" pattern="[0-9]*" value={endPage} onChange={(e) => { setEndPage(e.target.value); recalcPages(introPages, startPage, e.target.value); scheduleAutoSave(); }} onFocus={(e) => e.target.select()} placeholder="—" className={numCls} />
                   </div>
                 </div>
-                {computedReadingPages && <p className="text-xs text-zinc-500 mt-1">Reading pages: <span className="text-zinc-300 font-medium">{computedReadingPages}</span></p>}
+                {computedReadingPages && <p className="text-xs text-muted mt-1">Reading pages: <span className="text-foreground font-medium">{computedReadingPages}</span></p>}
               </div>
 
               {/* Classification */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-zinc-500 mb-1">LCC</label>
+                  <label className="block text-xs text-muted mb-1">LCC</label>
                   <input type="text" value={lcc} onChange={(e) => { setLcc(e.target.value); scheduleAutoSave(); }} className={inputCls} />
                 </div>
                 <div>
-                  <label className="block text-xs text-zinc-500 mb-1">DDC</label>
+                  <label className="block text-xs text-muted mb-1">DDC</label>
                   <input type="text" value={ddc} onChange={(e) => { setDdc(e.target.value); scheduleAutoSave(); }} className={inputCls} />
                 </div>
               </div>
 
               {/* Topics */}
               <div>
-                <label className="block text-xs text-zinc-500 mb-1">Topics</label>
+                <label className="block text-xs text-muted mb-1">Topics</label>
                 {editTopics.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     {editTopics.map((t) => (
-                      <span key={t} className="inline-flex items-center gap-1 bg-zinc-800 text-zinc-300 text-xs px-2 py-0.5 rounded-full">
-                        {t}<button onClick={() => { setEditTopics(editTopics.filter((x) => x !== t)); scheduleAutoSave(); }} className="text-zinc-500 hover:text-red-400">×</button>
+                      <span key={t} className="inline-flex items-center gap-1 bg-surface-2 text-foreground text-xs px-2 py-0.5 rounded-full">
+                        {t}<button onClick={() => { setEditTopics(editTopics.filter((x) => x !== t)); scheduleAutoSave(); }} className="text-muted hover:text-red-400">×</button>
                       </span>
                     ))}
                   </div>
@@ -381,19 +381,19 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
                 <div className="flex gap-2">
                   <input type="text" value={topicInput} onChange={(e) => setTopicInput(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTopic(); } }}
-                    placeholder="Add topic..." className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />
-                  <button onClick={addTopic} className="bg-zinc-700 hover:bg-zinc-600 px-3 py-1.5 rounded-lg text-xs font-medium">Add</button>
+                    placeholder="Add topic..." className="flex-1 bg-surface-2 border border-border-custom rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+                  <button onClick={addTopic} className="bg-border-custom hover:bg-muted-2 px-3 py-1.5 rounded-lg text-xs font-medium">Add</button>
                 </div>
               </div>
 
               {/* Dates */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-zinc-500 mb-1">Start Date</label>
+                  <label className="block text-xs text-muted mb-1">Start Date</label>
                   <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); scheduleAutoSave(); }} className={inputCls} />
                 </div>
                 <div>
-                  <label className="block text-xs text-zinc-500 mb-1">Complete Date</label>
+                  <label className="block text-xs text-muted mb-1">Complete Date</label>
                   <input type="date" value={completeDate} onChange={(e) => { setCompleteDate(e.target.value); scheduleAutoSave(); }} className={inputCls} />
                 </div>
               </div>
@@ -401,23 +401,23 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
           ) : (
             <>
               <div>
-                <h2 className="text-xl font-bold text-zinc-100">{book.title}</h2>
-                <p className="text-sm text-zinc-400 mt-1">{book.author}</p>
-                {book.volume && <p className="text-xs text-zinc-500 mt-0.5">{book.volume}</p>}
-                <div className="flex flex-wrap gap-3 mt-1 text-xs text-zinc-600">
+                <h2 className="text-xl font-bold text-foreground">{book.title}</h2>
+                <p className="text-sm text-muted mt-1">{book.author}</p>
+                {book.volume && <p className="text-xs text-muted mt-0.5">{book.volume}</p>}
+                <div className="flex flex-wrap gap-3 mt-1 text-xs text-muted-2">
                   {book.isbn && <span>ISBN: {book.isbn}</span>}
                   {displayPages && <span>{displayPages} reading pages</span>}
                   {book.pages && displayPages !== book.pages && <span>({book.pages} total)</span>}
                 </div>
                 {(book.lcc || book.ddc) && (
-                  <div className="flex gap-3 mt-1 text-xs text-zinc-600">
+                  <div className="flex gap-3 mt-1 text-xs text-muted-2">
                     {book.lcc && <span>LCC: {book.lcc}</span>}
                     {book.ddc && <span>DDC: {book.ddc}</span>}
                   </div>
                 )}
-                {book.source && <p className="text-xs text-zinc-600 mt-1">Source: {book.source}</p>}
+                {book.source && <p className="text-xs text-muted-2 mt-1">Source: {book.source}</p>}
                 {(book.start_date || book.complete_date) && (
-                  <div className="flex gap-3 mt-1 text-xs text-zinc-600">
+                  <div className="flex gap-3 mt-1 text-xs text-muted-2">
                     {book.start_date && <span>Started: {book.start_date}</span>}
                     {book.complete_date && <span>Finished: {book.complete_date}</span>}
                   </div>
@@ -425,31 +425,31 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
               </div>
               {book.topics && book.topics.length > 0 && (
                 <div>
-                  <p className="text-[10px] text-zinc-600 mb-1">Topics</p>
+                  <p className="text-[10px] text-muted-2 mb-1">Topics</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {book.topics.map((t) => <span key={t} className="bg-zinc-800 text-zinc-400 text-xs px-2 py-0.5 rounded-full">{t}</span>)}
+                    {book.topics.map((t) => <span key={t} className="bg-surface-2 text-muted text-xs px-2 py-0.5 rounded-full">{t}</span>)}
                   </div>
                 </div>
               )}
               {book.auto_topics && book.auto_topics.length > 0 && (
                 <div>
-                  <p className="text-[10px] text-zinc-600 mb-1">Subjects (Open Library)</p>
+                  <p className="text-[10px] text-muted-2 mb-1">Subjects (Open Library)</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {book.auto_topics.map((t) => <span key={t} className="bg-zinc-800/50 text-zinc-500 text-xs px-2 py-0.5 rounded-full">{t}</span>)}
+                    {book.auto_topics.map((t) => <span key={t} className="bg-surface-2/50 text-muted text-xs px-2 py-0.5 rounded-full">{t}</span>)}
                   </div>
                 </div>
               )}
-              {book.description && <p className="text-sm text-zinc-400 leading-relaxed line-clamp-4">{book.description}</p>}
+              {book.description && <p className="text-sm text-muted leading-relaxed line-clamp-4">{book.description}</p>}
             </>
           )}
 
           {/* Status */}
           <div>
-            <label className="block text-xs text-zinc-500 mb-2">Status</label>
+            <label className="block text-xs text-muted mb-2">Status</label>
             <div className="flex gap-2">
               {(Object.keys(statusLabels) as Book["status"][]).map((s) => (
                 <button key={s} onClick={() => handleStatusChange(s)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${status === s ? "bg-emerald-600 text-white" : "bg-zinc-800 text-zinc-400 hover:text-zinc-200"}`}>
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${status === s ? "bg-emerald-600 text-white" : "bg-surface-2 text-muted hover:text-foreground"}`}>
                   {statusLabels[s]}
                 </button>
               ))}
@@ -458,11 +458,11 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
 
           {/* Rating */}
           <div>
-            <label className="block text-xs text-zinc-500 mb-2">Rating</label>
+            <label className="block text-xs text-muted mb-2">Rating</label>
             <div className="flex gap-1">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button key={star} onClick={() => { setRating(star === rating ? 0 : star); scheduleAutoSave(); }}
-                  className={`text-2xl transition-colors ${star <= rating ? "text-amber-400" : "text-zinc-700 hover:text-zinc-500"}`}>★</button>
+                  className={`text-2xl transition-colors ${star <= rating ? "text-amber-400" : "text-muted-2 hover:text-muted"}`}>★</button>
               ))}
             </div>
           </div>
@@ -471,31 +471,31 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
           {status === "reading" && (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-xs text-zinc-500">Reading Progress</label>
+                <label className="text-xs text-muted">Reading Progress</label>
                 <button onClick={() => setShowAddUpdate(!showAddUpdate)} className="text-xs text-emerald-500 hover:text-emerald-400">+ Log Progress</button>
               </div>
               {(readingSpeed || (book.current_page && book.current_page > 0)) && (
-                <div className="bg-zinc-800/50 rounded-lg px-3 py-2 mb-3 text-xs text-zinc-400">
+                <div className="bg-surface-2/50 rounded-lg px-3 py-2 mb-3 text-xs text-muted">
                   {readingSpeed && <>📊 ~{readingSpeed} pages/day </>}
                   {(displayPages || book.pages) && (
-                    <span className={readingSpeed ? "ml-2 text-zinc-500" : ""}>
+                    <span className={readingSpeed ? "ml-2 text-muted" : ""}>
                       ({updates.length > 0 ? updates[0].current_page : book.current_page || 0}/{displayPages || book.pages} pages)
                     </span>
                   )}
                 </div>
               )}
               {(displayPages || book.pages) && (updates.length > 0 || (book.current_page && book.current_page > 0)) && (
-                <div className="w-full bg-zinc-800 rounded-full h-2 mb-3">
+                <div className="w-full bg-surface-2 rounded-full h-2 mb-3">
                   <div className="bg-emerald-600 h-2 rounded-full transition-all"
                     style={{ width: `${Math.min(((updates.length > 0 ? updates[0].current_page : book.current_page || 0) / (displayPages || book.pages || 1)) * 100, 100)}%` }} />
                 </div>
               )}
               {showAddUpdate && (
-                <div className="bg-zinc-800 rounded-lg p-3 mb-3 space-y-2">
+                <div className="bg-surface-2 rounded-lg p-3 mb-3 space-y-2">
                   <input type="text" inputMode="numeric" pattern="[0-9]*" value={currentPage} onChange={(e) => setCurrentPage(e.target.value)} placeholder="Current page #"
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+                    className="w-full bg-surface border border-border-custom rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />
                   <input type="text" value={updateNotes} onChange={(e) => setUpdateNotes(e.target.value)} placeholder="Quick note (optional)"
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+                    className="w-full bg-surface border border-border-custom rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />
                   <button onClick={handleAddUpdate} disabled={!currentPage}
                     className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-50">Log</button>
                 </div>
@@ -503,11 +503,11 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
               {updates.length > 0 && (
                 <div className="space-y-1 max-h-32 overflow-y-auto">
                   {updates.slice(0, 5).map((u) => (
-                    <div key={u.id} className="flex items-center gap-2 text-xs text-zinc-500">
-                      <span className="text-zinc-600">{new Date(u.created_at).toLocaleDateString()}</span>
+                    <div key={u.id} className="flex items-center gap-2 text-xs text-muted">
+                      <span className="text-muted-2">{new Date(u.created_at).toLocaleDateString()}</span>
                       <span>p.{u.current_page}</span>
-                      <span className="text-zinc-700">+{u.pages_read}</span>
-                      {u.notes && <span className="text-zinc-600 truncate">{u.notes}</span>}
+                      <span className="text-muted-2">+{u.pages_read}</span>
+                      {u.notes && <span className="text-muted-2 truncate">{u.notes}</span>}
                     </div>
                   ))}
                 </div>
@@ -517,7 +517,7 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
 
           {/* Actions */}
           <div className="flex items-center justify-between">
-            <div className="text-xs text-zinc-500">
+            <div className="text-xs text-muted">
               {saveStatus === "saving" && <span className="text-amber-400">Saving...</span>}
               {saveStatus === "saved" && <span className="text-emerald-400">Saved</span>}
             </div>
@@ -530,11 +530,11 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
         {showCoverSearch && (
           <div className="fixed inset-0 z-60 flex items-center justify-center">
             <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowCoverSearch(false)} />
-            <div className="relative bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="relative bg-surface border border-border-custom rounded-2xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
               {/* Header */}
-              <div className="flex items-center justify-between p-4 border-b border-zinc-800">
-                <h3 className="text-lg font-semibold text-zinc-100">Search Cover Images</h3>
-                <button onClick={() => setShowCoverSearch(false)} className="text-zinc-400 hover:text-zinc-200 text-xl">×</button>
+              <div className="flex items-center justify-between p-4 border-b border-border-custom">
+                <h3 className="text-lg font-semibold text-foreground">Search Cover Images</h3>
+                <button onClick={() => setShowCoverSearch(false)} className="text-muted hover:text-foreground text-xl">×</button>
               </div>
 
               {/* Content */}
@@ -542,8 +542,8 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
                 {coverSearchLoading ? (
                   <div className="flex items-center justify-center h-32">
                     <div className="flex flex-col items-center gap-3">
-                      <div className="animate-spin rounded-full h-8 w-8 border border-zinc-600 border-t-emerald-500" />
-                      <p className="text-sm text-zinc-400">Searching for covers...</p>
+                      <div className="animate-spin rounded-full h-8 w-8 border border-border-custom border-t-emerald-500" />
+                      <p className="text-sm text-muted">Searching for covers...</p>
                     </div>
                   </div>
                 ) : coverOptions.length > 0 ? (
@@ -552,7 +552,7 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
                       <button
                         key={idx}
                         onClick={() => handleCoverSelect(url)}
-                        className="group relative overflow-hidden rounded-lg border border-zinc-700 hover:border-emerald-600 transition-all hover:shadow-lg hover:shadow-emerald-600/20"
+                        className="group relative overflow-hidden rounded-lg border border-border-custom hover:border-emerald-600 transition-all hover:shadow-lg hover:shadow-emerald-600/20"
                       >
                         <img src={url} alt={`Cover option ${idx + 1}`} className="w-full h-32 object-cover" onError={(e) => { e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='150'%3E%3Crect fill='%23404040' width='100' height='150'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' font-size='12' fill='%23888'%3EImage Error%3C/text%3E%3C/svg%3E"; }} />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
@@ -563,14 +563,14 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
                   </div>
                 ) : (
                   <div className="flex items-center justify-center h-32">
-                    <p className="text-sm text-zinc-400">No covers found. Try searching again or enter a URL manually.</p>
+                    <p className="text-sm text-muted">No covers found. Try searching again or enter a URL manually.</p>
                   </div>
                 )}
               </div>
 
               {/* Footer */}
-              <div className="border-t border-zinc-800 p-4 flex gap-2">
-                <button onClick={() => setShowCoverSearch(false)} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 py-2 rounded-lg text-sm font-medium transition-colors">Close</button>
+              <div className="border-t border-border-custom p-4 flex gap-2">
+                <button onClick={() => setShowCoverSearch(false)} className="flex-1 bg-surface-2 hover:bg-border-custom text-foreground py-2 rounded-lg text-sm font-medium transition-colors">Close</button>
               </div>
             </div>
           </div>

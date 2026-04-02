@@ -203,15 +203,15 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
     setMode("choose"); stopCamera();
   };
 
-  const inputCls = "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600";
-  const numInputCls = "w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600";
+  const inputCls = "w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600";
+  const numInputCls = "w-full bg-surface-2 border border-border-custom rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600";
 
   // Shared fields rendered inline (NOT as a sub-component) to avoid focus loss
   const sharedFields = (
     <>
       {/* Source with auto-suggest */}
       <div className="relative">
-        <label className="block text-xs text-zinc-500 mb-1">Source</label>
+        <label className="block text-xs text-muted mb-1">Source</label>
         <input type="text" value={source}
           onChange={(e) => { setSource(e.target.value); setShowSourceSuggestions(true); }}
           onFocus={() => setShowSourceSuggestions(true)}
@@ -219,10 +219,10 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
           placeholder="Gift from Mom, Library, Amazon..."
           className={inputCls} />
         {showSourceSuggestions && filteredSources.length > 0 && (
-          <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-zinc-800 border border-zinc-700 rounded-lg overflow-hidden shadow-lg">
+          <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-surface-2 border border-border-custom rounded-lg overflow-hidden shadow-lg">
             {filteredSources.slice(0, 4).map((s) => (
               <button key={s} onMouseDown={() => { setSource(s); setShowSourceSuggestions(false); }}
-                className="w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-700 transition-colors">
+                className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-surface transition-colors">
                 {s}
               </button>
             ))}
@@ -232,45 +232,45 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
 
       {/* Volume */}
       <div>
-        <label className="block text-xs text-zinc-500 mb-1">Volume</label>
+        <label className="block text-xs text-muted mb-1">Volume</label>
         <input type="text" value={volume} onChange={(e) => setVolume(e.target.value)}
           placeholder="e.g. Vol. 1, Part 2..." className={inputCls} />
       </div>
 
       {/* Page details */}
       <div>
-        <label className="block text-xs text-zinc-500 mb-2">Page Details</label>
+        <label className="block text-xs text-muted mb-2">Page Details</label>
         <div className="grid grid-cols-3 gap-2">
           <div>
-            <label className="block text-[10px] text-zinc-600 mb-0.5">Intro (roman)</label>
+            <label className="block text-[10px] text-muted-2 mb-0.5">Intro (roman)</label>
             <input type="text" inputMode="numeric" pattern="[0-9]*" value={introPages}
               onChange={(e) => setIntroPages(e.target.value)} onFocus={(e) => e.target.select()} placeholder="0" className={numInputCls} />
           </div>
           <div>
-            <label className="block text-[10px] text-zinc-600 mb-0.5">Start page</label>
+            <label className="block text-[10px] text-muted-2 mb-0.5">Start page</label>
             <input type="text" inputMode="numeric" pattern="[0-9]*" value={startPage}
               onChange={(e) => setStartPage(e.target.value)} onFocus={(e) => e.target.select()} placeholder="1" className={numInputCls} />
           </div>
           <div>
-            <label className="block text-[10px] text-zinc-600 mb-0.5">End page</label>
+            <label className="block text-[10px] text-muted-2 mb-0.5">End page</label>
             <input type="text" inputMode="numeric" pattern="[0-9]*" value={endPage}
               onChange={(e) => setEndPage(e.target.value)} onFocus={(e) => e.target.select()} placeholder="" className={numInputCls} />
           </div>
         </div>
         {computedReadingPages && (
-          <p className="text-xs text-zinc-500 mt-1">Reading pages: <span className="text-zinc-300 font-medium">{computedReadingPages}</span></p>
+          <p className="text-xs text-muted mt-1">Reading pages: <span className="text-foreground font-medium">{computedReadingPages}</span></p>
         )}
       </div>
 
       {/* Topics */}
       <div>
-        <label className="block text-xs text-zinc-500 mb-1">Topics</label>
+        <label className="block text-xs text-muted mb-1">Topics</label>
         {editTopics.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-2">
             {editTopics.map((t) => (
-              <span key={t} className="inline-flex items-center gap-1 bg-zinc-800 text-zinc-300 text-xs px-2 py-0.5 rounded-full">
+              <span key={t} className="inline-flex items-center gap-1 bg-surface-2 text-foreground text-xs px-2 py-0.5 rounded-full">
                 {t}
-                <button onClick={() => setEditTopics(editTopics.filter((x) => x !== t))} className="text-zinc-500 hover:text-red-400">×</button>
+                <button onClick={() => setEditTopics(editTopics.filter((x) => x !== t))} className="text-muted hover:text-red-400">×</button>
               </span>
             ))}
           </div>
@@ -278,19 +278,19 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
         <div className="flex gap-2">
           <input type="text" value={topicInput} onChange={(e) => setTopicInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTopic(); } }}
-            placeholder="Add a topic..." className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />
-          <button onClick={addTopic} className="bg-zinc-700 hover:bg-zinc-600 px-3 py-1.5 rounded-lg text-xs font-medium">Add</button>
+            placeholder="Add a topic..." className="flex-1 bg-surface-2 border border-border-custom rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+          <button onClick={addTopic} className="bg-border-custom hover:bg-muted-2 px-3 py-1.5 rounded-lg text-xs font-medium">Add</button>
         </div>
       </div>
 
       {/* Status */}
       <div>
-        <label className="block text-xs text-zinc-500 mb-2">Status</label>
+        <label className="block text-xs text-muted mb-2">Status</label>
         <div className="flex gap-2">
           {(["not_read", "reading", "read"] as Book["status"][]).map((s) => (
             <button key={s} onClick={() => setStatus(s)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                status === s ? "bg-emerald-600 text-white" : "bg-zinc-800 text-zinc-400"}`}>
+                status === s ? "bg-emerald-600 text-white" : "bg-surface-2 text-muted"}`}>
               {s === "not_read" ? "Not Read" : s === "reading" ? "Reading" : "Read"}
             </button>
           ))}
@@ -302,12 +302,12 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-zinc-900 border border-zinc-800 rounded-t-2xl sm:rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6">
+      <div className="relative bg-surface border border-border-custom rounded-t-2xl sm:rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-semibold">
             {mode === "confirm" ? "Confirm Book" : mode === "pick" ? "Select a Book" : mode === "manual" ? "Add Manually" : "Add a Book"}
           </h2>
-          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 text-xl">×</button>
+          <button onClick={onClose} className="text-muted hover:text-foreground text-xl">×</button>
         </div>
 
         {/* === CHOOSE MODE === */}
@@ -318,11 +318,11 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
               <span className="text-xl">📷</span> Scan Barcode
             </button>
             <button onClick={() => setMode("isbn")}
-              className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 py-4 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-3">
+              className="w-full bg-surface-2 hover:bg-border-custom text-foreground py-4 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-3">
               <span className="text-xl">🔍</span> Search by Title, Author, or ISBN
             </button>
             <button onClick={() => setMode("manual")}
-              className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 py-4 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-3">
+              className="w-full bg-surface-2 hover:bg-border-custom text-foreground py-4 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-3">
               <span className="text-xl">✏️</span> Add Manually
             </button>
           </div>
@@ -332,9 +332,9 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
         {mode === "camera" && (
           <div className="space-y-4">
             <div id={scannerContainerId} className="w-full rounded-xl overflow-hidden bg-black" />
-            <p className="text-xs text-zinc-500 text-center">Point camera at the barcode</p>
+            <p className="text-xs text-muted text-center">Point camera at the barcode</p>
             <button onClick={() => { stopCamera(); setMode("isbn"); }}
-              className="w-full bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-lg text-sm font-medium transition-colors">
+              className="w-full bg-surface-2 hover:bg-border-custom py-2.5 rounded-lg text-sm font-medium transition-colors">
               Enter Manually Instead
             </button>
           </div>
@@ -344,56 +344,56 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
         {mode === "isbn" && !searching && (
           <div className="space-y-4">
             <div>
-              <label className="block text-xs text-zinc-400 mb-1">Title, Author, or ISBN</label>
+              <label className="block text-xs text-muted mb-1">Title, Author, or ISBN</label>
               <div className="flex gap-2">
                 <input type="text" value={query} onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") handleSearch(query); }}
                   placeholder="e.g. The Great Gatsby, N.T. Wright, or 9780143127550" autoFocus
-                  className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+                  className="flex-1 bg-surface-2 border border-border-custom rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />
                 <button onClick={() => handleSearch(query)} disabled={!query.trim()}
                   className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
                   Search
                 </button>
               </div>
             </div>
-            <button onClick={() => setMode("choose")} className="w-full bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-lg text-sm font-medium transition-colors">Back</button>
+            <button onClick={() => setMode("choose")} className="w-full bg-surface-2 hover:bg-border-custom py-2.5 rounded-lg text-sm font-medium transition-colors">Back</button>
           </div>
         )}
 
         {/* === PICK FROM RESULTS === */}
         {mode === "pick" && (
           <div className="space-y-2">
-            <p className="text-xs text-zinc-500 mb-3">Found {results.length} results:</p>
+            <p className="text-xs text-muted mb-3">Found {results.length} results:</p>
             {results.map((r, i) => (
               <button key={i} onClick={() => selectBook(r)}
-                className="w-full flex gap-3 p-3 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-left transition-colors">
+                className="w-full flex gap-3 p-3 bg-surface-2 hover:bg-border-custom rounded-lg text-left transition-colors">
                 {r.cover_url ? (
                   <img src={r.cover_url} alt={r.title} className="w-12 h-18 rounded object-cover flex-shrink-0" />
                 ) : (
-                  <div className="w-12 h-18 rounded bg-zinc-700 flex items-center justify-center flex-shrink-0">
-                    <span className="text-zinc-500 text-[8px]">No Cover</span>
+                  <div className="w-12 h-18 rounded bg-border-custom flex items-center justify-center flex-shrink-0">
+                    <span className="text-muted text-[8px]">No Cover</span>
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-zinc-100 truncate">{r.title}</p>
-                  {r.subtitle && <p className="text-xs text-zinc-500 truncate">{r.subtitle}</p>}
-                  <p className="text-xs text-zinc-400">{r.author}</p>
-                  <div className="flex gap-2 text-[10px] text-zinc-600 mt-0.5">
+                  <p className="text-sm font-medium text-foreground truncate">{r.title}</p>
+                  {r.subtitle && <p className="text-xs text-muted truncate">{r.subtitle}</p>}
+                  <p className="text-xs text-muted">{r.author}</p>
+                  <div className="flex gap-2 text-[10px] text-muted-2 mt-0.5">
                     {r.publish_year && <span>{r.publish_year}</span>}
                     {r.pages && <span>{r.pages} pages</span>}
                   </div>
                 </div>
               </button>
             ))}
-            <button onClick={reset} className="w-full bg-zinc-800 hover:bg-zinc-700 py-2 rounded-lg text-sm font-medium transition-colors mt-2">Search Again</button>
+            <button onClick={reset} className="w-full bg-surface-2 hover:bg-border-custom py-2 rounded-lg text-sm font-medium transition-colors mt-2">Search Again</button>
           </div>
         )}
 
         {/* === CONFIRM SCANNED/SEARCHED BOOK === */}
         {mode === "confirm" && (enriching ? (
           <div className="flex items-center justify-center py-6">
-            <div className="animate-spin rounded-full h-6 w-6 border-2 border-zinc-700 border-t-emerald-500" />
-            <span className="ml-3 text-sm text-zinc-500">Fetching details...</span>
+            <div className="animate-spin rounded-full h-6 w-6 border-2 border-border-custom border-t-emerald-500" />
+            <span className="ml-3 text-sm text-muted">Fetching details...</span>
           </div>
         ) : selected && (
           <div className="space-y-4">
@@ -401,15 +401,15 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
               {selected.cover_url ? (
                 <img src={selected.cover_url} alt={selected.title} className="w-20 h-30 rounded-md object-cover shadow-lg" />
               ) : (
-                <div className="w-20 h-30 rounded-md bg-zinc-800 flex items-center justify-center">
-                  <span className="text-zinc-600 text-xs">No Cover</span>
+                <div className="w-20 h-30 rounded-md bg-surface-2 flex items-center justify-center">
+                  <span className="text-muted-2 text-xs">No Cover</span>
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-zinc-100">{selected.title}</h3>
-                {selected.subtitle && <p className="text-xs text-zinc-500 mt-0.5">{selected.subtitle}</p>}
-                <p className="text-sm text-zinc-400 mt-0.5">{selected.author}</p>
-                <div className="flex flex-wrap gap-2 text-xs text-zinc-600 mt-1">
+                <h3 className="font-semibold text-foreground">{selected.title}</h3>
+                {selected.subtitle && <p className="text-xs text-muted mt-0.5">{selected.subtitle}</p>}
+                <p className="text-sm text-muted mt-0.5">{selected.author}</p>
+                <div className="flex flex-wrap gap-2 text-xs text-muted-2 mt-1">
                   {selected.isbn && <span>ISBN: {selected.isbn}</span>}
                   {selected.pages && <span>{selected.pages} pages</span>}
                 </div>
@@ -418,7 +418,7 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
 
             {/* Cover URL override */}
             <div>
-              <label className="block text-xs text-zinc-500 mb-1">Cover Image URL</label>
+              <label className="block text-xs text-muted mb-1">Cover Image URL</label>
               <input type="url" value={confirmCoverUrl} onChange={(e) => setConfirmCoverUrl(e.target.value)}
                 placeholder="https://... (leave blank to use default)" className={inputCls} />
             </div>
@@ -430,7 +430,7 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
                 className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
                 {saving ? "Adding..." : "Add to Library"}
               </button>
-              <button onClick={reset} className="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm font-medium transition-colors">Back</button>
+              <button onClick={reset} className="px-4 py-2.5 bg-surface-2 hover:bg-border-custom rounded-lg text-sm font-medium transition-colors">Back</button>
             </div>
           </div>
         ))}
@@ -439,23 +439,23 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
         {mode === "manual" && (
           <div className="space-y-4">
             <div>
-              <label className="block text-xs text-zinc-500 mb-1">Title *</label>
+              <label className="block text-xs text-muted mb-1">Title *</label>
               <input type="text" value={manTitle} onChange={(e) => setManTitle(e.target.value)} placeholder="Book title" className={inputCls} />
             </div>
             <div>
-              <label className="block text-xs text-zinc-500 mb-1">Author *</label>
+              <label className="block text-xs text-muted mb-1">Author *</label>
               <input type="text" value={manAuthor} onChange={(e) => setManAuthor(e.target.value)} placeholder="Author name" className={inputCls} />
             </div>
             <div>
-              <label className="block text-xs text-zinc-500 mb-1">ISBN</label>
+              <label className="block text-xs text-muted mb-1">ISBN</label>
               <input type="text" inputMode="numeric" value={manIsbn} onChange={(e) => setManIsbn(e.target.value)} placeholder="978..." className={inputCls} />
             </div>
             <div>
-              <label className="block text-xs text-zinc-500 mb-1">Total Pages</label>
+              <label className="block text-xs text-muted mb-1">Total Pages</label>
               <input type="text" inputMode="numeric" pattern="[0-9]*" value={manPages} onChange={(e) => setManPages(e.target.value)} placeholder="Page count" className={inputCls} />
             </div>
             <div>
-              <label className="block text-xs text-zinc-500 mb-1">Cover Image URL</label>
+              <label className="block text-xs text-muted mb-1">Cover Image URL</label>
               <input type="url" value={manCoverUrl} onChange={(e) => setManCoverUrl(e.target.value)}
                 placeholder="https://..." className={inputCls} />
             </div>
@@ -467,7 +467,7 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
                 className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
                 {saving ? "Adding..." : "Add to Library"}
               </button>
-              <button onClick={() => setMode("choose")} className="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm font-medium transition-colors">Back</button>
+              <button onClick={() => setMode("choose")} className="px-4 py-2.5 bg-surface-2 hover:bg-border-custom rounded-lg text-sm font-medium transition-colors">Back</button>
             </div>
           </div>
         )}
@@ -476,8 +476,8 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
         {searching && (
           <div className="flex flex-col items-center justify-center py-6 gap-2">
             <div className="flex items-center">
-              <div className="animate-spin rounded-full h-6 w-6 border-2 border-zinc-700 border-t-emerald-500" />
-              <span className="ml-3 text-sm text-zinc-400">Looking up{searchingIsbn ? ` ISBN ${searchingIsbn}` : " book"}...</span>
+              <div className="animate-spin rounded-full h-6 w-6 border-2 border-border-custom border-t-emerald-500" />
+              <span className="ml-3 text-sm text-muted">Looking up{searchingIsbn ? ` ISBN ${searchingIsbn}` : " book"}...</span>
             </div>
           </div>
         )}
@@ -488,11 +488,11 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
             {searchingIsbn && (
               <div className="flex gap-2">
                 <button onClick={() => { setManIsbn(searchingIsbn); setMode("manual"); setError(""); }}
-                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-lg text-sm font-medium transition-colors">
+                  className="flex-1 bg-surface-2 hover:bg-border-custom py-2.5 rounded-lg text-sm font-medium transition-colors">
                   Add manually with ISBN {searchingIsbn}
                 </button>
                 <button onClick={() => { setQuery(searchingIsbn); setMode("isbn"); setError(""); }}
-                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-lg text-sm font-medium transition-colors">
+                  className="flex-1 bg-surface-2 hover:bg-border-custom py-2.5 rounded-lg text-sm font-medium transition-colors">
                   Search again
                 </button>
               </div>
