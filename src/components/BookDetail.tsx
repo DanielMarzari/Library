@@ -37,6 +37,7 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
   const [ddc, setDdc] = useState(book.ddc || "");
   const [editTopics, setEditTopics] = useState<string[]>(book.topics || []);
   const [topicInput, setTopicInput] = useState("");
+  const [autoTopics, setAutoTopics] = useState<string[]>(book.auto_topics || []);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -73,7 +74,7 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
       if (enriched.ddc && !ddc) setDdc(enriched.ddc);
       if (enriched.pages && !pages) setPages(enriched.pages.toString());
       if (enriched.pages && !endPage) setEndPage(enriched.pages.toString());
-      if (enriched.topics?.length && editTopics.length === 0) setEditTopics(enriched.topics);
+      if (enriched.topics?.length && autoTopics.length === 0) setAutoTopics(enriched.topics);
     }
     setRefreshing(false);
   };
@@ -92,6 +93,7 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
       source: source.trim() || null, volume: volume.trim() || null,
       lcc: lcc.trim() || null, ddc: ddc.trim() || null,
       topics: editTopics.length > 0 ? editTopics : null,
+      auto_topics: autoTopics.length > 0 ? autoTopics : null,
       updated_at: new Date().toISOString(),
     }).eq("id", book.id);
     if (!error) { setEditing(false); onUpdated(); }
@@ -288,8 +290,19 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
                 )}
               </div>
               {book.topics && book.topics.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {book.topics.map((t) => <span key={t} className="bg-zinc-800 text-zinc-400 text-xs px-2 py-0.5 rounded-full">{t}</span>)}
+                <div>
+                  <p className="text-[10px] text-zinc-600 mb-1">Topics</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {book.topics.map((t) => <span key={t} className="bg-zinc-800 text-zinc-400 text-xs px-2 py-0.5 rounded-full">{t}</span>)}
+                  </div>
+                </div>
+              )}
+              {book.auto_topics && book.auto_topics.length > 0 && (
+                <div>
+                  <p className="text-[10px] text-zinc-600 mb-1">Subjects (Open Library)</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {book.auto_topics.map((t) => <span key={t} className="bg-zinc-800/50 text-zinc-500 text-xs px-2 py-0.5 rounded-full">{t}</span>)}
+                  </div>
                 </div>
               )}
               {book.description && <p className="text-sm text-zinc-400 leading-relaxed line-clamp-4">{book.description}</p>}

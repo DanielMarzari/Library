@@ -20,6 +20,7 @@ export interface Book {
   lcc?: string;
   ddc?: string;
   topics?: string[];
+  auto_topics?: string[];
   created_at: string;
   updated_at: string;
   _optimistic?: boolean;
