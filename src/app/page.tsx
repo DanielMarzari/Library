@@ -11,7 +11,7 @@ import { BookDetail } from "@/components/BookDetail";
 import { AddBookModal } from "@/components/AddBookModal";
 import { IsbnScanner } from "@/components/IsbnScanner";
 
-type FilterStatus = "all" | "want_to_read" | "reading" | "read";
+type FilterStatus = "all" | "not_read" | "reading" | "read";
 type ViewMode = "shelf" | "list";
 
 export default function Home() {
@@ -51,7 +51,16 @@ export default function Home() {
         if (error) {
           console.error("Error fetching books:", error);
         } else {
-          setBooks(data || []);
+          // Keep any optimistic books that haven't been confirmed yet
+          setBooks((prev) => {
+            const optimistic = prev.filter((b) => b._optimistic);
+            const real = data || [];
+            // Remove optimistic books that now exist in real data (match by title)
+            const stillPending = optimistic.filter(
+              (ob) => !real.some((rb) => rb.title === ob.title && rb.author === ob.author)
+            );
+            return [...stillPending, ...real];
+          });
         }
         setLoading(false);
       }
@@ -66,6 +75,32 @@ export default function Home() {
   const refetch = useCallback(() => {
     setRefreshKey((k) => k + 1);
   }, []);
+
+  // Optimistic add from scanner: show book immediately, then refetch
+  const handleOptimisticAdd = useCallback(
+    (partialBook: Partial<Book>) => {
+      const optimisticBook: Book = {
+        id: `optimistic-${Date.now()}`,
+        title: partialBook.title || "Loading...",
+        author: partialBook.author || "",
+        isbn: partialBook.isbn,
+        cover_url: partialBook.cover_url,
+        description: partialBook.description,
+        pages: partialBook.pages,
+        status: partialBook.status || "not_read",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        _optimistic: true,
+      };
+
+      setBooks((prev) => [optimisticBook, ...prev]);
+      setShowScanner(false);
+
+      // Refetch after a short delay to pick up the real DB record
+      setTimeout(() => refetch(), 1500);
+    },
+    [refetch]
+  );
 
   const handleDelete = async (id: string) => {
     const { error } = await supabase.from("books").delete().eq("id", id);
@@ -88,7 +123,7 @@ export default function Home() {
 
   const filterButtons: { label: string; value: FilterStatus }[] = [
     { label: "All", value: "all" },
-    { label: "Want to Read", value: "want_to_read" },
+    { label: "Not Read", value: "not_read" },
     { label: "Reading", value: "reading" },
     { label: "Read", value: "read" },
   ];
@@ -101,7 +136,6 @@ export default function Home() {
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-2xl font-bold tracking-tight">My Library</h1>
             <div className="flex items-center gap-2">
-              {/* Scan button */}
               <button
                 onClick={() => setShowScanner(true)}
                 className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
@@ -109,7 +143,6 @@ export default function Home() {
               >
                 📷
               </button>
-              {/* Add button */}
               <button
                 onClick={() => setShowAddModal(true)}
                 className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
@@ -119,7 +152,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Search */}
           <input
             type="text"
             placeholder="Search by title or author..."
@@ -128,7 +160,6 @@ export default function Home() {
             className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent mb-3"
           />
 
-          {/* Filter tabs + view toggle */}
           <div className="flex items-center justify-between">
             <div className="flex gap-2 overflow-x-auto pb-1">
               {filterButtons.map((f) => (
@@ -146,7 +177,6 @@ export default function Home() {
               ))}
             </div>
 
-            {/* View toggle */}
             <div className="flex gap-1 bg-zinc-800 rounded-lg p-0.5 ml-2 flex-shrink-0">
               <button
                 onClick={() => setViewMode("shelf")}
@@ -185,9 +215,7 @@ export default function Home() {
           <div className="text-center py-20">
             <p className="text-5xl mb-4">📚</p>
             <p className="text-zinc-500 text-lg mb-2">No books yet</p>
-            <p className="text-zinc-600 text-sm mb-6">
-              Start building your library
-            </p>
+            <p className="text-zinc-600 text-sm mb-6">Start building your library</p>
             <div className="flex gap-3 justify-center">
               <button
                 onClick={() => setShowScanner(true)}
@@ -222,7 +250,6 @@ export default function Home() {
         )}
       </main>
 
-      {/* Modals */}
       {showAddModal && (
         <AddBookModal
           onClose={() => setShowAddModal(false)}
@@ -236,10 +263,7 @@ export default function Home() {
       {showScanner && (
         <IsbnScanner
           onClose={() => setShowScanner(false)}
-          onAdded={() => {
-            setShowScanner(false);
-            refetch();
-          }}
+          onAdded={handleOptimisticAdd}
         />
       )}
 

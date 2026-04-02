@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Html5Qrcode } from "html5-qrcode";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { supabase } from "@/lib/supabase";
 import { Book } from "@/types/book";
 
 interface IsbnScannerProps {
   onClose: () => void;
-  onAdded: () => void;
+  onAdded: (optimisticBook: Partial<Book>) => void;
 }
 
 interface BookLookupResult {
@@ -16,6 +16,56 @@ interface BookLookupResult {
   isbn: string;
   cover_url: string | null;
   description: string | null;
+  pages: number | null;
+}
+
+async function lookupIsbn(isbn: string): Promise<BookLookupResult | null> {
+  const cleanIsbn = isbn.replace(/[^0-9X]/gi, "");
+  if (!cleanIsbn) return null;
+
+  try {
+    // Try Open Library
+    const res = await fetch(
+      `https://openlibrary.org/search.json?isbn=${encodeURIComponent(cleanIsbn)}&limit=1`
+    );
+    const data = await res.json();
+
+    if (data.docs && data.docs.length > 0) {
+      const book = data.docs[0];
+      return {
+        title: book.title || "Unknown Title",
+        author: book.author_name?.[0] || "Unknown Author",
+        isbn: cleanIsbn,
+        cover_url: book.cover_i
+          ? `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg`
+          : null,
+        description: book.first_sentence?.join(" ") || null,
+        pages: book.number_of_pages_median || null,
+      };
+    }
+
+    // Fallback: Google Books
+    const gRes = await fetch(
+      `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanIsbn}&maxResults=1`
+    );
+    const gData = await gRes.json();
+
+    if (gData.items && gData.items.length > 0) {
+      const vol = gData.items[0].volumeInfo;
+      return {
+        title: vol.title || "Unknown Title",
+        author: vol.authors?.[0] || "Unknown Author",
+        isbn: cleanIsbn,
+        cover_url: vol.imageLinks?.thumbnail?.replace("http:", "https:") || null,
+        description: vol.description?.substring(0, 300) || null,
+        pages: vol.pageCount || null,
+      };
+    }
+  } catch {
+    // fall through
+  }
+
+  return null;
 }
 
 export function IsbnScanner({ onClose, onAdded }: IsbnScannerProps) {
@@ -25,91 +75,55 @@ export function IsbnScanner({ onClose, onAdded }: IsbnScannerProps) {
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [status, setStatus] = useState<Book["status"]>("want_to_read");
+  const [status, setStatus] = useState<Book["status"]>("not_read");
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerContainerId = "isbn-scanner";
 
-  const lookupIsbn = async (isbn: string) => {
-    const cleanIsbn = isbn.replace(/[^0-9X]/gi, "");
-    if (!cleanIsbn) {
-      setError("Please enter a valid ISBN");
-      return;
-    }
-
+  const handleLookup = async (isbn: string) => {
     setSearching(true);
     setError("");
     setLookupResult(null);
 
-    try {
-      // Try Open Library first
-      const res = await fetch(
-        `https://openlibrary.org/search.json?isbn=${encodeURIComponent(cleanIsbn)}&limit=1`
-      );
-      const data = await res.json();
-
-      if (data.docs && data.docs.length > 0) {
-        const book = data.docs[0];
-        setLookupResult({
-          title: book.title || "Unknown Title",
-          author: book.author_name?.[0] || "Unknown Author",
-          isbn: cleanIsbn,
-          cover_url: book.cover_i
-            ? `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg`
-            : null,
-          description: book.first_sentence?.join(" ") || null,
-        });
-      } else {
-        // Fallback: try Google Books
-        const gRes = await fetch(
-          `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanIsbn}&maxResults=1`
-        );
-        const gData = await gRes.json();
-
-        if (gData.items && gData.items.length > 0) {
-          const vol = gData.items[0].volumeInfo;
-          setLookupResult({
-            title: vol.title || "Unknown Title",
-            author: vol.authors?.[0] || "Unknown Author",
-            isbn: cleanIsbn,
-            cover_url: vol.imageLinks?.thumbnail?.replace("http:", "https:") || null,
-            description: vol.description?.substring(0, 300) || null,
-          });
-        } else {
-          setError(`No book found for ISBN: ${cleanIsbn}`);
-        }
-      }
-    } catch {
-      setError("Lookup failed. Check your connection and try again.");
+    const result = await lookupIsbn(isbn);
+    if (result) {
+      setLookupResult(result);
+    } else {
+      setError(`No book found for ISBN: ${isbn.replace(/[^0-9X]/gi, "")}`);
     }
-
     setSearching(false);
   };
 
   const startCamera = async () => {
     setMode("camera");
 
-    // Small delay to let the DOM render the container
     setTimeout(async () => {
       try {
-        const scanner = new Html5Qrcode(scannerContainerId);
+        const scanner = new Html5Qrcode(scannerContainerId, {
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.CODE_128,
+          ],
+          verbose: false,
+        });
         scannerRef.current = scanner;
 
         await scanner.start(
           { facingMode: "environment" },
           {
-            fps: 10,
-            qrbox: { width: 280, height: 120 },
+            fps: 30,
+            qrbox: { width: 300, height: 150 },
             aspectRatio: 1.0,
+            disableFlip: false,
           },
           (decodedText) => {
-            // Got a barcode
             scanner.stop().catch(() => {});
             scannerRef.current = null;
-            lookupIsbn(decodedText);
+            handleLookup(decodedText);
           },
-          () => {
-            // Scan error (expected — ignore until we get a match)
-          }
+          () => {}
         );
       } catch {
         setError("Could not access camera. Try entering ISBN manually.");
@@ -129,25 +143,67 @@ export function IsbnScanner({ onClose, onAdded }: IsbnScannerProps) {
     return () => stopCamera();
   }, []);
 
+  // Instant add: fire optimistic update, then save to DB in background
   const handleAdd = async () => {
     if (!lookupResult) return;
     setSaving(true);
 
-    const { error: dbError } = await supabase.from("books").insert({
+    // Build the book object
+    const newBook: Partial<Book> = {
+      title: lookupResult.title,
+      author: lookupResult.author,
+      isbn: lookupResult.isbn,
+      cover_url: lookupResult.cover_url || undefined,
+      description: lookupResult.description || undefined,
+      pages: lookupResult.pages || undefined,
+      status,
+    };
+
+    // Immediately tell parent to show optimistic book and close
+    onAdded(newBook);
+
+    // Save to DB in the background
+    await supabase.from("books").insert({
       title: lookupResult.title,
       author: lookupResult.author,
       isbn: lookupResult.isbn,
       cover_url: lookupResult.cover_url,
       description: lookupResult.description,
+      pages: lookupResult.pages,
       status,
     });
 
-    if (dbError) {
-      setError("Failed to save. Try again.");
-    } else {
-      onAdded();
-    }
     setSaving(false);
+  };
+
+  // Quick add: scan → auto-add as "not_read" without confirmation
+  const handleQuickAdd = async (isbn: string) => {
+    const result = await lookupIsbn(isbn);
+    if (result) {
+      const newBook: Partial<Book> = {
+        title: result.title,
+        author: result.author,
+        isbn: result.isbn,
+        cover_url: result.cover_url || undefined,
+        description: result.description || undefined,
+        pages: result.pages || undefined,
+        status: "not_read",
+      };
+      onAdded(newBook);
+
+      await supabase.from("books").insert({
+        title: result.title,
+        author: result.author,
+        isbn: result.isbn,
+        cover_url: result.cover_url,
+        description: result.description,
+        pages: result.pages,
+        status: "not_read",
+      });
+    } else {
+      setError(`No book found for ISBN: ${isbn}`);
+      setSearching(false);
+    }
   };
 
   const reset = () => {
@@ -191,20 +247,17 @@ export function IsbnScanner({ onClose, onAdded }: IsbnScannerProps) {
                 <h3 className="font-semibold text-zinc-100">{lookupResult.title}</h3>
                 <p className="text-sm text-zinc-400 mt-0.5">{lookupResult.author}</p>
                 <p className="text-xs text-zinc-600 mt-1">ISBN: {lookupResult.isbn}</p>
+                {lookupResult.pages && (
+                  <p className="text-xs text-zinc-600">{lookupResult.pages} pages</p>
+                )}
               </div>
             </div>
-
-            {lookupResult.description && (
-              <p className="text-xs text-zinc-500 leading-relaxed line-clamp-3">
-                {lookupResult.description}
-              </p>
-            )}
 
             {/* Status picker */}
             <div>
               <label className="block text-xs text-zinc-500 mb-2">Add as:</label>
               <div className="flex gap-2">
-                {(["want_to_read", "reading", "read"] as Book["status"][]).map((s) => (
+                {(["not_read", "reading", "read"] as Book["status"][]).map((s) => (
                   <button
                     key={s}
                     onClick={() => setStatus(s)}
@@ -214,7 +267,7 @@ export function IsbnScanner({ onClose, onAdded }: IsbnScannerProps) {
                         : "bg-zinc-800 text-zinc-400"
                     }`}
                   >
-                    {s === "want_to_read" ? "Want to Read" : s === "reading" ? "Reading" : "Read"}
+                    {s === "not_read" ? "Not Read" : s === "reading" ? "Reading" : "Read"}
                   </button>
                 ))}
               </div>
@@ -291,14 +344,14 @@ export function IsbnScanner({ onClose, onAdded }: IsbnScannerProps) {
                       value={manualIsbn}
                       onChange={(e) => setManualIsbn(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") lookupIsbn(manualIsbn);
+                        if (e.key === "Enter") handleLookup(manualIsbn);
                       }}
                       placeholder="e.g. 9780143127550"
                       autoFocus
                       className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
                     />
                     <button
-                      onClick={() => lookupIsbn(manualIsbn)}
+                      onClick={() => handleLookup(manualIsbn)}
                       disabled={searching || !manualIsbn.trim()}
                       className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                     >
@@ -323,7 +376,6 @@ export function IsbnScanner({ onClose, onAdded }: IsbnScannerProps) {
           </>
         )}
 
-        {/* Error */}
         {error && (
           <div className="mt-4 bg-red-950/30 border border-red-900/50 rounded-lg px-4 py-3 text-sm text-red-400">
             {error}

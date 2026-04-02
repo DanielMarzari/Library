@@ -13,21 +13,19 @@ export function AddBookModal({ onClose, onAdded }: AddBookModalProps) {
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
   const [isbn, setIsbn] = useState("");
-  const [status, setStatus] = useState<Book["status"]>("want_to_read");
+  const [pages, setPages] = useState("");
+  const [status, setStatus] = useState<Book["status"]>("not_read");
   const [coverUrl, setCoverUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [searching, setSearching] = useState(false);
 
-  // Look up book info from Open Library API
   const lookupBook = async () => {
     const query = isbn.trim() || title.trim();
     if (!query) return;
 
     setSearching(true);
     try {
-      const searchParam = isbn.trim()
-        ? `isbn:${isbn.trim()}`
-        : title.trim();
+      const searchParam = isbn.trim() ? `isbn:${isbn.trim()}` : title.trim();
       const res = await fetch(
         `https://openlibrary.org/search.json?q=${encodeURIComponent(searchParam)}&limit=1`
       );
@@ -39,6 +37,9 @@ export function AddBookModal({ onClose, onAdded }: AddBookModalProps) {
         if (!author) setAuthor(book.author_name?.[0] || "");
         if (book.cover_i) {
           setCoverUrl(`https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg`);
+        }
+        if (book.number_of_pages_median && !pages) {
+          setPages(book.number_of_pages_median.toString());
         }
       }
     } catch (err) {
@@ -57,6 +58,7 @@ export function AddBookModal({ onClose, onAdded }: AddBookModalProps) {
       author: author.trim(),
       isbn: isbn.trim() || null,
       cover_url: coverUrl.trim() || null,
+      pages: pages ? parseInt(pages) : null,
       status,
     });
 
@@ -71,30 +73,19 @@ export function AddBookModal({ onClose, onAdded }: AddBookModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-      {/* Modal */}
       <div className="relative bg-zinc-900 border border-zinc-800 rounded-t-2xl sm:rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-semibold">Add a Book</h2>
-          <button
-            onClick={onClose}
-            className="text-zinc-500 hover:text-zinc-300 text-xl"
-          >
+          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 text-xl">
             ×
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* ISBN Lookup */}
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">
-              ISBN (optional — auto-fills details)
-            </label>
+            <label className="block text-xs text-zinc-400 mb-1">ISBN (optional — auto-fills details)</label>
             <div className="flex gap-2">
               <input
                 type="text"
@@ -114,11 +105,8 @@ export function AddBookModal({ onClose, onAdded }: AddBookModalProps) {
             </div>
           </div>
 
-          {/* Title */}
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">
-              Title *
-            </label>
+            <label className="block text-xs text-zinc-400 mb-1">Title *</label>
             <input
               type="text"
               value={title}
@@ -129,11 +117,8 @@ export function AddBookModal({ onClose, onAdded }: AddBookModalProps) {
             />
           </div>
 
-          {/* Author */}
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">
-              Author *
-            </label>
+            <label className="block text-xs text-zinc-400 mb-1">Author *</label>
             <input
               type="text"
               value={author}
@@ -144,19 +129,24 @@ export function AddBookModal({ onClose, onAdded }: AddBookModalProps) {
             />
           </div>
 
-          {/* Cover URL */}
+          <div>
+            <label className="block text-xs text-zinc-400 mb-1">Pages</label>
+            <input
+              type="number"
+              value={pages}
+              onChange={(e) => setPages(e.target.value)}
+              placeholder="Number of pages"
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+            />
+          </div>
+
           {coverUrl && (
             <div className="flex items-center gap-3">
-              <img
-                src={coverUrl}
-                alt="Cover preview"
-                className="w-12 h-18 rounded object-cover"
-              />
+              <img src={coverUrl} alt="Cover preview" className="w-12 h-18 rounded object-cover" />
               <span className="text-xs text-zinc-500">Cover found</span>
             </div>
           )}
 
-          {/* Status */}
           <div>
             <label className="block text-xs text-zinc-400 mb-1">Status</label>
             <select
@@ -164,13 +154,12 @@ export function AddBookModal({ onClose, onAdded }: AddBookModalProps) {
               onChange={(e) => setStatus(e.target.value as Book["status"])}
               className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
             >
-              <option value="want_to_read">Want to Read</option>
+              <option value="not_read">Not Read</option>
               <option value="reading">Reading</option>
               <option value="read">Read</option>
             </select>
           </div>
 
-          {/* Submit */}
           <button
             type="submit"
             disabled={saving || !title.trim() || !author.trim()}
