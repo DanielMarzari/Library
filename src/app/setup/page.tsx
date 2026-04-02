@@ -123,6 +123,8 @@ export default function SetupPage() {
   const [batchProgress, setBatchProgress] = useState({ done: 0, total: 0 });
   const [coverRunning, setCoverRunning] = useState(false);
   const [coverProgress, setCoverProgress] = useState({ done: 0, total: 0, found: 0 });
+  const [cachingCovers, setCachingCovers] = useState(false);
+  const [cacheResult, setCacheResult] = useState<string | null>(null);
 
   const handleBatchReimport = useCallback(async () => {
     if (batchRunning) return;
@@ -185,6 +187,20 @@ export default function SetupPage() {
     setRefreshKey((k) => k + 1);
   }, [books, coverRunning]);
 
+  const handleCacheCovers = useCallback(async () => {
+    setCachingCovers(true);
+    setCacheResult(null);
+    try {
+      const res = await fetch("/api/cache-covers", { method: "POST" });
+      const data = await res.json();
+      setCacheResult(`${data.cached} cached, ${data.failed} failed`);
+    } catch {
+      setCacheResult("Error running cache");
+    } finally {
+      setCachingCovers(false);
+    }
+  }, []);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -196,7 +212,7 @@ export default function SetupPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border-custom">
-        <div className="w-full mx-auto px-4 py-4">
+        <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-3">
             <h1 className="text-2xl font-bold tracking-tight">
               Complete Setup
@@ -222,6 +238,19 @@ export default function SetupPage() {
                   <><div className="animate-spin rounded-full h-3 w-3 border border-border-custom border-t-emerald-500" /> {batchProgress.done}/{batchProgress.total}</>
                 ) : (
                   <>🔄 Batch Reimport</>
+                )}
+              </button>
+              <button
+                onClick={handleCacheCovers}
+                disabled={cachingCovers}
+                className="bg-surface-2 hover:bg-border-custom text-foreground px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {cachingCovers ? (
+                  <><div className="animate-spin rounded-full h-3 w-3 border border-border-custom border-t-emerald-500" /> Caching...</>
+                ) : cacheResult ? (
+                  <>{cacheResult}</>
+                ) : (
+                  <>💾 Cache Covers</>
                 )}
               </button>
               <Link
@@ -265,7 +294,7 @@ export default function SetupPage() {
         </div>
       </header>
 
-      <main className="flex-1 w-full mx-auto w-full px-4 py-6">
+      <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-6">
         <p className="text-xs text-muted-2 mb-4">
           {filteredBooks.length} book{filteredBooks.length !== 1 ? "s" : ""}{" "}
           need attention

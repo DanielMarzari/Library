@@ -35,9 +35,9 @@ const TIERS: Tier[] = [
     minBooks: 2,
     maxBooks: 9,
     color: 'gray',
-    bgColor: 'bg-surface-2',
-    badgeBg: 'bg-border-custom/40',
-    badgeText: 'text-foreground',
+    bgColor: 'bg-surface',
+    badgeBg: 'bg-surface-2',
+    badgeText: 'text-muted',
     progressColor: 'bg-muted-2',
   },
   {
@@ -45,9 +45,9 @@ const TIERS: Tier[] = [
     minBooks: 10,
     maxBooks: 19,
     color: 'blue',
-    bgColor: 'bg-blue-950',
-    badgeBg: 'bg-blue-600/20',
-    badgeText: 'text-blue-300',
+    bgColor: 'bg-blue-500/10',
+    badgeBg: 'bg-blue-500/15',
+    badgeText: 'text-blue-600 dark:text-blue-400',
     progressColor: 'bg-blue-500',
   },
   {
@@ -55,9 +55,9 @@ const TIERS: Tier[] = [
     minBooks: 20,
     maxBooks: 49,
     color: 'emerald',
-    bgColor: 'bg-emerald-950',
-    badgeBg: 'bg-emerald-600/20',
-    badgeText: 'text-emerald-300',
+    bgColor: 'bg-emerald-500/10',
+    badgeBg: 'bg-emerald-500/15',
+    badgeText: 'text-emerald-600 dark:text-emerald-400',
     progressColor: 'bg-emerald-500',
   },
   {
@@ -65,9 +65,9 @@ const TIERS: Tier[] = [
     minBooks: 50,
     maxBooks: 99,
     color: 'purple',
-    bgColor: 'bg-purple-950',
-    badgeBg: 'bg-purple-600/20',
-    badgeText: 'text-purple-300',
+    bgColor: 'bg-purple-500/10',
+    badgeBg: 'bg-purple-500/15',
+    badgeText: 'text-purple-600 dark:text-purple-400',
     progressColor: 'bg-purple-500',
   },
   {
@@ -75,9 +75,9 @@ const TIERS: Tier[] = [
     minBooks: 100,
     maxBooks: null,
     color: 'amber',
-    bgColor: 'bg-amber-950',
-    badgeBg: 'bg-amber-600/20',
-    badgeText: 'text-amber-300',
+    bgColor: 'bg-amber-500/10',
+    badgeBg: 'bg-amber-500/15',
+    badgeText: 'text-amber-600 dark:text-amber-400',
     progressColor: 'bg-amber-500',
   },
 ];
@@ -194,7 +194,7 @@ export default function SkillsPage() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="bg-surface border-b border-border-custom sticky top-0 z-10">
-        <div className="w-full mx-auto px-6 py-6 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Skills</h1>
             <p className="text-muted mt-1">Track your knowledge across topics</p>
@@ -210,7 +210,7 @@ export default function SkillsPage() {
 
       {/* Topic Source Toggle */}
       <div className="bg-surface/50 border-b border-border-custom">
-        <div className="w-full mx-auto px-6 py-4">
+        <div className="max-w-6xl mx-auto px-6 py-4">
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted">View topics from:</span>
             <div className="flex gap-2">
@@ -237,7 +237,7 @@ export default function SkillsPage() {
       </div>
 
       {/* Content */}
-      <div className="w-full mx-auto px-6 py-8">
+      <div className="max-w-6xl mx-auto px-6 py-8">
         {loading ? (
           <div className="text-center py-12">
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
@@ -274,7 +274,13 @@ export default function SkillsPage() {
 
               return (
                 <section key={tier.name} className="mb-12">
-                  <h2 className={`text-2xl font-bold text-${tier.color}-400 mb-6`}>
+                  <h2 className={`text-2xl font-bold mb-6 ${
+                    tier.name === 'Scholar' ? 'text-amber-500' :
+                    tier.name === 'Master' ? 'text-purple-500' :
+                    tier.name === 'Expert' ? 'text-emerald-500' :
+                    tier.name === 'Knowledgeable' ? 'text-blue-500' :
+                    'text-muted'
+                  }`}>
                     {tier.name}
                   </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

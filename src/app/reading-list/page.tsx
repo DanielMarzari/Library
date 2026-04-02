@@ -200,7 +200,7 @@ export default function ReadingListPage() {
     <div className="min-h-screen flex flex-col bg-background">
       {/* Header */}
       <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border-custom">
-        <div className="w-full mx-auto px-4 py-4">
+        <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-2xl font-bold tracking-tight text-foreground">
               Reading List
@@ -233,7 +233,7 @@ export default function ReadingListPage() {
         </div>
       </header>
 
-      <main className="flex-1 w-full mx-auto w-full px-4 py-6">
+      <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-6">
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="animate-spin rounded-full h-8 w-8 border-2 border-border-custom border-t-emerald-500" />

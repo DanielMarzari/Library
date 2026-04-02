@@ -225,7 +225,7 @@ export default function LendingPage() {
     <div className="min-h-screen bg-background text-white">
       {/* Header */}
       <div className="border-b border-border-custom bg-surface">
-        <div className="w-full mx-auto px-4 py-6">
+        <div className="max-w-6xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link
@@ -248,7 +248,7 @@ export default function LendingPage() {
 
       {/* Summary Stats */}
       <div className="border-b border-border-custom bg-surface">
-        <div className="w-full mx-auto px-4 py-6">
+        <div className="max-w-6xl mx-auto px-4 py-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-surface-2 border border-border-custom rounded-lg p-4">
               <p className="text-muted text-sm">Total Books Out</p>
@@ -273,7 +273,7 @@ export default function LendingPage() {
       </div>
 
       {/* Main Content */}
-      <div className="w-full mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Active Loans */}
         <section className="mb-12">
           <h2 className="text-2xl font-bold text-emerald-500 mb-6">

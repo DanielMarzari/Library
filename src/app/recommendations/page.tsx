@@ -16,6 +16,9 @@ interface Recommendation {
   cover_url?: string;
   recommended_by?: string;
   notes?: string;
+  topic?: string;
+  interest?: string;
+  year?: number;
   created_at: string;
 }
 
@@ -34,6 +37,9 @@ export default function RecommendationsPage() {
   );
   const [addingLoading, setAddingLoading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [filterTopic, setFilterTopic] = useState<string | null>(null);
+  const [filterSource, setFilterSource] = useState<string | null>(null);
+  const [searchFilter, setSearchFilter] = useState("");
 
   // Load recommendations and library titles
   useEffect(() => {
@@ -189,13 +195,29 @@ export default function RecommendationsPage() {
     }
   };
 
+  // Derived filter data
+  const allTopics = [...new Set(recommendations.map(r => r.topic).filter(Boolean))] as string[];
+  const allSources = [...new Set(recommendations.map(r => r.recommended_by).filter(Boolean))] as string[];
+
+  const filteredRecs = recommendations.filter(rec => {
+    if (filterTopic && rec.topic !== filterTopic) return false;
+    if (filterSource && rec.recommended_by !== filterSource) return false;
+    if (searchFilter) {
+      const q = searchFilter.toLowerCase();
+      if (!rec.title.toLowerCase().includes(q) && !(rec.author || "").toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border-custom">
-        <div className="w-full mx-auto px-4 py-4">
+        <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-2xl font-bold tracking-tight">Recommendations</h1>
+            <h1 className="text-2xl font-bold tracking-tight">
+              Recommendations <span className="text-muted text-base font-normal">({filteredRecs.length})</span>
+            </h1>
             <Link
               href="/"
               className="bg-surface-2 hover:bg-border-custom text-foreground px-3 py-2 rounded-lg text-sm font-medium transition-colors"
@@ -207,7 +229,56 @@ export default function RecommendationsPage() {
       </header>
 
       {/* Main content */}
-      <main className="flex-1 w-full mx-auto w-full px-4 py-6">
+      <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-6">
+        {/* Filters */}
+        <div className="mb-6 space-y-3">
+          <input
+            type="text"
+            placeholder="Filter by title or author..."
+            value={searchFilter}
+            onChange={(e) => setSearchFilter(e.target.value)}
+            className="w-full bg-surface border border-border-custom rounded-lg px-4 py-2 text-sm text-foreground placeholder-muted focus:outline-none focus:border-emerald-500"
+          />
+          {allTopics.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setFilterTopic(null)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${!filterTopic ? "bg-emerald-600 text-white" : "bg-surface-2 text-muted hover:text-foreground"}`}
+              >
+                All Topics
+              </button>
+              {allTopics.sort().map(topic => (
+                <button
+                  key={topic}
+                  onClick={() => setFilterTopic(filterTopic === topic ? null : topic)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${filterTopic === topic ? "bg-emerald-600 text-white" : "bg-surface-2 text-muted hover:text-foreground"}`}
+                >
+                  {topic}
+                </button>
+              ))}
+            </div>
+          )}
+          {allSources.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setFilterSource(null)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${!filterSource ? "bg-blue-600 text-white" : "bg-surface-2 text-muted hover:text-foreground"}`}
+              >
+                All Sources
+              </button>
+              {allSources.sort().map(source => (
+                <button
+                  key={source}
+                  onClick={() => setFilterSource(filterSource === source ? null : source)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${filterSource === source ? "bg-blue-600 text-white" : "bg-surface-2 text-muted hover:text-foreground"}`}
+                >
+                  {source}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Add Recommendation Form */}
         <div className="bg-surface border border-border-custom rounded-lg p-6 mb-8">
           <h2 className="text-lg font-semibold text-foreground mb-4">
@@ -350,7 +421,7 @@ export default function RecommendationsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {recommendations.map((rec) => (
+            {filteredRecs.map((rec) => (
               <div
                 key={rec.id}
                 className="bg-surface border border-border-custom rounded-lg overflow-hidden hover:border-border-custom transition-colors flex flex-col"
@@ -376,6 +447,25 @@ export default function RecommendationsPage() {
 
                   {rec.author && (
                     <p className="text-xs text-muted mb-3">{rec.author}</p>
+                  )}
+
+                  {/* Topic & Interest pills */}
+                  {(rec.topic || rec.interest || rec.year) && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {rec.topic && (
+                        <span className="px-2 py-0.5 bg-blue-500/15 text-blue-400 rounded text-[10px] font-medium">{rec.topic}</span>
+                      )}
+                      {rec.interest && (
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                          rec.interest === "High" ? "bg-emerald-500/15 text-emerald-400" :
+                          rec.interest === "Average" ? "bg-amber-500/15 text-amber-400" :
+                          "bg-surface-2 text-muted"
+                        }`}>{rec.interest}</span>
+                      )}
+                      {rec.year && (
+                        <span className="px-2 py-0.5 bg-surface-2 text-muted rounded text-[10px]">{rec.year}</span>
+                      )}
+                    </div>
                   )}
 
                   {rec.recommended_by && (
