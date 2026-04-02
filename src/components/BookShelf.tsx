@@ -10,6 +10,7 @@ interface BookShelfProps {
   onToggleSelect: (id: string) => void;
   onStartSelect: (id: string) => void;
   selectMode: boolean;
+  sortMode?: string;
 }
 
 const statusLabels: Record<Book["status"], string> = {
@@ -83,6 +84,10 @@ function ShelfBook({
         book._optimistic ? "animate-pulse pointer-events-none" : ""
       }`}
     >
+      {/* Favorite indicator */}
+      {book.favorite && !selectMode && (
+        <div className="absolute -top-1 -left-1 z-10 text-amber-400 text-xs drop-shadow">★</div>
+      )}
       {/* Selection indicator */}
       {selectMode && (
         <div
@@ -160,17 +165,24 @@ export function BookShelf({
   onToggleSelect,
   onStartSelect,
   selectMode,
+  sortMode,
 }: BookShelfProps) {
+  // When sorting by alpha or rating, show flat grid (no grouping)
+  const flatMode = sortMode === "alpha" || sortMode === "rating";
+
   const grouped = books.reduce(
     (acc, book) => {
-      acc[book.status] = acc[book.status] || [];
-      acc[book.status].push(book);
+      const key = flatMode ? "all" : book.status;
+      acc[key] = acc[key] || [];
+      acc[key].push(book);
       return acc;
     },
     {} as Record<string, Book[]>
   );
 
-  const sections: Book["status"][] = ["reading", "not_read", "read"];
+  const sections: string[] = flatMode
+    ? ["all"]
+    : ["reading", "not_read", "read"];
 
   return (
     <div className="space-y-8">
@@ -180,15 +192,17 @@ export function BookShelf({
 
         return (
           <section key={status}>
-            <div className="flex items-center gap-2 mb-4 px-1">
-              <span className="text-lg">{statusEmoji[status]}</span>
-              <h2 className="text-lg font-semibold text-zinc-100">
-                {statusLabels[status]}
-              </h2>
-              <span className="text-xs text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded-full">
-                {sectionBooks.length}
-              </span>
-            </div>
+            {!flatMode && (
+              <div className="flex items-center gap-2 mb-4 px-1">
+                <span className="text-lg">{statusEmoji[status as Book["status"]]}</span>
+                <h2 className="text-lg font-semibold text-zinc-100">
+                  {statusLabels[status as Book["status"]]}
+                </h2>
+                <span className="text-xs text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded-full">
+                  {sectionBooks.length}
+                </span>
+              </div>
+            )}
 
             <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 gap-3 px-1">
               {sectionBooks.map((book) => (

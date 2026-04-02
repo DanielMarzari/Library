@@ -38,6 +38,7 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
   const [editTopics, setEditTopics] = useState<string[]>(book.topics || []);
   const [topicInput, setTopicInput] = useState("");
   const [autoTopics, setAutoTopics] = useState<string[]>(book.auto_topics || []);
+  const [favorite, setFavorite] = useState(book.favorite || false);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -94,6 +95,7 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
       lcc: lcc.trim() || null, ddc: ddc.trim() || null,
       topics: editTopics.length > 0 ? editTopics : null,
       auto_topics: autoTopics.length > 0 ? autoTopics : null,
+      favorite,
       updated_at: new Date().toISOString(),
     }).eq("id", book.id);
     if (!error) { setEditing(false); onUpdated(); }
@@ -155,6 +157,9 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted }: BookDetailPr
             <div className="h-40 w-28 rounded-lg bg-zinc-700 flex items-center justify-center"><span className="text-zinc-500 text-xs">No Cover</span></div>
           )}
           <div className="absolute top-3 right-3 flex gap-2">
+            <button onClick={() => setFavorite(!favorite)} className={`bg-black/40 rounded-full w-8 h-8 flex items-center justify-center text-sm ${favorite ? "text-amber-400" : "text-zinc-500 hover:text-zinc-200"}`} title={favorite ? "Remove from favorites" : "Add to favorites"}>
+              {favorite ? "★" : "☆"}
+            </button>
             <button onClick={() => setEditing(!editing)} className="text-zinc-400 hover:text-zinc-200 bg-black/40 rounded-full w-8 h-8 flex items-center justify-center text-sm">✏️</button>
             <button onClick={onClose} className="text-zinc-400 hover:text-zinc-200 bg-black/40 rounded-full w-8 h-8 flex items-center justify-center">×</button>
           </div>

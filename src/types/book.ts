@@ -21,6 +21,7 @@ export interface Book {
   ddc?: string;
   topics?: string[];
   auto_topics?: string[];
+  favorite?: boolean;
   created_at: string;
   updated_at: string;
   _optimistic?: boolean;
