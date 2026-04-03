@@ -18,8 +18,11 @@ interface Recommendation {
   topic?: string;
   interest?: string;
   year?: number;
+  lowest_price?: number | null;
   created_at: string;
 }
+
+type SortMode = "recent" | "price_asc" | "price_desc" | "alpha";
 
 interface LibraryBook {
   title: string;
@@ -49,6 +52,9 @@ export default function RecommendationsPage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [showOwned, setShowOwned] = useState(false);
   const [page, setPage] = useState(1);
+  const [sortMode, setSortMode] = useState<SortMode>("recent");
+  const [fetchingPrices, setFetchingPrices] = useState(false);
+  const [priceProgress, setPriceProgress] = useState({ done: 0, total: 0 });
   const PAGE_SIZE = 60;
 
   // Load recommendations and library titles
@@ -231,7 +237,7 @@ export default function RecommendationsPage() {
     recommendations.forEach(r => {
       getRecTags(r).forEach(tag => { counts[tag] = (counts[tag] || 0) + 1; });
     });
-    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    return Object.entries(counts).sort((a, b) => a[0].localeCompare(b[0]));
   }, [recommendations, getRecTags]);
 
   // Collection badges (Mentioned on Podcast, Mentioned in Classroom, etc.)
@@ -283,7 +289,7 @@ export default function RecommendationsPage() {
   };
 
   const filteredRecs = useMemo(() => {
-    return recommendations.filter(rec => {
+    const filtered = recommendations.filter(rec => {
       const tags = getRecTags(rec);
       if (filterTopic && !tags.includes(filterTopic)) return false;
       if (excludeTopic && tags.includes(excludeTopic)) return false;
@@ -295,11 +301,57 @@ export default function RecommendationsPage() {
       }
       return true;
     });
-  }, [recommendations, filterTopic, excludeTopic, filterSource, excludeSource, searchFilter, getRecTags]);
+
+    // Apply sort
+    switch (sortMode) {
+      case "alpha":
+        filtered.sort((a, b) => a.title.localeCompare(b.title));
+        break;
+      case "price_asc":
+        filtered.sort((a, b) => (a.lowest_price ?? 9999) - (b.lowest_price ?? 9999));
+        break;
+      case "price_desc":
+        filtered.sort((a, b) => (b.lowest_price ?? 0) - (a.lowest_price ?? 0));
+        break;
+      case "recent":
+      default:
+        break;
+    }
+    return filtered;
+  }, [recommendations, filterTopic, excludeTopic, filterSource, excludeSource, searchFilter, getRecTags, sortMode]);
 
   const paginatedRecs = useMemo(() => {
     return filteredRecs.slice(0, page * PAGE_SIZE);
   }, [filteredRecs, page]);
+
+  // Fetch prices for filtered recommendations that don't have one yet
+  const handleFetchPrices = async () => {
+    const noPriceRecs = filteredRecs.filter(r => r.lowest_price == null).slice(0, 50);
+    if (noPriceRecs.length === 0) return;
+    setFetchingPrices(true);
+    setPriceProgress({ done: 0, total: noPriceRecs.length });
+
+    for (let i = 0; i < noPriceRecs.length; i++) {
+      const rec = noPriceRecs[i];
+      try {
+        const resp = await fetch("/api/fetch-price", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: rec.title, author: rec.author, recId: rec.id }),
+        });
+        const data = await resp.json();
+        if (data.price != null) {
+          setRecommendations(prev => prev.map(r => r.id === rec.id ? { ...r, lowest_price: data.price } : r));
+        }
+      } catch (e) {
+        // skip failures
+      }
+      setPriceProgress({ done: i + 1, total: noPriceRecs.length });
+      // Small delay to avoid hammering AbeBooks
+      await new Promise(r => setTimeout(r, 800));
+    }
+    setFetchingPrices(false);
+  };
 
   const hasMore = paginatedRecs.length < filteredRecs.length;
 
@@ -439,7 +491,7 @@ export default function RecommendationsPage() {
           </div>
         )}
 
-        {/* Search & Filter Bar */}
+        {/* Search & Sort Bar */}
         <div className="mb-4 space-y-2">
           <div className="flex gap-2">
             <div className="relative flex-1">
@@ -453,6 +505,41 @@ export default function RecommendationsPage() {
                 onChange={(e) => setSearchFilter(e.target.value)}
                 className="w-full bg-surface border border-border-custom rounded-lg pl-9 pr-3 py-2 text-sm text-foreground placeholder-muted focus:outline-none focus:ring-1 focus:ring-emerald-600"
               />
+            </div>
+          </div>
+
+          {/* Sort + Price row */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] text-muted uppercase tracking-wider font-medium">Sort:</span>
+            {([
+              { label: "Recent", value: "recent" as SortMode },
+              { label: "A-Z", value: "alpha" as SortMode },
+              { label: "Price ↑", value: "price_asc" as SortMode },
+              { label: "Price ↓", value: "price_desc" as SortMode },
+            ]).map(s => (
+              <button
+                key={s.value}
+                onClick={() => setSortMode(s.value)}
+                className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                  sortMode === s.value ? "bg-foreground text-background" : "bg-surface-2 text-muted hover:text-foreground"
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
+            <div className="ml-auto flex items-center gap-2">
+              {fetchingPrices ? (
+                <span className="text-[10px] text-muted">
+                  Fetching prices... {priceProgress.done}/{priceProgress.total}
+                </span>
+              ) : (
+                <button
+                  onClick={handleFetchPrices}
+                  className="px-2.5 py-1 bg-amber-500/10 text-amber-500 rounded text-[10px] font-medium hover:bg-amber-500/20 transition-colors"
+                >
+                  Fetch Prices (AbeBooks)
+                </button>
+              )}
             </div>
           </div>
 
@@ -584,6 +671,13 @@ export default function RecommendationsPage() {
                       </div>
                     </div>
 
+                    {/* Price badge */}
+                    {rec.lowest_price != null && (
+                      <span className="px-1.5 py-0.5 bg-amber-500/10 text-amber-500 rounded text-[9px] font-bold flex-shrink-0">
+                        ${rec.lowest_price.toFixed(0)}
+                      </span>
+                    )}
+
                     {/* Source badge */}
                     {rec.recommended_by && (
                       <span className="text-[10px] text-muted hidden md:inline flex-shrink-0 max-w-[120px] truncate">
@@ -600,6 +694,14 @@ export default function RecommendationsPage() {
                         className="px-2 py-1 bg-amber-500/10 text-amber-500 rounded text-[9px] font-medium hover:bg-amber-500/20 transition-colors"
                       >
                         Amazon
+                      </a>
+                      <a
+                        href={`https://www.abebooks.com/servlet/SearchResults?kn=${encodeURIComponent(rec.title + (rec.author ? " " + rec.author : ""))}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-2 py-1 bg-emerald-500/10 text-emerald-500 rounded text-[9px] font-medium hover:bg-emerald-500/20 transition-colors"
+                      >
+                        Abe
                       </a>
                       <a
                         href={`https://www.thriftbooks.com/browse/?b.search=${encodeURIComponent(rec.title)}`}

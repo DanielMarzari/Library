@@ -10,8 +10,8 @@ import { BookDetail } from "@/components/BookDetail";
 import { AddBookSheet } from "@/components/AddBookSheet";
 import Link from "next/link";
 
-type FilterStatus = "all" | "not_read" | "reading" | "read" | "favorites";
-type SortMode = "recent" | "alpha" | "rating" | "lcc" | "ddc";
+type FilterStatus = "all" | "not_read" | "reading" | "read" | "favorites" | "on_reading_list";
+type SortMode = "recent" | "alpha" | "rating" | "lcc" | "ddc" | "pages_asc" | "pages_desc";
 type HeaderTab = "filter" | "sort";
 type GridSize = "xs" | "small" | "medium" | "large" | "xl";
 
@@ -31,6 +31,7 @@ export default function Home() {
   const [theme, setTheme] = useState<"system" | "light" | "dark">("system");
   const [gridSize, setGridSize] = useState<GridSize>("medium");
   const navRef = useRef<HTMLDivElement>(null);
+  const [readingListIds, setReadingListIds] = useState<Set<string>>(new Set());
 
   // Load persisted preferences
   useEffect(() => {
@@ -80,13 +81,23 @@ export default function Home() {
         .select("*")
         .order("created_at", { ascending: false });
 
+      // Fetch reading list IDs for the "on reading list" filter
+      if (filter === "on_reading_list") {
+        const { data: rlData } = await supabase.from("reading_list").select("book_id");
+        const { data: glData } = await supabase.from("learning_goal_books").select("book_id");
+        const ids = new Set<string>();
+        (rlData || []).forEach((r: any) => ids.add(r.book_id));
+        (glData || []).forEach((r: any) => ids.add(r.book_id));
+        setReadingListIds(ids);
+      }
+
       if (filter === "favorites") {
         query = supabase
           .from("books")
           .select("*")
           .eq("favorite", true)
           .order("created_at", { ascending: false });
-      } else if (filter !== "all") {
+      } else if (filter !== "all" && filter !== "on_reading_list") {
         query = query.eq("status", filter);
       }
 
@@ -125,7 +136,13 @@ export default function Home() {
   }, [filter, search, refreshKey]);
 
   const sortedBooks = useMemo(() => {
-    const sorted = [...books];
+    let sorted = [...books];
+
+    // Apply reading list filter if active
+    if (filter === "on_reading_list" && readingListIds.size > 0) {
+      sorted = sorted.filter(b => readingListIds.has(b.id));
+    }
+
     switch (sortMode) {
       case "alpha":
         sorted.sort((a, b) => a.title.localeCompare(b.title));
@@ -143,21 +160,26 @@ export default function Home() {
           return aDdc - bDdc;
         });
         break;
+      case "pages_asc":
+        sorted.sort((a, b) => (a.pages || 9999) - (b.pages || 9999));
+        break;
+      case "pages_desc":
+        sorted.sort((a, b) => (b.pages || 0) - (a.pages || 0));
+        break;
       case "recent":
       default:
-        // Sort read books by complete_date desc, others by created_at desc
         sorted.sort((a, b) => {
           if (a.status === "read" && b.status === "read") {
             const aDate = a.complete_date || "0";
             const bDate = b.complete_date || "0";
             return bDate.localeCompare(aDate);
           }
-          return 0; // preserve DB order for non-read books
+          return 0;
         });
         break;
     }
     return sorted;
-  }, [books, sortMode]);
+  }, [books, sortMode, filter, readingListIds]);
 
   const refetch = useCallback(() => {
     setRefreshKey((k) => k + 1);
@@ -256,12 +278,15 @@ export default function Home() {
     { label: "Not Read", value: "not_read" },
     { label: "Reading", value: "reading" },
     { label: "Read", value: "read" },
+    { label: "On List", value: "on_reading_list" },
   ];
 
   const sortButtons: { label: string; value: SortMode }[] = [
     { label: "Recent", value: "recent" },
     { label: "A-Z", value: "alpha" },
     { label: "Rating", value: "rating" },
+    { label: "Shortest", value: "pages_asc" },
+    { label: "Longest", value: "pages_desc" },
     { label: "LCC", value: "lcc" },
     { label: "DDC", value: "ddc" },
   ];
