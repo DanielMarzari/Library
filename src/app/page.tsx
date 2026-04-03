@@ -32,6 +32,9 @@ export default function Home() {
   const [gridSize, setGridSize] = useState<GridSize>("medium");
   const navRef = useRef<HTMLDivElement>(null);
   const [readingListIds, setReadingListIds] = useState<Set<string>>(new Set());
+  const [availableLists, setAvailableLists] = useState<Array<{ id: string; name: string; type: "year" | "goal" }>>([]);
+  const [selectedListId, setSelectedListId] = useState<string | null>(null);
+  const [showListDropdown, setShowListDropdown] = useState(false);
 
   // Load persisted preferences
   useEffect(() => {
@@ -81,13 +84,40 @@ export default function Home() {
         .select("*")
         .order("created_at", { ascending: false });
 
-      // Fetch reading list IDs for the "on reading list" filter
+      // Fetch reading list/goal data for the "on list" filter
       if (filter === "on_reading_list") {
-        const { data: rlData } = await supabase.from("reading_list").select("book_id");
-        const { data: glData } = await supabase.from("learning_goal_books").select("book_id");
+        const [rlRes, glRes, goalsRes] = await Promise.all([
+          supabase.from("reading_list").select("book_id,year"),
+          supabase.from("learning_goal_books").select("book_id,goal_id"),
+          supabase.from("learning_goals").select("id,name").order("name"),
+        ]);
+
+        const rlData = rlRes.data || [];
+        const glData = glRes.data || [];
+        const goalsData = (goalsRes.data || []) as Array<{ id: string; name: string }>;
+
+        // Build available lists: years from reading_list + all goals
+        const years = new Set<number>();
+        rlData.forEach((r: any) => years.add(r.year));
+        const lists: Array<{ id: string; name: string; type: "year" | "goal" }> = [];
+        Array.from(years).sort((a, b) => b - a).forEach(y => lists.push({ id: `year-${y}`, name: `${y} Reading List`, type: "year" }));
+        goalsData.forEach(g => lists.push({ id: g.id, name: g.name, type: "goal" }));
+        setAvailableLists(lists);
+
+        // Build IDs based on selected list
         const ids = new Set<string>();
-        (rlData || []).forEach((r: any) => ids.add(r.book_id));
-        (glData || []).forEach((r: any) => ids.add(r.book_id));
+        if (selectedListId) {
+          if (selectedListId.startsWith("year-")) {
+            const year = parseInt(selectedListId.replace("year-", ""));
+            rlData.filter((r: any) => r.year === year).forEach((r: any) => ids.add(r.book_id));
+          } else {
+            glData.filter((r: any) => r.goal_id === selectedListId).forEach((r: any) => ids.add(r.book_id));
+          }
+        } else {
+          // "All lists" — combine everything
+          rlData.forEach((r: any) => ids.add(r.book_id));
+          glData.forEach((r: any) => ids.add(r.book_id));
+        }
         setReadingListIds(ids);
       }
 
@@ -133,7 +163,7 @@ export default function Home() {
     return () => {
       ignore = true;
     };
-  }, [filter, search, refreshKey]);
+  }, [filter, search, refreshKey, selectedListId]);
 
   const sortedBooks = useMemo(() => {
     let sorted = [...books];
@@ -420,20 +450,50 @@ export default function Home() {
 
             {/* Filter pills */}
             {headerTab === "filter" && (
-              <div className="flex gap-1.5 overflow-x-auto pb-1">
-                {filterButtons.map((f) => (
-                  <button
-                    key={f.value}
-                    onClick={() => setFilter(f.value)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
-                      filter === f.value
-                        ? "bg-emerald-600 text-white"
-                        : "bg-surface text-muted hover:text-foreground"
-                    }`}
-                  >
-                    {f.label}
-                  </button>
-                ))}
+              <div className="space-y-2">
+                <div className="flex gap-1.5 overflow-x-auto pb-1">
+                  {filterButtons.map((f) => (
+                    <button
+                      key={f.value}
+                      onClick={() => {
+                        setFilter(f.value);
+                        if (f.value === "on_reading_list") setShowListDropdown(prev => !prev);
+                        else { setShowListDropdown(false); setSelectedListId(null); }
+                      }}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                        filter === f.value
+                          ? "bg-emerald-600 text-white"
+                          : "bg-surface text-muted hover:text-foreground"
+                      }`}
+                    >
+                      {f.label}
+                      {f.value === "on_reading_list" && filter === "on_reading_list" && " ▾"}
+                    </button>
+                  ))}
+                </div>
+                {filter === "on_reading_list" && showListDropdown && availableLists.length > 0 && (
+                  <div className="flex gap-1.5 overflow-x-auto pb-1">
+                    <button
+                      onClick={() => setSelectedListId(null)}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-colors ${
+                        !selectedListId ? "bg-blue-600 text-white" : "bg-surface text-muted hover:text-foreground"
+                      }`}
+                    >
+                      All Lists
+                    </button>
+                    {availableLists.map((list) => (
+                      <button
+                        key={list.id}
+                        onClick={() => setSelectedListId(list.id)}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-colors ${
+                          selectedListId === list.id ? "bg-blue-600 text-white" : "bg-surface text-muted hover:text-foreground"
+                        }`}
+                      >
+                        {list.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 

@@ -40,9 +40,17 @@ const LENGTH_BUCKETS = [
   { label: "501+", min: 501, max: 99999 },
 ];
 
+interface AuthorMeta {
+  name: string;
+  gender: string | null;
+  ethnicity: string | null;
+  nationality: string | null;
+}
+
 export default function StatsPage() {
   const [books, setBooks] = useState<Book[]>([]);
   const [readingUpdates, setReadingUpdates] = useState<ReadingUpdate[]>([]);
+  const [authorMeta, setAuthorMeta] = useState<AuthorMeta[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -77,6 +85,18 @@ export default function StatsPage() {
     return () => {
       ignore = true;
     };
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+    const load = async () => {
+      const { data } = await supabase
+        .from("authors")
+        .select("name,gender,ethnicity,nationality");
+      if (!ignore && data) setAuthorMeta(data as AuthorMeta[]);
+    };
+    load();
+    return () => { ignore = true; };
   }, []);
 
   const stats = useMemo(() => {
@@ -321,6 +341,34 @@ export default function StatsPage() {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 8);
 
+    // --- Author diversity ---
+    const metaByName: Record<string, AuthorMeta> = {};
+    authorMeta.forEach((a) => { metaByName[a.name] = a; });
+
+    // Gender counts weighted by number of books
+    const genderBookCounts: Record<string, number> = { Male: 0, Female: 0, Unknown: 0 };
+    const genderAuthorCounts: Record<string, number> = { Male: 0, Female: 0, Unknown: 0 };
+    const ethnicityBookCounts: Record<string, number> = {};
+    const ethnicityAuthorCounts: Record<string, number> = {};
+
+    Object.entries(authorCounts).forEach(([name, counts]) => {
+      const meta = metaByName[name];
+      const gender = meta?.gender || "Unknown";
+      const genderKey = gender.charAt(0).toUpperCase() === "M" ? "Male" : gender.charAt(0).toUpperCase() === "F" ? "Female" : "Unknown";
+      genderBookCounts[genderKey] = (genderBookCounts[genderKey] || 0) + counts.books;
+      genderAuthorCounts[genderKey] = (genderAuthorCounts[genderKey] || 0) + 1;
+
+      const ethnicity = meta?.ethnicity || null;
+      if (ethnicity) {
+        ethnicityBookCounts[ethnicity] = (ethnicityBookCounts[ethnicity] || 0) + counts.books;
+        ethnicityAuthorCounts[ethnicity] = (ethnicityAuthorCounts[ethnicity] || 0) + 1;
+      }
+    });
+
+    const totalGenderBooks = genderBookCounts.Male + genderBookCounts.Female + genderBookCounts.Unknown;
+    const topEthnicities = Object.entries(ethnicityBookCounts)
+      .sort((a, b) => b[1] - a[1]);
+
     return {
       total,
       readCount: read.length,
@@ -361,8 +409,13 @@ export default function StatsPage() {
       totalHeatmapPages,
       maxPagesInDay,
       daysWithActivity,
+      genderBookCounts,
+      genderAuthorCounts,
+      totalGenderBooks,
+      topEthnicities,
+      ethnicityAuthorCounts,
     };
-  }, [books, readingUpdates]);
+  }, [books, readingUpdates, authorMeta]);
 
   if (loading) {
     return (
@@ -688,6 +741,72 @@ export default function StatsPage() {
           )}
         </section>
 
+        {/* Author Diversity */}
+        <section>
+          <h2 className="text-lg font-semibold text-foreground mb-3">Author Diversity</h2>
+          <div className="bg-surface border border-border-custom rounded-xl p-5 space-y-5">
+            {/* Gender breakdown */}
+            <div>
+              <p className="text-xs text-muted mb-3">Gender (by books owned)</p>
+              <div className="flex gap-1 h-6 rounded-full overflow-hidden mb-3">
+                {stats.totalGenderBooks > 0 && (
+                  <>
+                    <div
+                      className="bg-blue-500 transition-all"
+                      style={{ width: `${(stats.genderBookCounts.Male / stats.totalGenderBooks) * 100}%` }}
+                    />
+                    <div
+                      className="bg-pink-500 transition-all"
+                      style={{ width: `${(stats.genderBookCounts.Female / stats.totalGenderBooks) * 100}%` }}
+                    />
+                    <div
+                      className="bg-surface-2 transition-all"
+                      style={{ width: `${(stats.genderBookCounts.Unknown / stats.totalGenderBooks) * 100}%` }}
+                    />
+                  </>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <p className="text-lg font-bold text-blue-400">{stats.genderBookCounts.Male}</p>
+                  <p className="text-[10px] text-muted">Male · {stats.genderAuthorCounts.Male} authors</p>
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-pink-400">{stats.genderBookCounts.Female}</p>
+                  <p className="text-[10px] text-muted">Female · {stats.genderAuthorCounts.Female} authors</p>
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-muted">{stats.genderBookCounts.Unknown}</p>
+                  <p className="text-[10px] text-muted">Unknown · {stats.genderAuthorCounts.Unknown} authors</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Ethnicity breakdown */}
+            {stats.topEthnicities.length > 0 && (
+              <div>
+                <p className="text-xs text-muted mb-3">Ethnicity (by books owned) — {stats.topEthnicities.reduce((s, e) => s + e[1], 0)} books classified</p>
+                <div className="space-y-2">
+                  {stats.topEthnicities.map(([ethnicity, bookCount]) => (
+                    <div key={ethnicity} className="flex items-center gap-3">
+                      <span className="text-sm text-foreground w-32 flex-shrink-0">{ethnicity}</span>
+                      <div className="flex-1 bg-surface-2 rounded-full h-3 overflow-hidden">
+                        <div
+                          className="bg-emerald-600 h-full rounded-full"
+                          style={{ width: `${(bookCount / stats.topEthnicities[0][1]) * 100}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-muted w-20 text-right flex-shrink-0">
+                        {bookCount} books · {stats.ethnicityAuthorCounts[ethnicity]} auth.
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
         {/* Skill stats */}
         <section>
           <h2 className="text-lg font-semibold text-foreground mb-3">Skills</h2>
@@ -851,7 +970,7 @@ function ContributionHeatmap({
                     <div
                       key={dateKey}
                       className={`w-3 h-3 rounded-sm cursor-pointer transition-colors ${
-                        isInRange ? `${getColorClass(pages)} ${getHoverColor(pages)}` : "bg-background"
+                        isInRange ? `${getColorClass(pages)} ${getHoverColor(pages)}` : "bg-transparent"
                       }`}
                       onMouseEnter={() => setHoveredDate(dateKey)}
                       onMouseLeave={() => setHoveredDate(null)}
