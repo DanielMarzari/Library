@@ -465,7 +465,7 @@ export default function ReadingListPage() {
     <div className="min-h-screen flex flex-col bg-background">
       {/* Header */}
       <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border-custom">
-        <div className="max-w-6xl mx-auto px-4 py-3">
+        <div className="max-w-screen-xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between mb-3">
             <h1 className="text-xl font-bold tracking-tight text-foreground">Reading List</h1>
             <Link href="/" className="bg-surface-2 hover:bg-border-custom text-foreground px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
@@ -491,7 +491,7 @@ export default function ReadingListPage() {
         </div>
       </header>
 
-      <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-4">
+      <main className="flex-1 max-w-screen-xl mx-auto w-full px-4 py-4">
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="animate-spin rounded-full h-8 w-8 border-2 border-border-custom border-t-emerald-500" />
@@ -561,7 +561,9 @@ export default function ReadingListPage() {
               return (
                 <>
                   <h2 className="text-xs font-semibold text-muted uppercase tracking-wider mt-2">Study Topics</h2>
-                  {customGoals.map(goal => renderGoalCard(goal))}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    {customGoals.map(goal => renderGoalCard(goal))}
+                  </div>
                 </>
               );
             })()}
@@ -581,13 +583,17 @@ export default function ReadingListPage() {
                   {otGoals.length > 0 && (
                     <>
                       <h2 className="text-xs font-semibold text-muted uppercase tracking-wider mt-6">Old Testament</h2>
-                      {otGoals.map(goal => renderGoalCard(goal))}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        {otGoals.map(goal => renderGoalCard(goal))}
+                      </div>
                     </>
                   )}
                   {ntGoals.length > 0 && (
                     <>
                       <h2 className="text-xs font-semibold text-muted uppercase tracking-wider mt-6">New Testament</h2>
-                      {ntGoals.map(goal => renderGoalCard(goal))}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        {ntGoals.map(goal => renderGoalCard(goal))}
+                      </div>
                     </>
                   )}
                 </>

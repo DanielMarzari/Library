@@ -34,7 +34,6 @@ export default function Home() {
   const [readingListIds, setReadingListIds] = useState<Set<string>>(new Set());
   const [availableLists, setAvailableLists] = useState<Array<{ id: string; name: string; type: "year" | "goal" }>>([]);
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
-  const [showListDropdown, setShowListDropdown] = useState(false);
 
   // Load persisted preferences
   useEffect(() => {
@@ -457,8 +456,7 @@ export default function Home() {
                       key={f.value}
                       onClick={() => {
                         setFilter(f.value);
-                        if (f.value === "on_reading_list") setShowListDropdown(prev => !prev);
-                        else { setShowListDropdown(false); setSelectedListId(null); }
+                        if (f.value !== "on_reading_list") setSelectedListId(null);
                       }}
                       className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
                         filter === f.value
@@ -467,33 +465,32 @@ export default function Home() {
                       }`}
                     >
                       {f.label}
-                      {f.value === "on_reading_list" && filter === "on_reading_list" && " ▾"}
                     </button>
                   ))}
-                </div>
-                {filter === "on_reading_list" && showListDropdown && availableLists.length > 0 && (
-                  <div className="flex gap-1.5 overflow-x-auto pb-1">
-                    <button
-                      onClick={() => setSelectedListId(null)}
-                      className={`px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-colors ${
-                        !selectedListId ? "bg-blue-600 text-white" : "bg-surface text-muted hover:text-foreground"
-                      }`}
+                  {filter === "on_reading_list" && availableLists.length > 0 && (
+                    <select
+                      value={selectedListId || ""}
+                      onChange={(e) => setSelectedListId(e.target.value || null)}
+                      className="px-2 py-1.5 rounded-lg text-xs font-medium bg-surface-2 text-foreground border border-border-custom outline-none cursor-pointer"
                     >
-                      All Lists
-                    </button>
-                    {availableLists.map((list) => (
-                      <button
-                        key={list.id}
-                        onClick={() => setSelectedListId(list.id)}
-                        className={`px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-colors ${
-                          selectedListId === list.id ? "bg-blue-600 text-white" : "bg-surface text-muted hover:text-foreground"
-                        }`}
-                      >
-                        {list.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                      <option value="">All Lists</option>
+                      {availableLists.filter(l => l.type === "year").length > 0 && (
+                        <optgroup label="Reading Lists">
+                          {availableLists.filter(l => l.type === "year").map(list => (
+                            <option key={list.id} value={list.id}>{list.name}</option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {availableLists.filter(l => l.type === "goal").length > 0 && (
+                        <optgroup label="Learning Goals">
+                          {availableLists.filter(l => l.type === "goal").map(list => (
+                            <option key={list.id} value={list.id}>{list.name}</option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </select>
+                  )}
+                </div>
               </div>
             )}
 

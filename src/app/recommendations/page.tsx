@@ -355,7 +355,7 @@ export default function RecommendationsPage() {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border-custom">
-        <div className="max-w-6xl mx-auto px-4 py-3">
+        <div className="max-w-screen-xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-xl font-bold tracking-tight">Recommendations</h1>
@@ -379,7 +379,7 @@ export default function RecommendationsPage() {
         </div>
       </header>
 
-      <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-4">
+      <main className="flex-1 max-w-screen-xl mx-auto w-full px-4 py-4">
         {/* Stats Cards */}
         {!loading && (
           <div className="grid grid-cols-3 gap-3 mb-5">
