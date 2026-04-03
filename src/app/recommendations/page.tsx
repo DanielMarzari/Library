@@ -337,7 +337,7 @@ export default function RecommendationsPage() {
         const resp = await fetch("/api/fetch-price", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: rec.title, author: rec.author, recId: rec.id }),
+          body: JSON.stringify({ title: rec.title, author: rec.author, isbn: rec.isbn, recId: rec.id }),
         });
         const data = await resp.json();
         if (data.price != null) {
@@ -674,7 +674,7 @@ export default function RecommendationsPage() {
                     {/* Price badge */}
                     {rec.lowest_price != null && (
                       <span className="px-1.5 py-0.5 bg-amber-500/10 text-amber-500 rounded text-[9px] font-bold flex-shrink-0">
-                        ${rec.lowest_price.toFixed(0)}
+                        ${rec.lowest_price.toFixed(2)}
                       </span>
                     )}
 

@@ -47,6 +47,24 @@ function getColorClasses(colorName: string) {
   return COLORS.find(c => c.name === colorName) || COLORS[0];
 }
 
+// Canonical Bible book order for sorting
+const BIBLE_BOOK_ORDER: Record<string, number> = {
+  "Genesis": 1, "Exodus": 2, "Leviticus": 3, "Numbers": 4, "Deuteronomy": 5,
+  "Joshua": 6, "Judges": 7, "Ruth": 8, "1 Samuel": 9, "2 Samuel": 10,
+  "1 Kings": 11, "2 Kings": 12, "1 Chronicles": 13, "2 Chronicles": 14,
+  "Ezra": 15, "Nehemiah": 16, "Esther": 17, "Job": 18, "Psalms": 19, "Proverbs": 20,
+  "Ecclesiastes": 21, "Song of Songs": 22, "Isaiah": 23, "Jeremiah": 24, "Lamentations": 25,
+  "Ezekiel": 26, "Daniel": 27, "Hosea": 28, "Joel": 29, "Amos": 30,
+  "Obadiah": 31, "Jonah": 32, "Micah": 33, "Nahum": 34, "Habakkuk": 35,
+  "Zephaniah": 36, "Haggai": 37, "Zechariah": 38, "Malachi": 39,
+  "Matthew": 40, "Mark": 41, "Luke": 42, "John": 43, "Acts": 44,
+  "Romans": 45, "1 Corinthians": 46, "2 Corinthians": 47, "Galatians": 48, "Ephesians": 49,
+  "Philippians": 50, "Colossians": 51, "1 Thessalonians": 52, "2 Thessalonians": 53,
+  "1 Timothy": 54, "2 Timothy": 55, "Titus": 56, "Philemon": 57, "Hebrews": 58,
+  "James": 59, "1 Peter": 60, "2 Peter": 61, "1 John": 62, "2 John": 63, "3 John": 64,
+  "Jude": 65, "Revelation": 66,
+};
+
 export default function ReadingListPage() {
   // Shared state
   const [books, setBooks] = useState<Book[]>([]);
@@ -270,6 +288,179 @@ export default function ReadingListPage() {
       .sort((a, b) => a.title.localeCompare(b.title));
   }, [books, goalBooks, goalSearchQuery]);
 
+  const renderGoalCard = (goal: LearningGoal) => {
+    const gBooks = goalBooks[goal.id] || [];
+    const readCount = gBooks.filter(gb => gb.book.status === "read" || (gb.book.status as string) === "completed").length;
+    const readingCount = gBooks.filter(gb => gb.book.status === "reading").length;
+    const totalPages = gBooks.reduce((sum, gb) => sum + (gb.book.pages || 0), 0);
+    const readPages = gBooks.filter(gb => gb.book.status === "read" || (gb.book.status as string) === "completed").reduce((sum, gb) => sum + (gb.book.pages || 0), 0);
+    const pct = gBooks.length > 0 ? Math.round((readCount / gBooks.length) * 100) : 0;
+    const isExpanded = expandedGoal === goal.id;
+    const cc = getColorClasses(goal.color);
+
+    return (
+      <div key={goal.id} className={`bg-surface border ${isExpanded ? cc.border : "border-border-custom"} rounded-xl overflow-hidden transition-colors`}>
+        {/* Goal Header */}
+        <button
+          onClick={() => setExpandedGoal(isExpanded ? null : goal.id)}
+          className="w-full text-left p-4"
+        >
+          <div className="flex items-center gap-3">
+            <div className={`w-3 h-3 rounded-full ${cc.bar} flex-shrink-0`} />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-foreground text-sm">{goal.name}</h3>
+                <span className="text-[10px] text-muted">
+                  {readCount}/{gBooks.length} books
+                  {readingCount > 0 && ` · ${readingCount} reading`}
+                </span>
+              </div>
+              {goal.description && (
+                <p className="text-xs text-muted mt-0.5 truncate">{goal.description}</p>
+              )}
+            </div>
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <span className={`text-lg font-bold ${cc.text}`}>{pct}%</span>
+              <svg className={`w-4 h-4 text-muted transition-transform ${isExpanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
+          {/* Progress bar */}
+          <div className="mt-2 h-1.5 bg-surface-2 rounded-full overflow-hidden">
+            <div className={`h-full ${cc.bar} rounded-full transition-all`} style={{ width: `${pct}%` }} />
+          </div>
+          {totalPages > 0 && (
+            <p className="text-[10px] text-muted mt-1">{readPages.toLocaleString()} / {totalPages.toLocaleString()} pages</p>
+          )}
+        </button>
+
+        {/* Expanded Content */}
+        {isExpanded && (
+          <div className="border-t border-border-custom">
+            {/* Book list */}
+            {gBooks.length > 0 && (
+              <div className="divide-y divide-border-custom">
+                {gBooks.map(gb => {
+                  const isRead = gb.book.status === "read" || (gb.book.status as string) === "completed";
+                  const isReading = gb.book.status === "reading";
+                  return (
+                    <div key={gb.id} className={`flex items-center gap-3 px-4 py-2.5 group ${isRead ? "opacity-60" : ""}`}>
+                      {gb.book.cover_url ? (
+                        <img src={gb.book.cover_url} alt="" className="w-8 h-11 object-cover rounded flex-shrink-0" />
+                      ) : (
+                        <div className="w-8 h-11 bg-surface-2 rounded flex-shrink-0 flex items-center justify-center">
+                          <span className="text-[10px] text-muted">📖</span>
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-medium truncate ${isRead ? "line-through text-muted" : "text-foreground"}`}>{gb.book.title}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs text-muted truncate">{gb.book.author}</span>
+                          {gb.book.pages && <span className="text-[10px] text-muted-2">{gb.book.pages}p</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {isRead && (
+                          <span className="px-1.5 py-0.5 bg-emerald-500/15 text-emerald-500 rounded text-[9px] font-medium">Read</span>
+                        )}
+                        {isReading && (
+                          <span className="px-1.5 py-0.5 bg-blue-500/15 text-blue-500 rounded text-[9px] font-medium">Reading</span>
+                        )}
+                        {!isRead && !isReading && (
+                          <span className="px-1.5 py-0.5 bg-surface-2 text-muted rounded text-[9px] font-medium">To Read</span>
+                        )}
+                        <button
+                          onClick={() => removeBookFromGoal(gb.id, goal.id)}
+                          className="p-1 text-muted hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Add book to goal */}
+            <div className="p-3 border-t border-border-custom">
+              {addingToGoal === goal.id ? (
+                <div>
+                  <input
+                    type="text"
+                    placeholder="Search your library..."
+                    value={goalSearchQuery}
+                    onChange={(e) => setGoalSearchQuery(e.target.value)}
+                    className="w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted focus:outline-none focus:ring-1 focus:ring-emerald-600 mb-2"
+                    autoFocus
+                  />
+                  <div className="max-h-48 overflow-y-auto rounded-lg border border-border-custom bg-surface-2">
+                    {availableBooksForGoal(goal.id).slice(0, 30).map(book => (
+                      <button
+                        key={book.id}
+                        onClick={() => addBookToGoal(goal.id, book.id)}
+                        className="w-full text-left px-3 py-2 hover:bg-border-custom border-b border-border-custom last:border-0 transition-colors"
+                      >
+                        <p className="text-sm font-medium text-foreground truncate">{book.title}</p>
+                        <p className="text-xs text-muted">{book.author}</p>
+                      </button>
+                    ))}
+                    {availableBooksForGoal(goal.id).length === 0 && (
+                      <p className="p-3 text-sm text-muted text-center">No matching books</p>
+                    )}
+                  </div>
+                  <button onClick={() => { setAddingToGoal(null); setGoalSearchQuery(""); }} className="mt-2 text-xs text-muted hover:text-foreground">
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setAddingToGoal(goal.id)}
+                    className={`flex-1 text-center py-1.5 rounded-lg text-xs font-medium transition-colors ${cc.bg} ${cc.text} hover:opacity-80`}
+                  >
+                    + Add Book
+                  </button>
+
+                  {/* Edit / Delete */}
+                  {editingGoal === goal.id ? (
+                    <div className="flex-1 flex gap-1">
+                      <input
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="flex-1 bg-surface-2 border border-border-custom rounded px-2 py-1 text-xs text-foreground"
+                      />
+                      <button onClick={() => updateGoal(goal.id)} className="px-2 py-1 bg-emerald-600 text-white rounded text-xs">Save</button>
+                      <button onClick={() => setEditingGoal(null)} className="px-2 py-1 bg-surface-2 text-muted rounded text-xs">X</button>
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => { setEditingGoal(goal.id); setEditName(goal.name); setEditDesc(goal.description || ""); }}
+                        className="px-2 py-1.5 bg-surface-2 hover:bg-border-custom rounded-lg text-[10px] text-muted hover:text-foreground transition-colors"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => { if (confirm(`Delete "${goal.name}" and all its book assignments?`)) deleteGoal(goal.id); }}
+                        className="px-2 py-1.5 bg-surface-2 hover:bg-red-500/15 rounded-lg text-[10px] text-muted hover:text-red-400 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* Header */}
@@ -363,178 +554,45 @@ export default function ReadingListPage() {
               </div>
             )}
 
-            {goals.map(goal => {
-              const gBooks = goalBooks[goal.id] || [];
-              const readCount = gBooks.filter(gb => gb.book.status === "read" || (gb.book.status as string) === "completed").length;
-              const readingCount = gBooks.filter(gb => gb.book.status === "reading").length;
-              const totalPages = gBooks.reduce((sum, gb) => sum + (gb.book.pages || 0), 0);
-              const readPages = gBooks.filter(gb => gb.book.status === "read" || (gb.book.status as string) === "completed").reduce((sum, gb) => sum + (gb.book.pages || 0), 0);
-              const pct = gBooks.length > 0 ? Math.round((readCount / gBooks.length) * 100) : 0;
-              const isExpanded = expandedGoal === goal.id;
-              const cc = getColorClasses(goal.color);
+            {/* Custom / Topic Goals */}
+            {(() => {
+              const customGoals = goals.filter(g => !(g.name in BIBLE_BOOK_ORDER));
+              if (customGoals.length === 0) return null;
+              return (
+                <>
+                  <h2 className="text-xs font-semibold text-muted uppercase tracking-wider mt-2">Study Topics</h2>
+                  {customGoals.map(goal => renderGoalCard(goal))}
+                </>
+              );
+            })()}
+
+            {/* Bible Book Goals */}
+            {(() => {
+              const bibleGoals = goals
+                .filter(g => g.name in BIBLE_BOOK_ORDER)
+                .sort((a, b) => BIBLE_BOOK_ORDER[a.name] - BIBLE_BOOK_ORDER[b.name]);
+              if (bibleGoals.length === 0) return null;
+
+              const otGoals = bibleGoals.filter(g => BIBLE_BOOK_ORDER[g.name] <= 39);
+              const ntGoals = bibleGoals.filter(g => BIBLE_BOOK_ORDER[g.name] >= 40);
 
               return (
-                <div key={goal.id} className={`bg-surface border ${isExpanded ? cc.border : "border-border-custom"} rounded-xl overflow-hidden transition-colors`}>
-                  {/* Goal Header */}
-                  <button
-                    onClick={() => setExpandedGoal(isExpanded ? null : goal.id)}
-                    className="w-full text-left p-4"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-3 h-3 rounded-full ${cc.bar} flex-shrink-0`} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-foreground text-sm">{goal.name}</h3>
-                          <span className="text-[10px] text-muted">
-                            {readCount}/{gBooks.length} books
-                            {readingCount > 0 && ` · ${readingCount} reading`}
-                          </span>
-                        </div>
-                        {goal.description && (
-                          <p className="text-xs text-muted mt-0.5 truncate">{goal.description}</p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 flex-shrink-0">
-                        <span className={`text-lg font-bold ${cc.text}`}>{pct}%</span>
-                        <svg className={`w-4 h-4 text-muted transition-transform ${isExpanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </div>
-                    </div>
-                    {/* Progress bar */}
-                    <div className="mt-2 h-1.5 bg-surface-2 rounded-full overflow-hidden">
-                      <div className={`h-full ${cc.bar} rounded-full transition-all`} style={{ width: `${pct}%` }} />
-                    </div>
-                    {totalPages > 0 && (
-                      <p className="text-[10px] text-muted mt-1">{readPages.toLocaleString()} / {totalPages.toLocaleString()} pages</p>
-                    )}
-                  </button>
-
-                  {/* Expanded Content */}
-                  {isExpanded && (
-                    <div className="border-t border-border-custom">
-                      {/* Book list */}
-                      {gBooks.length > 0 && (
-                        <div className="divide-y divide-border-custom">
-                          {gBooks.map(gb => {
-                            const isRead = gb.book.status === "read" || (gb.book.status as string) === "completed";
-                            const isReading = gb.book.status === "reading";
-                            return (
-                              <div key={gb.id} className={`flex items-center gap-3 px-4 py-2.5 group ${isRead ? "opacity-60" : ""}`}>
-                                {gb.book.cover_url ? (
-                                  <img src={gb.book.cover_url} alt="" className="w-8 h-11 object-cover rounded flex-shrink-0" />
-                                ) : (
-                                  <div className="w-8 h-11 bg-surface-2 rounded flex-shrink-0 flex items-center justify-center">
-                                    <span className="text-[10px] text-muted">📖</span>
-                                  </div>
-                                )}
-                                <div className="flex-1 min-w-0">
-                                  <p className={`text-sm font-medium truncate ${isRead ? "line-through text-muted" : "text-foreground"}`}>{gb.book.title}</p>
-                                  <div className="flex items-center gap-2 mt-0.5">
-                                    <span className="text-xs text-muted truncate">{gb.book.author}</span>
-                                    {gb.book.pages && <span className="text-[10px] text-muted-2">{gb.book.pages}p</span>}
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-1.5 flex-shrink-0">
-                                  {isRead && (
-                                    <span className="px-1.5 py-0.5 bg-emerald-500/15 text-emerald-500 rounded text-[9px] font-medium">Read</span>
-                                  )}
-                                  {isReading && (
-                                    <span className="px-1.5 py-0.5 bg-blue-500/15 text-blue-500 rounded text-[9px] font-medium">Reading</span>
-                                  )}
-                                  {!isRead && !isReading && (
-                                    <span className="px-1.5 py-0.5 bg-surface-2 text-muted rounded text-[9px] font-medium">To Read</span>
-                                  )}
-                                  <button
-                                    onClick={() => removeBookFromGoal(gb.id, goal.id)}
-                                    className="p-1 text-muted hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
-                                  >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {/* Add book to goal */}
-                      <div className="p-3 border-t border-border-custom">
-                        {addingToGoal === goal.id ? (
-                          <div>
-                            <input
-                              type="text"
-                              placeholder="Search your library..."
-                              value={goalSearchQuery}
-                              onChange={(e) => setGoalSearchQuery(e.target.value)}
-                              className="w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted focus:outline-none focus:ring-1 focus:ring-emerald-600 mb-2"
-                              autoFocus
-                            />
-                            <div className="max-h-48 overflow-y-auto rounded-lg border border-border-custom bg-surface-2">
-                              {availableBooksForGoal(goal.id).slice(0, 30).map(book => (
-                                <button
-                                  key={book.id}
-                                  onClick={() => addBookToGoal(goal.id, book.id)}
-                                  className="w-full text-left px-3 py-2 hover:bg-border-custom border-b border-border-custom last:border-0 transition-colors"
-                                >
-                                  <p className="text-sm font-medium text-foreground truncate">{book.title}</p>
-                                  <p className="text-xs text-muted">{book.author}</p>
-                                </button>
-                              ))}
-                              {availableBooksForGoal(goal.id).length === 0 && (
-                                <p className="p-3 text-sm text-muted text-center">No matching books</p>
-                              )}
-                            </div>
-                            <button onClick={() => { setAddingToGoal(null); setGoalSearchQuery(""); }} className="mt-2 text-xs text-muted hover:text-foreground">
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => setAddingToGoal(goal.id)}
-                              className={`flex-1 text-center py-1.5 rounded-lg text-xs font-medium transition-colors ${cc.bg} ${cc.text} hover:opacity-80`}
-                            >
-                              + Add Book
-                            </button>
-
-                            {/* Edit / Delete */}
-                            {editingGoal === goal.id ? (
-                              <div className="flex-1 flex gap-1">
-                                <input
-                                  value={editName}
-                                  onChange={(e) => setEditName(e.target.value)}
-                                  className="flex-1 bg-surface-2 border border-border-custom rounded px-2 py-1 text-xs text-foreground"
-                                />
-                                <button onClick={() => updateGoal(goal.id)} className="px-2 py-1 bg-emerald-600 text-white rounded text-xs">Save</button>
-                                <button onClick={() => setEditingGoal(null)} className="px-2 py-1 bg-surface-2 text-muted rounded text-xs">X</button>
-                              </div>
-                            ) : (
-                              <>
-                                <button
-                                  onClick={() => { setEditingGoal(goal.id); setEditName(goal.name); setEditDesc(goal.description || ""); }}
-                                  className="px-2 py-1.5 bg-surface-2 hover:bg-border-custom rounded-lg text-[10px] text-muted hover:text-foreground transition-colors"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  onClick={() => { if (confirm(`Delete "${goal.name}" and all its book assignments?`)) deleteGoal(goal.id); }}
-                                  className="px-2 py-1.5 bg-surface-2 hover:bg-red-500/15 rounded-lg text-[10px] text-muted hover:text-red-400 transition-colors"
-                                >
-                                  Delete
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                <>
+                  {otGoals.length > 0 && (
+                    <>
+                      <h2 className="text-xs font-semibold text-muted uppercase tracking-wider mt-6">Old Testament</h2>
+                      {otGoals.map(goal => renderGoalCard(goal))}
+                    </>
                   )}
-                </div>
+                  {ntGoals.length > 0 && (
+                    <>
+                      <h2 className="text-xs font-semibold text-muted uppercase tracking-wider mt-6">New Testament</h2>
+                      {ntGoals.map(goal => renderGoalCard(goal))}
+                    </>
+                  )}
+                </>
               );
-            })}
+            })()}
           </div>
         ) : (
           /* ===== BY YEAR TAB ===== */

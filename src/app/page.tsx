@@ -161,10 +161,18 @@ export default function Home() {
         });
         break;
       case "pages_asc":
-        sorted.sort((a, b) => (a.pages || 9999) - (b.pages || 9999));
+        sorted.sort((a, b) => {
+          const ap = a.pages ?? Infinity;
+          const bp = b.pages ?? Infinity;
+          return ap - bp;
+        });
         break;
       case "pages_desc":
-        sorted.sort((a, b) => (b.pages || 0) - (a.pages || 0));
+        sorted.sort((a, b) => {
+          const ap = a.pages ?? -1;
+          const bp = b.pages ?? -1;
+          return bp - ap;
+        });
         break;
       case "recent":
       default:

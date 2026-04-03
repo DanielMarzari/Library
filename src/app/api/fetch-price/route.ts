@@ -12,17 +12,40 @@ function getSupabase() {
 
 export async function POST(request: Request) {
   try {
-    const { title, author, recId } = await request.json();
+    const { title, author, isbn, recId } = await request.json();
 
-    if (!title) {
-      return NextResponse.json({ error: "Title required" }, { status: 400 });
+    if (!title && !isbn) {
+      return NextResponse.json(
+        { error: "Title or ISBN required" },
+        { status: 400 }
+      );
     }
 
-    // Search AbeBooks for the lowest price
-    const query = encodeURIComponent(
-      title + (author ? " " + author : "")
-    );
-    const url = `https://www.abebooks.com/servlet/SearchResults?kn=${query}&sortby=17`;
+    // Prefer ISBN search (much more precise), fall back to title+author
+    let url: string;
+    if (isbn) {
+      const cleanIsbn = isbn.replace(/[-\s]/g, "");
+      url = `https://www.abebooks.com/servlet/SearchResults?isbn=${encodeURIComponent(cleanIsbn)}&sortby=17`;
+    } else {
+      // Strip subtitles (after colon) and parenthetical series info for cleaner search
+      let shortTitle = title
+        .replace(/\s*[:]\s*.*/g, "")       // remove everything after first colon
+        .replace(/\s*\(.*?\)\s*/g, "")     // remove parenthetical text
+        .trim();
+      // If that left us with nothing, use first 5 words of original
+      if (!shortTitle || shortTitle.length < 3) {
+        shortTitle = title.split(/\s+/).slice(0, 5).join(" ");
+      }
+      // Also limit to first 6 words max
+      shortTitle = shortTitle.split(/\s+/).slice(0, 6).join(" ");
+      const query = encodeURIComponent(
+        shortTitle + (author ? " " + author : "")
+      );
+      url = `https://www.abebooks.com/servlet/SearchResults?kn=${query}&sortby=17`;
+    }
+
+    // If we got results with an ISBN, try to save it back to the recommendation
+    let foundIsbn: string | null = null;
 
     const resp = await fetch(url, {
       headers: {
@@ -38,40 +61,76 @@ export async function POST(request: Request) {
       );
     }
 
-    const html = await resp.text();
+    const rawHtml = await resp.text();
+    // Collapse whitespace so multi-line attributes match in one regex
+    const html = rawHtml.replace(/\s+/g, " ");
 
-    // Extract prices from AbeBooks HTML
-    // Prices appear as "US$ XX.XX" or "US$ XX"
-    const priceMatches = html.match(/US\$\s*([0-9]+\.?[0-9]*)/g);
+    // Strategy 1: Use data attributes from add-to-basket links (most reliable)
+    // These have data-csa-c-cost="18.88" and data-csa-c-shipping-cost="6.88"
+    const basketLinkPattern =
+      /data-csa-c-cost="([0-9]+\.?[0-9]*)"[^>]*?data-csa-c-shipping-cost="([0-9]+\.?[0-9]*)"/g;
+    const totalPrices: number[] = [];
+    let match;
 
-    if (!priceMatches || priceMatches.length === 0) {
+    while ((match = basketLinkPattern.exec(html)) !== null) {
+      const bookPrice = parseFloat(match[1]);
+      const shippingPrice = parseFloat(match[2]);
+      if (!isNaN(bookPrice) && !isNaN(shippingPrice)) {
+        totalPrices.push(bookPrice + shippingPrice);
+      }
+    }
+
+    // Strategy 3: Last resort - parse item-price elements and shipping text
+    if (totalPrices.length === 0) {
+      const itemPriceMatches = html.match(
+        /class="item-price"[^>]*>(?:US\$|£|€|C\$|A\$)?\s*([0-9]+[,.]?[0-9]*)/g
+      );
+      if (itemPriceMatches && itemPriceMatches.length > 0) {
+        for (const pm of itemPriceMatches) {
+          const numMatch = pm.match(/([0-9]+[,.]?[0-9]*)\s*$/);
+          if (numMatch) {
+            const price = parseFloat(numMatch[1].replace(",", ""));
+            if (!isNaN(price) && price > 0) {
+              totalPrices.push(price);
+            }
+          }
+        }
+      }
+    }
+
+    if (totalPrices.length === 0) {
       return NextResponse.json({ price: null, source: "abebooks" });
     }
 
-    // Parse all prices and find the lowest
-    const prices = priceMatches
-      .map((p: string) => parseFloat(p.replace("US$ ", "").replace("US$", "")))
-      .filter((p: number) => !isNaN(p) && p > 0);
+    // Get the lowest total price (book + shipping)
+    const lowestPrice = Math.min(...totalPrices);
+    // Round to 2 decimal places to avoid floating point artifacts
+    const roundedPrice = Math.round(lowestPrice * 100) / 100;
 
-    if (prices.length === 0) {
-      return NextResponse.json({ price: null, source: "abebooks" });
+    // Try to extract ISBN from search results for backfill
+    const isbnMatch = html.match(/itemprop="isbn"\s*content="(\d{10,13})"/);
+    if (isbnMatch) {
+      foundIsbn = isbnMatch[1];
     }
 
-    const lowestPrice = Math.min(...prices);
-
-    // Save price to DB if recId provided
+    // Save price (and ISBN if found) to DB if recId provided
     if (recId) {
       const supabase = getSupabase();
+      const updateData: Record<string, unknown> = { lowest_price: roundedPrice };
+      // Backfill ISBN if we found one and the rec doesn't have one
+      if (foundIsbn && !isbn) {
+        updateData.isbn = foundIsbn;
+      }
       await supabase
         .from("recommendations")
-        .update({ lowest_price: lowestPrice })
+        .update(updateData)
         .eq("id", recId);
     }
 
     return NextResponse.json({
-      price: lowestPrice,
+      price: roundedPrice,
       source: "abebooks",
-      totalResults: prices.length,
+      totalResults: totalPrices.length,
     });
   } catch (error) {
     console.error("Price fetch error:", error);
