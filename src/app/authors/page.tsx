@@ -321,73 +321,6 @@ function DropdownSelector({
   );
 }
 
-// Profile URL Input Component
-function ProfileUrlInput({
-  value,
-  onSave,
-}: {
-  value: string | null;
-  onSave: (url: string | null) => void;
-}) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [inputValue, setInputValue] = useState(value || "");
-
-  const handleSave = () => {
-    const trimmed = inputValue.trim();
-    onSave(trimmed || null);
-    setIsEditing(false);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") handleSave();
-    if (e.key === "Escape") {
-      setInputValue(value || "");
-      setIsEditing(false);
-    }
-  };
-
-  if (isEditing) {
-    return (
-      <div className="flex gap-1">
-        <input
-          type="url"
-          placeholder="Profile URL..."
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={handleSave}
-          className="flex-1 min-w-0 px-2 py-1 bg-surface-2 border border-border-custom rounded text-xs text-foreground placeholder-muted focus:outline-none focus:border-emerald-500"
-          autoFocus
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div
-      onClick={() => {
-        setInputValue(value || "");
-        setIsEditing(true);
-      }}
-      className="px-2 py-1 bg-surface-2 rounded text-xs cursor-pointer hover:bg-border-custom transition-colors truncate"
-    >
-      {value ? (
-        <a
-          href={value}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          className="text-blue-400 hover:text-blue-300 underline"
-        >
-          Profile ↗
-        </a>
-      ) : (
-        <span className="text-muted italic">+ Add profile URL</span>
-      )}
-    </div>
-  );
-}
-
 // Image Search Modal Component
 function ImageSearchModal({
   authorName,
@@ -512,9 +445,18 @@ function ImageSearchModal({
     fetchImages();
   }, [authorName]);
 
+  const [customUrl, setCustomUrl] = useState("");
+
+  const handleCustomUrl = () => {
+    const trimmed = customUrl.trim();
+    if (trimmed && (trimmed.startsWith("http://") || trimmed.startsWith("https://"))) {
+      onSelectImage(trimmed);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-surface border border-border-custom rounded-lg p-6 w-full w-full mx-4">
+      <div className="bg-surface border border-border-custom rounded-lg p-6 w-full max-w-lg mx-4">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-bold text-foreground">
             Find photo for {authorName}
@@ -527,12 +469,32 @@ function ImageSearchModal({
           </button>
         </div>
 
+        {/* Custom URL Input */}
+        <div className="flex gap-2 mb-4">
+          <input
+            type="url"
+            placeholder="Paste image URL..."
+            value={customUrl}
+            onChange={(e) => setCustomUrl(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleCustomUrl()}
+            className="flex-1 min-w-0 px-3 py-2 bg-surface-2 border border-border-custom rounded-lg text-sm text-foreground placeholder-muted focus:outline-none focus:border-emerald-500"
+          />
+          <button
+            onClick={handleCustomUrl}
+            disabled={!customUrl.trim()}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-surface-2 disabled:text-muted text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            Use
+          </button>
+        </div>
+
+        {/* Search Results */}
         {loading ? (
           <div className="text-center py-8 text-muted">
             Loading images...
           </div>
         ) : error ? (
-          <div className="text-center py-8 text-red-400">{error}</div>
+          <div className="text-center py-8 text-muted">{error}</div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {images.map((img, index) => (
@@ -762,37 +724,6 @@ export default function AuthorsPage() {
         setImageSearchAuthor(null);
       } catch (error) {
         console.error("Error saving author image:", error);
-      }
-    },
-    [authors]
-  );
-
-  const handleSaveProfileUrl = useCallback(
-    async (authorName: string, url: string | null) => {
-      try {
-        const currentAuthor = authors.find((a) => a.name === authorName);
-        const upsertData: Record<string, unknown> = {
-          name: authorName,
-          ethnicity: currentAuthor?.ethnicity ?? null,
-          nationality: currentAuthor?.nationality ?? null,
-          religious_tradition: currentAuthor?.religious_tradition ?? null,
-          image_url: currentAuthor?.image_url ?? null,
-          profile_url: url,
-        };
-
-        const { error } = await supabase.from("authors").upsert([upsertData], { onConflict: "name" });
-
-        if (error) throw error;
-
-        setAuthors((prev) =>
-          prev.map((author) =>
-            author.name === authorName
-              ? { ...author, profile_url: url }
-              : author
-          )
-        );
-      } catch (error) {
-        console.error("Error saving profile URL:", error);
       }
     },
     [authors]
@@ -1081,12 +1012,6 @@ export default function AuthorsPage() {
                     onSelect={(value) => handleSaveMetadata(author.name, "religious_tradition", value)}
                     onClear={() => handleSaveMetadata(author.name, "religious_tradition", null)}
                     label="Tradition"
-                  />
-
-                  {/* Profile URL */}
-                  <ProfileUrlInput
-                    value={author.profile_url}
-                    onSave={(url) => handleSaveProfileUrl(author.name, url)}
                   />
 
                   {/* Fetch from Wikipedia */}
