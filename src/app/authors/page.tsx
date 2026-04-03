@@ -805,10 +805,11 @@ export default function AuthorsPage() {
   );
 
   const isAuthorComplete = useCallback((author: AuthorData) => {
-    return !!(author.gender && author.ethnicity && author.nationality && author.religious_tradition && author.image_url);
+    return !!author.image_url;
   }, []);
 
-  const incompleteAuthors = useMemo(() => authors.filter(a => !isAuthorComplete(a)), [authors, isAuthorComplete]);
+  const incompleteAuthors = useMemo(() => filteredAndSortedAuthors.filter(a => !isAuthorComplete(a)), [filteredAndSortedAuthors, isAuthorComplete]);
+  const completeAuthors = useMemo(() => filteredAndSortedAuthors.filter(a => isAuthorComplete(a)), [filteredAndSortedAuthors, isAuthorComplete]);
 
   const handleBatchFetchAll = useCallback(async () => {
     const toFetch = incompleteAuthors.filter(a => !a.gender || !a.nationality || !a.religious_tradition || !a.image_url);
@@ -825,12 +826,6 @@ export default function AuthorsPage() {
     setBatchFetching(false);
   }, [incompleteAuthors, handleFetchAuthorInfo]);
 
-  // Apply incomplete filter to the already filtered/sorted list
-  const displayedAuthors = useMemo(() => {
-    if (!showIncompleteOnly) return filteredAndSortedAuthors;
-    return filteredAndSortedAuthors.filter(a => !isAuthorComplete(a));
-  }, [filteredAndSortedAuthors, showIncompleteOnly, isAuthorComplete]);
-
   if (loading) {
     return (
       <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
@@ -845,7 +840,7 @@ export default function AuthorsPage() {
       <div className="mb-8">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-4xl font-bold text-emerald-500">
-            Authors <span className="text-muted text-lg">({displayedAuthors.length})</span>
+            Authors <span className="text-muted text-lg">({filteredAndSortedAuthors.length})</span>
           </h1>
           <div className="flex items-center gap-2">
             <button
@@ -910,123 +905,85 @@ export default function AuthorsPage() {
             Rating {sortConfig.key === "averageRating" && (sortConfig.direction === "desc" ? "↓" : "↑")}
           </button>
 
-          <div className="ml-auto">
-            <button
-              onClick={() => setShowIncompleteOnly(!showIncompleteOnly)}
-              className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                showIncompleteOnly
-                  ? "bg-amber-500 text-background"
-                  : "bg-surface text-foreground hover:bg-surface-2"
-              }`}
-            >
-              {showIncompleteOnly ? `Incomplete (${incompleteAuthors.length})` : "Show Incomplete"}
-            </button>
-          </div>
         </div>
       </div>
 
-      {/* Cards Grid */}
-      {displayedAuthors.length === 0 ? (
+      {filteredAndSortedAuthors.length === 0 ? (
         <div className="p-8 text-center text-muted">
-          {showIncompleteOnly ? "All authors have complete info!" : searchTerm ? "No authors match your search." : "No authors found."}
+          {searchTerm ? "No authors match your search." : "No authors found."}
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
-          {displayedAuthors.map((author) => {
-            const avatarColor = getAvatarColor(author.name);
-            const colorClasses = getColorClasses(avatarColor);
-            const initials = getInitials(author.name);
-
-            return (
-              <div
-                key={author.name}
-                className="bg-surface rounded-xl border border-border-custom p-4 hover:border-border-custom transition-colors relative focus-within:z-50"
-              >
-                {/* Avatar */}
-                <div className="flex justify-center mb-4">
-                  <button
-                    onClick={() => setImageSearchAuthor(author.name)}
-                    className="relative group"
-                  >
-                    {author.image_url ? (
-                      <img
-                        src={author.image_url}
-                        alt={author.name}
-                        className="w-16 h-16 rounded-full object-cover border border-border-custom group-hover:border-emerald-500 transition-colors"
-                      />
-                    ) : (
-                      <div
-                        className={`w-16 h-16 rounded-full ${colorClasses.bg} ${colorClasses.text} flex items-center justify-center font-bold text-xl group-hover:ring-2 group-hover:ring-emerald-500 transition-all`}
-                      >
-                        {initials}
+        <>
+          {/* Incomplete Section */}
+          {incompleteAuthors.length > 0 && (
+            <section className="mb-10">
+              <h2 className="text-lg font-semibold text-amber-500 mb-4">
+                Needs Photo <span className="text-muted text-sm font-normal">({incompleteAuthors.length})</span>
+              </h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
+                {incompleteAuthors.map((author) => {
+                  const avatarColor = getAvatarColor(author.name);
+                  const colorClasses = getColorClasses(avatarColor);
+                  const initials = getInitials(author.name);
+                  return (
+                    <div key={author.name} className="bg-surface rounded-xl border border-amber-500/30 p-4 hover:border-amber-500/60 transition-colors relative focus-within:z-50">
+                      <div className="flex justify-center mb-4">
+                        <button onClick={() => setImageSearchAuthor(author.name)} className="relative group">
+                          <div className={`w-16 h-16 rounded-full ${colorClasses.bg} ${colorClasses.text} flex items-center justify-center font-bold text-xl group-hover:ring-2 group-hover:ring-emerald-500 transition-all`}>
+                            {initials}
+                          </div>
+                        </button>
                       </div>
-                    )}
-                  </button>
-                </div>
-
-                {/* Author Name */}
-                <h3 className="text-center font-bold text-foreground mb-3 text-sm break-words">
-                  {author.name}
-                </h3>
-
-                {/* Stats */}
-                <div className="text-center text-xs text-muted mb-4">
-                  <div className="font-semibold text-foreground">
-                    {author.bookCount} books · {author.readCount} read · {author.averageRating !== null ? author.averageRating.toFixed(1) : "—"}★ avg
-                  </div>
-                </div>
-
-                {/* Badges */}
-                <div className="space-y-2 mb-4">
-                  {/* Gender Dropdown */}
-                  <DropdownSelector
-                    value={author.gender}
-                    options={GENDER_OPTIONS}
-                    onSelect={(value) => handleSaveMetadata(author.name, "gender", value)}
-                    onClear={() => handleSaveMetadata(author.name, "gender", null)}
-                    label="Gender"
-                  />
-
-                  {/* Ethnicity Dropdown */}
-                  <DropdownSelector
-                    value={author.ethnicity}
-                    options={ETHNICITY_OPTIONS}
-                    onSelect={(value) => handleSaveMetadata(author.name, "ethnicity", value)}
-                    onClear={() => handleSaveMetadata(author.name, "ethnicity", null)}
-                    label="Ethnicity"
-                  />
-
-                  {/* Nationality Dropdown */}
-                  <DropdownSelector
-                    value={author.nationality}
-                    options={NATIONALITY_OPTIONS}
-                    onSelect={(value) => handleSaveMetadata(author.name, "nationality", value)}
-                    onClear={() => handleSaveMetadata(author.name, "nationality", null)}
-                    label="Nationality"
-                  />
-
-                  {/* Religious Tradition Dropdown */}
-                  <DropdownSelector
-                    value={author.religious_tradition}
-                    options={RELIGIOUS_TRADITION_OPTIONS}
-                    onSelect={(value) => handleSaveMetadata(author.name, "religious_tradition", value)}
-                    onClear={() => handleSaveMetadata(author.name, "religious_tradition", null)}
-                    label="Tradition"
-                  />
-
-                  {/* Fetch from Wikipedia */}
-                  <button
-                    onClick={() => handleFetchAuthorInfo(author.name)}
-                    disabled={fetchingInfo.has(author.name)}
-                    className="w-full px-2 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 rounded text-xs font-medium transition-colors disabled:opacity-50"
-                  >
-                    {fetchingInfo.has(author.name) ? "Fetching..." : "Fetch from Wikipedia"}
-                  </button>
-                </div>
+                      <h3 className="text-center font-bold text-foreground mb-3 text-sm break-words">{author.name}</h3>
+                      <div className="text-center text-xs text-muted mb-4">
+                        <div className="font-semibold text-foreground">{author.bookCount} books · {author.readCount} read · {author.averageRating !== null ? author.averageRating.toFixed(1) : "—"}★ avg</div>
+                      </div>
+                      <div className="space-y-2 mb-4">
+                        <DropdownSelector value={author.gender} options={GENDER_OPTIONS} onSelect={(v) => handleSaveMetadata(author.name, "gender", v)} onClear={() => handleSaveMetadata(author.name, "gender", null)} label="Gender" />
+                        <DropdownSelector value={author.ethnicity} options={ETHNICITY_OPTIONS} onSelect={(v) => handleSaveMetadata(author.name, "ethnicity", v)} onClear={() => handleSaveMetadata(author.name, "ethnicity", null)} label="Ethnicity" />
+                        <DropdownSelector value={author.nationality} options={NATIONALITY_OPTIONS} onSelect={(v) => handleSaveMetadata(author.name, "nationality", v)} onClear={() => handleSaveMetadata(author.name, "nationality", null)} label="Nationality" />
+                        <DropdownSelector value={author.religious_tradition} options={RELIGIOUS_TRADITION_OPTIONS} onSelect={(v) => handleSaveMetadata(author.name, "religious_tradition", v)} onClear={() => handleSaveMetadata(author.name, "religious_tradition", null)} label="Tradition" />
+                        <button onClick={() => handleFetchAuthorInfo(author.name)} disabled={fetchingInfo.has(author.name)} className="w-full px-2 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 rounded text-xs font-medium transition-colors disabled:opacity-50">
+                          {fetchingInfo.has(author.name) ? "Fetching..." : "Fetch from Wikipedia"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
-        </div>
+            </section>
+          )}
+
+          {/* Complete Section */}
+          {completeAuthors.length > 0 && (
+            <section>
+              <h2 className="text-lg font-semibold text-emerald-500 mb-4">
+                Complete <span className="text-muted text-sm font-normal">({completeAuthors.length})</span>
+              </h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
+                {completeAuthors.map((author) => (
+                  <div key={author.name} className="bg-surface rounded-xl border border-border-custom p-4 hover:border-border-custom transition-colors relative focus-within:z-50">
+                    <div className="flex justify-center mb-4">
+                      <button onClick={() => setImageSearchAuthor(author.name)} className="relative group">
+                        <img src={author.image_url!} alt={author.name} className="w-16 h-16 rounded-full object-cover border border-border-custom group-hover:border-emerald-500 transition-colors" />
+                      </button>
+                    </div>
+                    <h3 className="text-center font-bold text-foreground mb-3 text-sm break-words">{author.name}</h3>
+                    <div className="text-center text-xs text-muted mb-4">
+                      <div className="font-semibold text-foreground">{author.bookCount} books · {author.readCount} read · {author.averageRating !== null ? author.averageRating.toFixed(1) : "—"}★ avg</div>
+                    </div>
+                    <div className="space-y-2 mb-4">
+                      <DropdownSelector value={author.gender} options={GENDER_OPTIONS} onSelect={(v) => handleSaveMetadata(author.name, "gender", v)} onClear={() => handleSaveMetadata(author.name, "gender", null)} label="Gender" />
+                      <DropdownSelector value={author.ethnicity} options={ETHNICITY_OPTIONS} onSelect={(v) => handleSaveMetadata(author.name, "ethnicity", v)} onClear={() => handleSaveMetadata(author.name, "ethnicity", null)} label="Ethnicity" />
+                      <DropdownSelector value={author.nationality} options={NATIONALITY_OPTIONS} onSelect={(v) => handleSaveMetadata(author.name, "nationality", v)} onClear={() => handleSaveMetadata(author.name, "nationality", null)} label="Nationality" />
+                      <DropdownSelector value={author.religious_tradition} options={RELIGIOUS_TRADITION_OPTIONS} onSelect={(v) => handleSaveMetadata(author.name, "religious_tradition", v)} onClear={() => handleSaveMetadata(author.name, "religious_tradition", null)} label="Tradition" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </>
       )}
 
       {/* Image Search Modal */}
