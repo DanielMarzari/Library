@@ -50,14 +50,15 @@ export default function RecommendationsPage() {
   const [excludeSource, setExcludeSource] = useState<string | null>(null);
   const [searchFilter, setSearchFilter] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
-  const [showOwned, setShowOwned] = useState(false);
   const [page, setPage] = useState(1);
   const [sortMode, setSortMode] = useState<SortMode>("recent");
   const [fetchingPrices, setFetchingPrices] = useState(false);
   const [priceProgress, setPriceProgress] = useState({ done: 0, total: 0 });
   const PAGE_SIZE = 60;
 
-  // Load recommendations and library titles
+  const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "").substring(0, 40);
+
+  // Load recommendations and library titles, auto-removing owned books
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
@@ -84,61 +85,53 @@ export default function RecommendationsPage() {
         .from("books")
         .select("title,status");
 
+      const normalizedBookTitles = new Set(
+        (books || []).map((b) => normalize(b.title))
+      );
       const existingTitles = new Set(
         (books || []).map((b) => b.title.toLowerCase())
       );
       setLibraryTitles(existingTitles);
       setLibraryBooks(books || []);
-      setAllRecs(allRecsData);
 
-      const visibleRecs = allRecsData.filter(
-        (rec) => !existingTitles.has(rec.title.toLowerCase())
+      // Auto-delete recommendations for books already in library
+      const ownedRecs = allRecsData.filter((r) =>
+        normalizedBookTitles.has(normalize(r.title))
       );
-      setRecommendations(visibleRecs);
+      if (ownedRecs.length > 0) {
+        const idsToDelete = ownedRecs.map((r) => r.id);
+        // Delete in batches of 50
+        for (let i = 0; i < idsToDelete.length; i += 50) {
+          const batch = idsToDelete.slice(i, i + 50);
+          await supabase
+            .from("recommendations")
+            .delete()
+            .in("id", batch);
+        }
+        // Remove from local data
+        const deletedIds = new Set(idsToDelete);
+        allRecsData = allRecsData.filter((r) => !deletedIds.has(r.id));
+      }
+
+      setAllRecs(allRecsData);
+      setRecommendations(allRecsData);
       setLoading(false);
     };
 
     loadData();
   }, []);
 
-  // Stats calculations
+  // Stats calculations (owned books are already removed from allRecs)
   const stats = useMemo(() => {
     const timRecs = allRecs.filter(r => r.recommended_by === "Tim Mackie (BibleProject)" || r.recommended_by === "Tim Mackie");
-    const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "").substring(0, 40);
-    const bookMap = new Map<string, LibraryBook>();
-    libraryBooks.forEach(b => bookMap.set(normalize(b.title), b));
-
-    let timOwned = 0, timRead = 0;
-    timRecs.forEach(r => {
-      const match = bookMap.get(normalize(r.title));
-      if (match) {
-        timOwned++;
-        if (match.status === "read" || match.status === "completed") timRead++;
-      }
-    });
-
     const otherRecs = allRecs.filter(r => r.recommended_by !== "Tim Mackie (BibleProject)" && r.recommended_by !== "Tim Mackie");
-    let otherOwned = 0, otherRead = 0;
-    otherRecs.forEach(r => {
-      const match = bookMap.get(normalize(r.title));
-      if (match) {
-        otherOwned++;
-        if (match.status === "read" || match.status === "completed") otherRead++;
-      }
-    });
 
     return {
       total: allRecs.length,
       timTotal: timRecs.length,
-      timOwned,
-      timRead,
-      timOwnPct: timRecs.length > 0 ? ((timOwned / timRecs.length) * 100).toFixed(1) : "0",
-      timReadPct: timRecs.length > 0 ? ((timRead / timRecs.length) * 100).toFixed(1) : "0",
       otherTotal: otherRecs.length,
-      otherOwned,
-      otherRead,
     };
-  }, [allRecs, libraryBooks]);
+  }, [allRecs]);
 
   // Search for books
   const handleSearch = useCallback(async (query: string) => {
@@ -389,38 +382,21 @@ export default function RecommendationsPage() {
       <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-4">
         {/* Stats Cards */}
         {!loading && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+          <div className="grid grid-cols-3 gap-3 mb-5">
+            <div className="bg-surface border border-border-custom rounded-xl p-3">
+              <p className="text-[10px] uppercase tracking-wider text-muted font-medium">Total Recs</p>
+              <p className="text-2xl font-bold text-foreground mt-1">{stats.total.toLocaleString()}</p>
+              <p className="text-[10px] text-muted mt-0.5">books to explore</p>
+            </div>
             <div className="bg-surface border border-border-custom rounded-xl p-3">
               <p className="text-[10px] uppercase tracking-wider text-muted font-medium">Tim&apos;s Library</p>
               <p className="text-2xl font-bold text-foreground mt-1">{stats.timTotal.toLocaleString()}</p>
-              <p className="text-[10px] text-muted mt-0.5">books in collection</p>
-            </div>
-            <div className="bg-surface border border-border-custom rounded-xl p-3">
-              <p className="text-[10px] uppercase tracking-wider text-muted font-medium">You Own</p>
-              <div className="flex items-baseline gap-1.5 mt-1">
-                <p className="text-2xl font-bold text-emerald-500">{stats.timOwnPct}%</p>
-                <p className="text-xs text-muted">({stats.timOwned})</p>
-              </div>
-              <div className="mt-1.5 h-1.5 bg-surface-2 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${stats.timOwnPct}%` }} />
-              </div>
-            </div>
-            <div className="bg-surface border border-border-custom rounded-xl p-3">
-              <p className="text-[10px] uppercase tracking-wider text-muted font-medium">You&apos;ve Read</p>
-              <div className="flex items-baseline gap-1.5 mt-1">
-                <p className="text-2xl font-bold text-blue-500">{stats.timReadPct}%</p>
-                <p className="text-xs text-muted">({stats.timRead})</p>
-              </div>
-              <div className="mt-1.5 h-1.5 bg-surface-2 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${stats.timReadPct}%` }} />
-              </div>
+              <p className="text-[10px] text-muted mt-0.5">from BibleProject</p>
             </div>
             <div className="bg-surface border border-border-custom rounded-xl p-3">
               <p className="text-[10px] uppercase tracking-wider text-muted font-medium">Other Recs</p>
               <p className="text-2xl font-bold text-foreground mt-1">{stats.otherTotal}</p>
-              <p className="text-[10px] text-muted mt-0.5">
-                {stats.otherOwned} owned · {stats.otherRead} read
-              </p>
+              <p className="text-[10px] text-muted mt-0.5">other sources</p>
             </div>
           </div>
         )}
