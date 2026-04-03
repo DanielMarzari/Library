@@ -317,9 +317,9 @@ export default function RecommendationsPage() {
     return filteredRecs.slice(0, page * PAGE_SIZE);
   }, [filteredRecs, page]);
 
-  // Fetch prices for filtered recommendations that don't have one yet
-  const handleFetchPrices = async () => {
-    const noPriceRecs = filteredRecs.filter(r => r.lowest_price == null).slice(0, 50);
+  // Refresh prices for visible recs that are missing them
+  const handleRefreshPrices = async () => {
+    const noPriceRecs = paginatedRecs.filter(r => r.lowest_price == null).slice(0, 20);
     if (noPriceRecs.length === 0) return;
     setFetchingPrices(true);
     setPriceProgress({ done: 0, total: noPriceRecs.length });
@@ -335,13 +335,13 @@ export default function RecommendationsPage() {
         const data = await resp.json();
         if (data.price != null) {
           setRecommendations(prev => prev.map(r => r.id === rec.id ? { ...r, lowest_price: data.price } : r));
+          setAllRecs(prev => prev.map(r => r.id === rec.id ? { ...r, lowest_price: data.price } : r));
         }
       } catch (e) {
         // skip failures
       }
       setPriceProgress({ done: i + 1, total: noPriceRecs.length });
-      // Small delay to avoid hammering AbeBooks
-      await new Promise(r => setTimeout(r, 800));
+      await new Promise(r => setTimeout(r, 1000));
     }
     setFetchingPrices(false);
   };
@@ -505,15 +505,16 @@ export default function RecommendationsPage() {
             ))}
             <div className="ml-auto flex items-center gap-2">
               {fetchingPrices ? (
-                <span className="text-[10px] text-muted">
-                  Fetching prices... {priceProgress.done}/{priceProgress.total}
+                <span className="text-[10px] text-muted animate-pulse">
+                  Refreshing... {priceProgress.done}/{priceProgress.total}
                 </span>
               ) : (
                 <button
-                  onClick={handleFetchPrices}
+                  onClick={handleRefreshPrices}
                   className="px-2.5 py-1 bg-amber-500/10 text-amber-500 rounded text-[10px] font-medium hover:bg-amber-500/20 transition-colors"
+                  title="Refresh missing prices for visible books"
                 >
-                  Fetch Prices (AbeBooks)
+                  ↻ Refresh Prices
                 </button>
               )}
             </div>
