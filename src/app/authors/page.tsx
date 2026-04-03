@@ -799,6 +799,9 @@ export default function AuthorsPage() {
   );
 
   const [fetchingInfo, setFetchingInfo] = useState<Set<string>>(new Set());
+  const [showIncompleteOnly, setShowIncompleteOnly] = useState(false);
+  const [batchFetching, setBatchFetching] = useState(false);
+  const [batchProgress, setBatchProgress] = useState({ done: 0, total: 0 });
 
   const handleFetchAuthorInfo = useCallback(
     async (authorName: string) => {
@@ -870,6 +873,33 @@ export default function AuthorsPage() {
     [authors]
   );
 
+  const isAuthorComplete = useCallback((author: AuthorData) => {
+    return !!(author.gender && author.ethnicity && author.nationality && author.religious_tradition && author.image_url);
+  }, []);
+
+  const incompleteAuthors = useMemo(() => authors.filter(a => !isAuthorComplete(a)), [authors, isAuthorComplete]);
+
+  const handleBatchFetchAll = useCallback(async () => {
+    const toFetch = incompleteAuthors.filter(a => !a.gender || !a.nationality || !a.religious_tradition || !a.image_url);
+    if (toFetch.length === 0) return;
+
+    setBatchFetching(true);
+    setBatchProgress({ done: 0, total: toFetch.length });
+
+    for (let i = 0; i < toFetch.length; i++) {
+      await handleFetchAuthorInfo(toFetch[i].name);
+      setBatchProgress({ done: i + 1, total: toFetch.length });
+    }
+
+    setBatchFetching(false);
+  }, [incompleteAuthors, handleFetchAuthorInfo]);
+
+  // Apply incomplete filter to the already filtered/sorted list
+  const displayedAuthors = useMemo(() => {
+    if (!showIncompleteOnly) return filteredAndSortedAuthors;
+    return filteredAndSortedAuthors.filter(a => !isAuthorComplete(a));
+  }, [filteredAndSortedAuthors, showIncompleteOnly, isAuthorComplete]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
@@ -884,14 +914,25 @@ export default function AuthorsPage() {
       <div className="mb-8">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-4xl font-bold text-emerald-500">
-            Authors <span className="text-muted text-lg">({filteredAndSortedAuthors.length})</span>
+            Authors <span className="text-muted text-lg">({displayedAuthors.length})</span>
           </h1>
-          <Link
-            href="/"
-            className="px-4 py-2 bg-surface hover:bg-surface-2 rounded-lg text-foreground transition-colors"
-          >
-            Back to Library
-          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleBatchFetchAll}
+              disabled={batchFetching || incompleteAuthors.length === 0}
+              className="px-3 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+            >
+              {batchFetching
+                ? `Fetching ${batchProgress.done}/${batchProgress.total}...`
+                : `Fetch All (${incompleteAuthors.length})`}
+            </button>
+            <Link
+              href="/"
+              className="px-4 py-2 bg-surface hover:bg-surface-2 rounded-lg text-foreground transition-colors"
+            >
+              Back to Library
+            </Link>
+          </div>
         </div>
 
         {/* Search */}
@@ -937,17 +978,30 @@ export default function AuthorsPage() {
           >
             Rating {sortConfig.key === "averageRating" && (sortConfig.direction === "desc" ? "↓" : "↑")}
           </button>
+
+          <div className="ml-auto">
+            <button
+              onClick={() => setShowIncompleteOnly(!showIncompleteOnly)}
+              className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                showIncompleteOnly
+                  ? "bg-amber-500 text-background"
+                  : "bg-surface text-foreground hover:bg-surface-2"
+              }`}
+            >
+              {showIncompleteOnly ? `Incomplete (${incompleteAuthors.length})` : "Show Incomplete"}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Cards Grid */}
-      {filteredAndSortedAuthors.length === 0 ? (
+      {displayedAuthors.length === 0 ? (
         <div className="p-8 text-center text-muted">
-          {searchTerm ? "No authors match your search." : "No authors found."}
+          {showIncompleteOnly ? "All authors have complete info!" : searchTerm ? "No authors match your search." : "No authors found."}
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
-          {filteredAndSortedAuthors.map((author) => {
+          {displayedAuthors.map((author) => {
             const avatarColor = getAvatarColor(author.name);
             const colorClasses = getColorClasses(avatarColor);
             const initials = getInitials(author.name);

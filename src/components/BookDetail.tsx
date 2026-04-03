@@ -101,21 +101,35 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
   // Duplicate this book
   const handleDuplicate = async () => {
     try {
-      const { id, created_at, ...rest } = book as any;
-      const duplicate = {
-        ...rest,
+      const duplicate: Record<string, unknown> = {
         title: `${book.title} (copy)`,
-        status: "not_read" as const,
+        author: book.author,
+        isbn: book.isbn || null,
+        cover_url: book.cover_url || null,
+        description: book.description || null,
+        status: "not_read",
         rating: null,
+        volume: book.volume || null,
+        pages: book.pages || null,
+        intro_pages: book.intro_pages || null,
+        start_page: book.start_page || null,
+        end_page: book.end_page || null,
         start_date: null,
         complete_date: null,
+        source: book.source || null,
+        lcc: book.lcc || null,
+        ddc: book.ddc || null,
+        topics: book.topics || null,
+        auto_topics: book.auto_topics || null,
         favorite: false,
       };
       const { error } = await supabase.from("books").insert(duplicate);
-      if (!error) {
-        onUpdated();
-        onClose();
+      if (error) {
+        console.error("Duplicate error:", error);
+        return;
       }
+      onUpdated();
+      onClose();
     } catch (err) {
       console.error("Duplicate error:", err);
     }
