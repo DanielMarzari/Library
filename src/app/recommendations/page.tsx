@@ -42,7 +42,9 @@ export default function RecommendationsPage() {
   const [addingLoading, setAddingLoading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [filterTopic, setFilterTopic] = useState<string | null>(null);
+  const [excludeTopic, setExcludeTopic] = useState<string | null>(null);
   const [filterSource, setFilterSource] = useState<string | null>(null);
+  const [excludeSource, setExcludeSource] = useState<string | null>(null);
   const [searchFilter, setSearchFilter] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
   const [showOwned, setShowOwned] = useState(false);
@@ -208,10 +210,41 @@ export default function RecommendationsPage() {
     }
   };
 
-  // Derived filter data
+  // Helper: get all tags for a recommendation (from topic + notes)
+  const getRecTags = useCallback((rec: Recommendation): string[] => {
+    const tags: string[] = [];
+    if (rec.topic) tags.push(rec.topic);
+    // notes sometimes has additional tags (not duplicates of topic)
+    if (rec.notes && rec.notes !== rec.topic && rec.notes !== rec.interest) {
+      // Split comma-separated notes into individual tags
+      rec.notes.split(",").forEach(n => {
+        const t = n.trim();
+        if (t && t !== rec.topic && !t.startsWith("Mentioned")) tags.push(t);
+      });
+    }
+    return tags;
+  }, []);
+
+  // Derived filter data — count tags across topic + notes
   const allTopics = useMemo(() => {
     const counts: Record<string, number> = {};
-    recommendations.forEach(r => { if (r.topic) counts[r.topic] = (counts[r.topic] || 0) + 1; });
+    recommendations.forEach(r => {
+      getRecTags(r).forEach(tag => { counts[tag] = (counts[tag] || 0) + 1; });
+    });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  }, [recommendations, getRecTags]);
+
+  // Collection badges (Mentioned on Podcast, Mentioned in Classroom, etc.)
+  const allCollections = useMemo(() => {
+    const counts: Record<string, number> = {};
+    recommendations.forEach(r => {
+      if (r.interest) {
+        r.interest.split(",").forEach(i => {
+          const t = i.trim();
+          if (t && t.startsWith("Mentioned")) counts[t] = (counts[t] || 0) + 1;
+        });
+      }
+    });
     return Object.entries(counts).sort((a, b) => b[1] - a[1]);
   }, [recommendations]);
 
@@ -221,17 +254,48 @@ export default function RecommendationsPage() {
     return Object.entries(counts).sort((a, b) => b[1] - a[1]);
   }, [recommendations]);
 
+  // 3-state filter: null = all, filterTopic = include, excludeTopic = exclude
+  const toggleTopicFilter = (topic: string) => {
+    if (filterTopic === topic) {
+      // Second click: switch to exclude
+      setFilterTopic(null);
+      setExcludeTopic(topic);
+    } else if (excludeTopic === topic) {
+      // Third click: clear
+      setExcludeTopic(null);
+    } else {
+      // First click: include
+      setFilterTopic(topic);
+      setExcludeTopic(null);
+    }
+  };
+
+  const toggleSourceFilter = (source: string) => {
+    if (filterSource === source) {
+      setFilterSource(null);
+      setExcludeSource(source);
+    } else if (excludeSource === source) {
+      setExcludeSource(null);
+    } else {
+      setFilterSource(source);
+      setExcludeSource(null);
+    }
+  };
+
   const filteredRecs = useMemo(() => {
     return recommendations.filter(rec => {
-      if (filterTopic && rec.topic !== filterTopic) return false;
+      const tags = getRecTags(rec);
+      if (filterTopic && !tags.includes(filterTopic)) return false;
+      if (excludeTopic && tags.includes(excludeTopic)) return false;
       if (filterSource && rec.recommended_by !== filterSource) return false;
+      if (excludeSource && rec.recommended_by === excludeSource) return false;
       if (searchFilter) {
         const q = searchFilter.toLowerCase();
         if (!rec.title.toLowerCase().includes(q) && !(rec.author || "").toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [recommendations, filterTopic, filterSource, searchFilter]);
+  }, [recommendations, filterTopic, excludeTopic, filterSource, excludeSource, searchFilter, getRecTags]);
 
   const paginatedRecs = useMemo(() => {
     return filteredRecs.slice(0, page * PAGE_SIZE);
@@ -240,7 +304,7 @@ export default function RecommendationsPage() {
   const hasMore = paginatedRecs.length < filteredRecs.length;
 
   // Reset page when filters change
-  useEffect(() => { setPage(1); }, [filterTopic, filterSource, searchFilter]);
+  useEffect(() => { setPage(1); }, [filterTopic, excludeTopic, filterSource, excludeSource, searchFilter]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -396,18 +460,41 @@ export default function RecommendationsPage() {
           {allSources.length > 1 && (
             <div className="flex flex-wrap gap-1.5">
               <button
-                onClick={() => setFilterSource(null)}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${!filterSource ? "bg-blue-600 text-white" : "bg-surface-2 text-muted hover:text-foreground"}`}
+                onClick={() => { setFilterSource(null); setExcludeSource(null); }}
+                className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${!filterSource && !excludeSource ? "bg-blue-600 text-white" : "bg-surface-2 text-muted hover:text-foreground"}`}
               >
                 All Sources
               </button>
               {allSources.slice(0, 8).map(([source, count]) => (
                 <button
                   key={source}
-                  onClick={() => setFilterSource(filterSource === source ? null : source)}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${filterSource === source ? "bg-blue-600 text-white" : "bg-surface-2 text-muted hover:text-foreground"}`}
+                  onClick={() => toggleSourceFilter(source)}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                    filterSource === source ? "bg-blue-600 text-white" :
+                    excludeSource === source ? "bg-red-500/20 text-red-400 line-through" :
+                    "bg-surface-2 text-muted hover:text-foreground"
+                  }`}
                 >
-                  {source} <span className="opacity-60">({count})</span>
+                  {excludeSource === source && "− "}{source} <span className="opacity-60">({count})</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Collection filter pills (Mentioned on Podcast, etc.) */}
+          {allCollections.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {allCollections.map(([coll, count]) => (
+                <button
+                  key={coll}
+                  onClick={() => toggleTopicFilter(coll)}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                    filterTopic === coll ? "bg-amber-600 text-white" :
+                    excludeTopic === coll ? "bg-red-500/20 text-red-400 line-through" :
+                    "bg-amber-500/10 text-amber-500 hover:bg-amber-500/20"
+                  }`}
+                >
+                  {excludeTopic === coll && "− "}{coll} <span className="opacity-60">({count})</span>
                 </button>
               ))}
             </div>
@@ -417,18 +504,22 @@ export default function RecommendationsPage() {
           {allTopics.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               <button
-                onClick={() => setFilterTopic(null)}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${!filterTopic ? "bg-emerald-600 text-white" : "bg-surface-2 text-muted hover:text-foreground"}`}
+                onClick={() => { setFilterTopic(null); setExcludeTopic(null); }}
+                className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${!filterTopic && !excludeTopic ? "bg-emerald-600 text-white" : "bg-surface-2 text-muted hover:text-foreground"}`}
               >
                 All Topics
               </button>
-              {allTopics.slice(0, 20).map(([topic, count]) => (
+              {allTopics.map(([topic, count]) => (
                 <button
                   key={topic}
-                  onClick={() => setFilterTopic(filterTopic === topic ? null : topic)}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${filterTopic === topic ? "bg-emerald-600 text-white" : "bg-surface-2 text-muted hover:text-foreground"}`}
+                  onClick={() => toggleTopicFilter(topic)}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                    filterTopic === topic ? "bg-emerald-600 text-white" :
+                    excludeTopic === topic ? "bg-red-500/20 text-red-400 line-through" :
+                    "bg-surface-2 text-muted hover:text-foreground"
+                  }`}
                 >
-                  {topic} <span className="opacity-60">({count})</span>
+                  {excludeTopic === topic && "− "}{topic} <span className="opacity-60">({count})</span>
                 </button>
               ))}
             </div>
@@ -469,20 +560,27 @@ export default function RecommendationsPage() {
                     {/* Title & Author */}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{rec.title}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                         {rec.author && (
                           <span className="text-xs text-muted truncate">{rec.author}</span>
                         )}
-                        {rec.topic && (
-                          <span className="px-1.5 py-0 bg-emerald-500/10 text-emerald-500 rounded text-[9px] font-medium flex-shrink-0">
-                            {rec.topic}
+                        {getRecTags(rec).map((tag, i) => (
+                          <span
+                            key={i}
+                            onClick={(e) => { e.stopPropagation(); toggleTopicFilter(tag); }}
+                            className="px-1.5 py-0 bg-emerald-500/10 text-emerald-500 rounded text-[9px] font-medium flex-shrink-0 cursor-pointer hover:bg-emerald-500/20"
+                          >
+                            {tag}
                           </span>
-                        )}
-                        {rec.interest && rec.interest !== rec.topic && (
-                          <span className="px-1.5 py-0 bg-blue-500/10 text-blue-400 rounded text-[9px] font-medium flex-shrink-0 hidden sm:inline">
-                            {rec.interest.length > 30 ? rec.interest.substring(0, 28) + "…" : rec.interest}
+                        ))}
+                        {rec.interest && rec.interest.split(",").map(i => i.trim()).filter(i => i.startsWith("Mentioned")).map((coll, i) => (
+                          <span
+                            key={`c${i}`}
+                            className="px-1.5 py-0 bg-amber-500/10 text-amber-500 rounded text-[9px] font-medium flex-shrink-0 hidden sm:inline"
+                          >
+                            {coll}
                           </span>
-                        )}
+                        ))}
                       </div>
                     </div>
 
