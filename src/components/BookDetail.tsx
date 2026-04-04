@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { Book, ReadingUpdate } from "@/types/book";
 import { enrichBook, searchBooks } from "@/lib/bookLookup";
@@ -355,6 +355,30 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
     return Math.round(totalPages / days);
   })();
 
+  // Aggregate updates by day: sum pages_read, take max current_page, join notes
+  const dailyUpdates = useMemo(() => {
+    const byDay: Record<string, { date: string; current_page: number; pages_read: number; notes: string[] }> = {};
+    // updates are ordered newest-first
+    updates.forEach((u) => {
+      const dateKey = new Date(u.created_at).toLocaleDateString();
+      if (!byDay[dateKey]) {
+        byDay[dateKey] = { date: dateKey, current_page: u.current_page, pages_read: 0, notes: [] };
+      }
+      byDay[dateKey].pages_read += u.pages_read;
+      // Keep the highest current_page for that day
+      if (u.current_page > byDay[dateKey].current_page) byDay[dateKey].current_page = u.current_page;
+      if (u.notes) byDay[dateKey].notes.push(u.notes);
+    });
+    // Return in newest-first order (same as updates)
+    const days = Object.values(byDay);
+    days.sort((a, b) => {
+      const da = new Date(a.date).getTime();
+      const db = new Date(b.date).getTime();
+      return db - da;
+    });
+    return days;
+  }, [updates]);
+
   const projectedCompletion = (() => {
     if (!readingSpeed || readingSpeed <= 0) return null;
     const totalPgs = book.reading_pages || computedReadingPages || book.pages;
@@ -636,30 +660,30 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
                 </div>
               )}
 
-              {/* Update history */}
-              {updates.length > 0 && (
+              {/* Update history — aggregated by day */}
+              {dailyUpdates.length > 0 && (
                 <div className="space-y-1 max-h-32 overflow-y-auto">
-                  {updates.slice(0, 5).map((u) => (
-                    <div key={u.id} className="flex items-center gap-2 text-xs text-muted">
-                      <span className="text-muted-2">{new Date(u.created_at).toLocaleDateString()}</span>
-                      <span>p.{u.current_page}</span>
-                      <span className="text-emerald-600">+{u.pages_read}</span>
-                      {u.notes && <span className="text-muted-2 truncate">{u.notes}</span>}
+                  {dailyUpdates.slice(0, 7).map((d) => (
+                    <div key={d.date} className="flex items-center gap-2 text-xs text-muted">
+                      <span className="text-muted-2">{d.date}</span>
+                      <span>p.{d.current_page}</span>
+                      <span className="text-emerald-600">+{d.pages_read}</span>
+                      {d.notes.length > 0 && <span className="text-muted-2 truncate">{d.notes.join("; ")}</span>}
                     </div>
                   ))}
                 </div>
               )}
             </div>
-          ) : status === "read" && updates.length > 0 ? (
+          ) : status === "read" && dailyUpdates.length > 0 ? (
             <div>
               <label className="block text-xs text-muted mb-2">Reading Log</label>
               <div className="space-y-1 max-h-32 overflow-y-auto">
-                {updates.slice(0, 5).map((u) => (
-                  <div key={u.id} className="flex items-center gap-2 text-xs text-muted">
-                    <span className="text-muted-2">{new Date(u.created_at).toLocaleDateString()}</span>
-                    <span>p.{u.current_page}</span>
-                    <span className="text-emerald-600">+{u.pages_read}</span>
-                    {u.notes && <span className="text-muted-2 truncate">{u.notes}</span>}
+                {dailyUpdates.slice(0, 7).map((d) => (
+                  <div key={d.date} className="flex items-center gap-2 text-xs text-muted">
+                    <span className="text-muted-2">{d.date}</span>
+                    <span>p.{d.current_page}</span>
+                    <span className="text-emerald-600">+{d.pages_read}</span>
+                    {d.notes.length > 0 && <span className="text-muted-2 truncate">{d.notes.join("; ")}</span>}
                   </div>
                 ))}
               </div>
