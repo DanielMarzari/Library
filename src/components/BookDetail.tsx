@@ -19,6 +19,43 @@ const statusLabels: Record<Book["status"], string> = {
   read: "Read",
 };
 
+const CONFETTI_COLORS = ["#10b981", "#f59e0b", "#3b82f6", "#ef4444", "#a855f7", "#ec4899", "#06b6d4"];
+
+function ConfettiOverlay() {
+  const pieces = useRef(
+    Array.from({ length: 60 }).map((_, i) => ({
+      left: Math.random() * 100,
+      delay: Math.random() * 0.8,
+      duration: 2 + Math.random() * 2,
+      size: 6 + Math.random() * 8,
+      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+      rotation: Math.random() * 360,
+      drift: ((Math.random() - 0.5) * 120).toFixed(0),
+    }))
+  ).current;
+
+  return (
+    <div className="fixed inset-0 z-[60] pointer-events-none overflow-hidden">
+      <style>{pieces.map((p, i) =>
+        `@keyframes cf-${i}{0%{opacity:1;transform:translateY(0) translateX(0) rotate(0deg)}100%{opacity:0;transform:translateY(100vh) translateX(${p.drift}px) rotate(720deg)}}`
+      ).join("")}</style>
+      {pieces.map((p, i) => (
+        <div key={i} style={{
+          position: "absolute", left: `${p.left}%`, top: "-10px",
+          width: `${p.size}px`, height: `${p.size * 0.6}px`,
+          backgroundColor: p.color, borderRadius: "2px",
+          transform: `rotate(${p.rotation}deg)`,
+          animation: `cf-${i} ${p.duration}s ease-in ${p.delay}s forwards`,
+          opacity: 0,
+        }} />
+      ))}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="text-6xl animate-bounce">🎉</div>
+      </div>
+    </div>
+  );
+}
+
 export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources = [] }: BookDetailProps) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(book.title);
@@ -53,10 +90,11 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
   const [showCoverSearch, setShowCoverSearch] = useState(false);
   const [coverOptions, setCoverOptions] = useState<string[]>([]);
   const [coverSearchLoading, setCoverSearchLoading] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
 
   useEffect(() => {
-    if (book.status === "reading" || status === "reading") loadUpdates();
-  }, [book.id, book.status, status]);
+    loadUpdates();
+  }, [book.id]);
 
   const loadUpdates = async () => {
     const { data } = await supabase.from("reading_updates").select("*").eq("book_id", book.id).order("created_at", { ascending: false });
@@ -187,8 +225,35 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
     const pagesRead = Math.max(cp - lastPage, 0);
     const { error } = await supabase.from("reading_updates").insert({ book_id: book.id, current_page: cp, pages_read: pagesRead, notes: updateNotes.trim() || null });
     if (!error) {
-      // Also update current_page on the book
-      await supabase.from("books").update({ current_page: cp, updated_at: new Date().toISOString() }).eq("id", book.id);
+      const bookUpdate: Record<string, unknown> = { current_page: cp, updated_at: new Date().toISOString() };
+
+      // Auto-set start date on first log if not already reading
+      const isFirstLog = updates.length === 0 && (!book.current_page || book.current_page === 0);
+      if (isFirstLog && status !== "reading") {
+        const today = new Date().toISOString().split("T")[0];
+        bookUpdate.status = "reading";
+        bookUpdate.start_date = today;
+        setStatus("reading");
+        setStartDate(today);
+      } else if (isFirstLog && !startDate) {
+        const today = new Date().toISOString().split("T")[0];
+        bookUpdate.start_date = today;
+        setStartDate(today);
+      }
+
+      // Auto-complete on last page
+      const totalPgs = displayPages || book.pages || 0;
+      if (totalPgs > 0 && cp >= totalPgs) {
+        const today = new Date().toISOString().split("T")[0];
+        bookUpdate.status = "read";
+        bookUpdate.complete_date = today;
+        setStatus("read");
+        setCompleteDate(today);
+        setShowConfetti(true);
+        setTimeout(() => setShowConfetti(false), 3000);
+      }
+
+      await supabase.from("books").update(bookUpdate).eq("id", book.id);
       setCurrentPage(""); setUpdateNotes(""); setShowAddUpdate(false); loadUpdates();
     }
   };
@@ -290,6 +355,19 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
     return Math.round(totalPages / days);
   })();
 
+  const projectedCompletion = (() => {
+    if (!readingSpeed || readingSpeed <= 0) return null;
+    const totalPgs = book.reading_pages || computedReadingPages || book.pages;
+    if (!totalPgs) return null;
+    const currentPg = updates.length > 0 ? updates[0].current_page : (book.current_page || 0);
+    const remaining = totalPgs - currentPg;
+    if (remaining <= 0) return null;
+    const daysLeft = Math.ceil(remaining / readingSpeed);
+    const projected = new Date();
+    projected.setDate(projected.getDate() + daysLeft);
+    return projected.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  })();
+
   const displayPages = book.reading_pages || computedReadingPages || book.pages;
   const inputCls = "w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600";
   const numCls = "w-full bg-surface-2 border border-border-custom rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600";
@@ -297,6 +375,10 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { if (saveTimeoutRef.current) { clearTimeout(saveTimeoutRef.current); doSave(); } onUpdated(); }} />
+
+      {/* Confetti */}
+      {showConfetti && <ConfettiOverlay />}
+
       <div className="relative bg-surface border border-border-custom rounded-t-2xl sm:rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         {/* Cover */}
         <div className="relative h-48 bg-gradient-to-b from-surface-2 to-surface flex items-center justify-center">
@@ -507,53 +589,82 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
             </div>
           </div>
 
-          {/* Reading Updates */}
-          {status === "reading" && (
+          {/* Reading Progress — always visible if book has pages */}
+          {status !== "read" && (displayPages || book.pages) ? (
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs text-muted">Reading Progress</label>
-                <button onClick={() => setShowAddUpdate(!showAddUpdate)} className="text-xs text-emerald-500 hover:text-emerald-400">+ Log Progress</button>
+                <button onClick={() => setShowAddUpdate(!showAddUpdate)} className="text-xs text-emerald-500 hover:text-emerald-400 font-medium">
+                  {showAddUpdate ? "Cancel" : "+ Log Page"}
+                </button>
               </div>
-              {(readingSpeed || (book.current_page && book.current_page > 0)) && (
-                <div className="bg-surface-2/50 rounded-lg px-3 py-2 mb-3 text-xs text-muted">
-                  {readingSpeed && <>📊 ~{readingSpeed} pages/day </>}
-                  {(displayPages || book.pages) && (
-                    <span className={readingSpeed ? "ml-2 text-muted" : ""}>
-                      ({updates.length > 0 ? updates[0].current_page : book.current_page || 0}/{displayPages || book.pages} pages)
-                    </span>
-                  )}
-                </div>
-              )}
-              {(displayPages || book.pages) && (updates.length > 0 || (book.current_page && book.current_page > 0)) && (
-                <div className="w-full bg-surface-2 rounded-full h-2 mb-3">
-                  <div className="bg-emerald-600 h-2 rounded-full transition-all"
-                    style={{ width: `${Math.min(((updates.length > 0 ? updates[0].current_page : book.current_page || 0) / (displayPages || book.pages || 1)) * 100, 100)}%` }} />
-                </div>
-              )}
+
+              {/* Progress bar */}
+              {(() => {
+                const currentPg = updates.length > 0 ? updates[0].current_page : (book.current_page || 0);
+                const totalPgs = displayPages || book.pages || 1;
+                const pct = Math.min((currentPg / totalPgs) * 100, 100);
+                return (
+                  <div className="mb-3">
+                    <div className="w-full bg-surface-2 rounded-full h-3 overflow-hidden">
+                      <div className="bg-emerald-600 h-full rounded-full transition-all relative" style={{ width: `${pct}%` }}>
+                        {pct > 8 && <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white">{Math.round(pct)}%</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between mt-1.5">
+                      <span className="text-xs text-muted">p. {currentPg} of {totalPgs}</span>
+                      <div className="flex items-center gap-3 text-xs text-muted">
+                        {readingSpeed && <span>~{readingSpeed} pg/day</span>}
+                        {projectedCompletion && <span className="text-emerald-500">Done ~{projectedCompletion}</span>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Log form */}
               {showAddUpdate && (
                 <div className="bg-surface-2 rounded-lg p-3 mb-3 space-y-2">
-                  <input type="text" inputMode="numeric" pattern="[0-9]*" value={currentPage} onChange={(e) => setCurrentPage(e.target.value)} placeholder="Current page #"
-                    className="w-full bg-surface border border-border-custom rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+                  <input type="text" inputMode="numeric" pattern="[0-9]*" value={currentPage} onChange={(e) => setCurrentPage(e.target.value)}
+                    placeholder={`Current page # (of ${displayPages || book.pages || "?"})`}
+                    className="w-full bg-surface border border-border-custom rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                    autoFocus />
                   <input type="text" value={updateNotes} onChange={(e) => setUpdateNotes(e.target.value)} placeholder="Quick note (optional)"
                     className="w-full bg-surface border border-border-custom rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />
                   <button onClick={handleAddUpdate} disabled={!currentPage}
                     className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-50">Log</button>
                 </div>
               )}
+
+              {/* Update history */}
               {updates.length > 0 && (
                 <div className="space-y-1 max-h-32 overflow-y-auto">
                   {updates.slice(0, 5).map((u) => (
                     <div key={u.id} className="flex items-center gap-2 text-xs text-muted">
                       <span className="text-muted-2">{new Date(u.created_at).toLocaleDateString()}</span>
                       <span>p.{u.current_page}</span>
-                      <span className="text-muted-2">+{u.pages_read}</span>
+                      <span className="text-emerald-600">+{u.pages_read}</span>
                       {u.notes && <span className="text-muted-2 truncate">{u.notes}</span>}
                     </div>
                   ))}
                 </div>
               )}
             </div>
-          )}
+          ) : status === "read" && updates.length > 0 ? (
+            <div>
+              <label className="block text-xs text-muted mb-2">Reading Log</label>
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {updates.slice(0, 5).map((u) => (
+                  <div key={u.id} className="flex items-center gap-2 text-xs text-muted">
+                    <span className="text-muted-2">{new Date(u.created_at).toLocaleDateString()}</span>
+                    <span>p.{u.current_page}</span>
+                    <span className="text-emerald-600">+{u.pages_read}</span>
+                    {u.notes && <span className="text-muted-2 truncate">{u.notes}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           {/* Actions */}
           <div className="flex items-center justify-between">
