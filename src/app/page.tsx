@@ -218,6 +218,21 @@ export default function Home() {
     return sorted;
   }, [books, sortMode, filter, readingListIds]);
 
+  // Average pages per day from read books with both dates
+  const avgPagesPerDay = useMemo(() => {
+    const booksWithDates = books.filter(b => b.status === "read" && b.start_date && b.complete_date && (b.reading_pages || b.pages));
+    if (booksWithDates.length < 3) return null; // need a reasonable sample
+    let totalPages = 0;
+    let totalDays = 0;
+    booksWithDates.forEach(b => {
+      const pages = b.reading_pages || b.pages || 0;
+      const days = Math.max(1, Math.ceil((new Date(b.complete_date!).getTime() - new Date(b.start_date!).getTime()) / 86400000));
+      totalPages += pages;
+      totalDays += days;
+    });
+    return totalDays > 0 ? totalPages / totalDays : null;
+  }, [books]);
+
   const refetch = useCallback(() => {
     setRefreshKey((k) => k + 1);
   }, []);
@@ -592,6 +607,7 @@ export default function Home() {
             sortMode={sortMode}
             flatGrid={filter === "all" || filter === "favorites"}
             gridSize={gridSize}
+            avgPagesPerDay={avgPagesPerDay}
           />
         )}
       </main>
