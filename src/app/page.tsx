@@ -642,6 +642,7 @@ export default function Home() {
               books.map((b) => b.source).filter(Boolean) as string[]
             ),
           ]}
+          avgPagesPerDay={avgPagesPerDay}
         />
       )}
     </div>

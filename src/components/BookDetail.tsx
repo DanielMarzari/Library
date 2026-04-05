@@ -11,6 +11,7 @@ interface BookDetailProps {
   onUpdated: () => void;
   onDeleted: () => void;
   recentSources?: string[];
+  avgPagesPerDay?: number | null;
 }
 
 const statusLabels: Record<Book["status"], string> = {
@@ -56,7 +57,7 @@ function ConfettiOverlay() {
   );
 }
 
-export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources = [] }: BookDetailProps) {
+export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources = [], avgPagesPerDay }: BookDetailProps) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(book.title);
   const [author, setAuthor] = useState(book.author);
@@ -379,17 +380,15 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
     return days;
   }, [updates]);
 
-  const projectedCompletion = (() => {
-    if (!readingSpeed || readingSpeed <= 0) return null;
+  const estimatedDays = (() => {
+    const pace = readingSpeed || avgPagesPerDay;
+    if (!pace || pace <= 0) return null;
     const totalPgs = book.reading_pages || computedReadingPages || book.pages;
     if (!totalPgs) return null;
     const currentPg = updates.length > 0 ? updates[0].current_page : (book.current_page || 0);
     const remaining = totalPgs - currentPg;
     if (remaining <= 0) return null;
-    const daysLeft = Math.ceil(remaining / readingSpeed);
-    const projected = new Date();
-    projected.setDate(projected.getDate() + daysLeft);
-    return projected.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    return Math.ceil(remaining / pace);
   })();
 
   const displayPages = book.reading_pages || computedReadingPages || book.pages;
@@ -639,7 +638,7 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
                       <span className="text-xs text-muted">p. {currentPg} of {totalPgs}</span>
                       <div className="flex items-center gap-3 text-xs text-muted">
                         {readingSpeed && <span>~{readingSpeed} pg/day</span>}
-                        {projectedCompletion && <span className="text-emerald-500">Done ~{projectedCompletion}</span>}
+                        {estimatedDays && <span className="text-emerald-500">Est. {estimatedDays} {estimatedDays === 1 ? "day" : "days"}</span>}
                       </div>
                     </div>
                   </div>

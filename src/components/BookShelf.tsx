@@ -165,14 +165,6 @@ function ShelfBook({
           {book.title}
         </p>
         <p className="text-[10px] text-muted-2 truncate">{book.author}</p>
-        {avgPagesPerDay && avgPagesPerDay > 0 && book.status !== "read" && (book.reading_pages || book.pages) ? (() => {
-          const totalPgs = book.reading_pages || book.pages || 0;
-          const remaining = totalPgs - (book.current_page || 0);
-          if (remaining <= 0) return null;
-          const days = Math.ceil(remaining / avgPagesPerDay);
-          const label = days <= 1 ? "<1 day" : days < 7 ? `~${days}d` : days < 30 ? `~${Math.round(days / 7)}w` : `~${Math.round(days / 30)}mo`;
-          return <p className="text-[9px] text-muted-2 mt-0.5">{label} read</p>;
-        })() : null}
       </div>
     </button>
   );
