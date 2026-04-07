@@ -105,10 +105,7 @@ export default function SkillsPage() {
   const fetchAndProcessBooks = async () => {
     setLoading(true);
     try {
-      const data = await api.books.list(); const error = null; // .from('books').select('*');
-
-      if (error) throw error;
-
+      const data = await api.books.list();
       const books = (data as Book[]) || [];
       const topicMap = new Map<string, { total: number; read: number }>();
 

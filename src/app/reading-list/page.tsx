@@ -97,50 +97,63 @@ export default function ReadingListPage() {
   // Load all data
   useEffect(() => {
     const loadData = async () => {
-      setLoading(true);
+      try {
+        setLoading(true);
 
-      const [booksRes, itemsRes, goalsRes, goalBooksRes] = await Promise.all([
-        api.books.list(),
-        api.reading_list.list().eq("year", selectedYear).order("priority", { ascending: true }),
-        api.learning_goals.list().order("created_at", { ascending: true }),
-        api.learning_goal_books.list().order("priority", { ascending: true }),
-      ]);
+        const [booksData, itemsData, goalsData, goalBooksData] = await Promise.all([
+          api.books.list(),
+          api.readingList.list(selectedYear),
+          api.learningGoals.list(),
+          api.learningGoalBooks.list(),
+        ]);
 
-      const booksData = (booksRes.data || []) as Book[];
-      setBooks(booksData);
+        setBooks(booksData);
 
-      // Enrich reading list items
-      if (itemsRes.data) {
-        const enriched = (itemsRes.data as any[]).map(item => ({
-          ...item,
-          book: booksData.find(b => b.id === item.book_id) || null,
-        })).filter(item => item.book);
-        setItems(enriched);
-      }
-
-      // Set goals
-      if (goalsRes.data) {
-        setGoals(goalsRes.data as LearningGoal[]);
-        // Auto-expand first goal
-        if (goalsRes.data.length > 0 && !expandedGoal) {
-          setExpandedGoal(goalsRes.data[0].id);
+        // Enrich reading list items
+        if (itemsData && itemsData.length > 0) {
+          const enriched = itemsData
+            .filter(item => item.year === selectedYear)
+            .map(item => ({
+              ...item,
+              book: booksData.find(b => b.id === item.book_id) || null,
+            }))
+            .filter(item => item.book);
+          setItems(enriched);
+        } else {
+          setItems([]);
         }
-      }
 
-      // Enrich goal books
-      if (goalBooksRes.data) {
-        const grouped: Record<string, GoalBook[]> = {};
-        (goalBooksRes.data as any[]).forEach(gb => {
-          const book = booksData.find(b => b.id === gb.book_id);
-          if (book) {
-            if (!grouped[gb.goal_id]) grouped[gb.goal_id] = [];
-            grouped[gb.goal_id].push({ ...gb, book });
+        // Set goals
+        if (goalsData && goalsData.length > 0) {
+          setGoals(goalsData as LearningGoal[]);
+          // Auto-expand first goal
+          if (!expandedGoal) {
+            setExpandedGoal(goalsData[0].id);
           }
-        });
-        setGoalBooks(grouped);
-      }
+        } else {
+          setGoals([]);
+        }
 
-      setLoading(false);
+        // Enrich goal books
+        if (goalBooksData && goalBooksData.length > 0) {
+          const grouped: Record<string, GoalBook[]> = {};
+          goalBooksData.forEach(gb => {
+            const book = booksData.find(b => b.id === gb.book_id);
+            if (book) {
+              if (!grouped[gb.goal_id]) grouped[gb.goal_id] = [];
+              grouped[gb.goal_id].push({ ...gb, book });
+            }
+          });
+          setGoalBooks(grouped);
+        } else {
+          setGoalBooks({});
+        }
+
+        setLoading(false);
+      } catch (error) {
+        console.error("Error loading data:", error);
+        setLoading(false);
+      }
     };
 
     loadData();
@@ -173,89 +186,104 @@ export default function ReadingListPage() {
   }, [availableBooks, searchQuery]);
 
   const addBookToList = async (bookId: string) => {
-    const maxPriority = currentYearItems.reduce((max, item) => Math.max(max, item.priority || 0), -1);
-    const { error } = await supabase.from("reading_list").insert({
-      book_id: bookId, year: selectedYear, priority: maxPriority + 1, added_at: new Date().toISOString(),
-    });
-    if (!error) {
+    try {
+      const maxPriority = currentYearItems.reduce((max, item) => Math.max(max, item.priority || 0), -1);
+      const data = await api.readingList.create({
+        book_id: bookId,
+        year: selectedYear,
+      });
       const book = books.find(b => b.id === bookId);
       if (book) {
-        setItems([...items, { id: `temp-${Date.now()}`, book_id: bookId, year: selectedYear, priority: maxPriority + 1, added_at: new Date().toISOString(), book }]);
+        setItems([...items, { id: data.id, book_id: bookId, year: selectedYear, priority: maxPriority + 1, added_at: new Date().toISOString(), book }]);
       }
       setShowAddDropdown(false);
       setSearchQuery("");
+    } catch (error) {
+      console.error("Error adding book to list:", error);
     }
   };
 
   const removeBookFromList = async (itemId: string) => {
-    const { error } = await supabase.from("reading_list").delete().eq("id", itemId);
-    if (!error) setItems(prev => prev.filter(i => i.id !== itemId));
+    try {
+      await api.readingList.delete(itemId);
+      setItems(prev => prev.filter(i => i.id !== itemId));
+    } catch (error) {
+      console.error("Error removing book from list:", error);
+    }
   };
 
   const movePriority = async (itemId: string, direction: "up" | "down") => {
-    const itemIndex = currentYearItems.findIndex(i => i.id === itemId);
-    if (itemIndex === -1) return;
-    if (direction === "up" && itemIndex === 0) return;
-    if (direction === "down" && itemIndex === currentYearItems.length - 1) return;
-    const currentItem = currentYearItems[itemIndex];
-    const otherItem = currentYearItems[direction === "up" ? itemIndex - 1 : itemIndex + 1];
-    await Promise.all([
-      supabase.from("reading_list").update({ priority: otherItem.priority }).eq("id", itemId),
-      supabase.from("reading_list").update({ priority: currentItem.priority }).eq("id", otherItem.id),
-    ]);
-    setItems(prev => prev.map(i => {
-      if (i.id === itemId) return { ...i, priority: otherItem.priority };
-      if (i.id === otherItem.id) return { ...i, priority: currentItem.priority };
-      return i;
-    }));
+    try {
+      const itemIndex = currentYearItems.findIndex(i => i.id === itemId);
+      if (itemIndex === -1) return;
+      if (direction === "up" && itemIndex === 0) return;
+      if (direction === "down" && itemIndex === currentYearItems.length - 1) return;
+      const currentItem = currentYearItems[itemIndex];
+      const otherItem = currentYearItems[direction === "up" ? itemIndex - 1 : itemIndex + 1];
+      await Promise.all([
+        api.readingList.update(itemId, { book_id: itemId, year: selectedYear }),
+        api.readingList.update(otherItem.id, { book_id: otherItem.book_id, year: selectedYear }),
+      ]);
+      setItems(prev => prev.map(i => {
+        if (i.id === itemId) return { ...i, priority: otherItem.priority };
+        if (i.id === otherItem.id) return { ...i, priority: currentItem.priority };
+        return i;
+      }));
+    } catch (error) {
+      console.error("Error moving priority:", error);
+    }
   };
 
   // ===== LEARNING GOALS FUNCTIONS =====
 
   const createGoal = async () => {
     if (!newGoalName.trim()) return;
-    const data = await api.books.list(); const error = null; // .from("learning_goals").insert({
-      name: newGoalName.trim(),
-      description: newGoalDesc.trim() || null,
-      color: newGoalColor,
-    }).select().single();
-    if (!error && data) {
+    try {
+      const data = await api.learningGoals.create({
+        name: newGoalName.trim(),
+        description: newGoalDesc.trim() || null,
+      });
       setGoals(prev => [...prev, data as LearningGoal]);
       setNewGoalName("");
       setNewGoalDesc("");
       setShowNewGoal(false);
       setExpandedGoal(data.id);
+    } catch (error) {
+      console.error("Error creating goal:", error);
     }
   };
 
   const updateGoal = async (goalId: string) => {
-    const { error } = await supabase.from("learning_goals").update({
-      name: editName.trim(),
-      description: editDesc.trim() || null,
-    }).eq("id", goalId);
-    if (!error) {
+    try {
+      await api.learningGoals.update(goalId, {
+        name: editName.trim(),
+        description: editDesc.trim() || null,
+      });
       setGoals(prev => prev.map(g => g.id === goalId ? { ...g, name: editName.trim(), description: editDesc.trim() || null } : g));
       setEditingGoal(null);
+    } catch (error) {
+      console.error("Error updating goal:", error);
     }
   };
 
   const deleteGoal = async (goalId: string) => {
-    const { error } = await supabase.from("learning_goals").delete().eq("id", goalId);
-    if (!error) {
+    try {
+      await api.learningGoals.delete(goalId);
       setGoals(prev => prev.filter(g => g.id !== goalId));
       const newGoalBooks = { ...goalBooks };
       delete newGoalBooks[goalId];
       setGoalBooks(newGoalBooks);
+    } catch (error) {
+      console.error("Error deleting goal:", error);
     }
   };
 
   const addBookToGoal = async (goalId: string, bookId: string) => {
-    const existing = goalBooks[goalId] || [];
-    const maxPriority = existing.reduce((max, gb) => Math.max(max, gb.priority || 0), -1);
-    const data = await api.books.list(); const error = null; // .from("learning_goal_books").insert({
-      goal_id: goalId, book_id: bookId, priority: maxPriority + 1,
-    }).select().single();
-    if (!error && data) {
+    try {
+      const data = await api.learningGoalBooks.create({
+        goal_id: goalId,
+        book_id: bookId,
+      });
       const book = books.find(b => b.id === bookId);
       if (book) {
         setGoalBooks(prev => ({
@@ -263,18 +291,22 @@ export default function ReadingListPage() {
           [goalId]: [...(prev[goalId] || []), { ...data, book } as GoalBook],
         }));
       }
+      setAddingToGoal(null);
+      setGoalSearchQuery("");
+    } catch (error) {
+      console.error("Error adding book to goal:", error);
     }
-    setAddingToGoal(null);
-    setGoalSearchQuery("");
   };
 
   const removeBookFromGoal = async (goalBookId: string, goalId: string) => {
-    const { error } = await supabase.from("learning_goal_books").delete().eq("id", goalBookId);
-    if (!error) {
+    try {
+      await api.learningGoalBooks.delete(goalBookId);
       setGoalBooks(prev => ({
         ...prev,
         [goalId]: (prev[goalId] || []).filter(gb => gb.id !== goalBookId),
       }));
+    } catch (error) {
+      console.error("Error removing book from goal:", error);
     }
   };
 

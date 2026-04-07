@@ -50,32 +50,17 @@ export default function LendingPage() {
       setLoading(true);
 
       // Fetch all books
-      const { data: booksData } = await supabase
-        .from('books')
-        .select('*')
-        .order('title', { ascending: true });
-
+      const booksData = await api.books.list();
       setBooks(booksData || []);
 
-      // Fetch lending records with book details
-      const { data: lendingData } = await supabase
-        .from('lending')
-        .select(`
-          id,
-          book_id,
-          borrower_name,
-          lent_date,
-          due_date,
-          returned_date,
-          notes,
-          book:books(*)
-        `)
-        .order('lent_date', { ascending: false });
+      // Fetch lending records
+      const lendingData = await api.lending.list();
 
-      // Supabase returns book as array from join — flatten to single object
+      // Enrich lending records with book details
+      const booksMap = new Map(booksData.map((b) => [b.id, b]));
       const normalized = (lendingData || []).map((r: any) => ({
         ...r,
-        book: Array.isArray(r.book) ? r.book[0] : r.book,
+        book: booksMap.get(r.book_id) || null,
       })) as LendingRecord[];
       setLendingRecords(normalized);
 
@@ -125,17 +110,12 @@ export default function LendingPage() {
     try {
       setSubmitting(true);
 
-      const { error } = await supabase.from('lending').insert([
-        {
-          book_id: selectedBook.id,
-          borrower_name: borrowerName.trim(),
-          lent_date: new Date().toISOString().split('T')[0],
-          due_date: dueDate || null,
-          notes: notes.trim() || null,
-        },
-      ]);
-
-      if (error) throw error;
+      await api.lending.create({
+        book_id: selectedBook.id,
+        lent_to: borrowerName.trim(),
+        lent_date: new Date().toISOString().split('T')[0],
+        return_date: dueDate || null,
+      });
 
       // Reset form and close modal
       setSelectedBook(null);
@@ -156,14 +136,12 @@ export default function LendingPage() {
 
   const handleMarkReturned = async (recordId: string) => {
     try {
-      const { error } = await supabase
-        .from('lending')
-        .update({
-          returned_date: new Date().toISOString().split('T')[0],
-        })
-        .eq('id', recordId);
-
-      if (error) throw error;
+      await api.lending.update(recordId, {
+        book_id: '',
+        lent_to: '',
+        lent_date: '',
+        return_date: new Date().toISOString().split('T')[0],
+      });
 
       await fetchData();
     } catch (error) {

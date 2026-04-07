@@ -61,61 +61,51 @@ export default function RecommendationsPage() {
   // Load recommendations and library titles, auto-removing owned books
   useEffect(() => {
     const loadData = async () => {
-      setLoading(true);
+      try {
+        setLoading(true);
 
-      // Load ALL recommendations (paginated for large sets)
-      let allRecsData: Recommendation[] = [];
-      let from = 0;
-      const batchSize = 1000;
-      while (true) {
-        const { data: batch } = await supabase
-          .from("recommendations")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .range(from, from + batchSize - 1);
-        if (batch && batch.length > 0) {
-          allRecsData = [...allRecsData, ...batch];
-          if (batch.length < batchSize) break;
-          from += batchSize;
-        } else break;
-      }
+        // Load all recommendations
+        const allRecsData = await api.recommendations.list();
 
-      // Load library books
-      const { data: books } = await supabase
-        .from("books")
-        .select("title,status");
+        // Load library books
+        const books = await api.books.list();
 
-      const normalizedBookTitles = new Set(
-        (books || []).map((b) => normalize(b.title))
-      );
-      const existingTitles = new Set(
-        (books || []).map((b) => b.title.toLowerCase())
-      );
-      setLibraryTitles(existingTitles);
-      setLibraryBooks(books || []);
+        const normalizedBookTitles = new Set(
+          (books || []).map((b) => normalize(b.title))
+        );
+        const existingTitles = new Set(
+          (books || []).map((b) => b.title.toLowerCase())
+        );
+        setLibraryTitles(existingTitles);
+        setLibraryBooks(books || []);
 
-      // Auto-delete recommendations for books already in library
-      const ownedRecs = allRecsData.filter((r) =>
-        normalizedBookTitles.has(normalize(r.title))
-      );
-      if (ownedRecs.length > 0) {
-        const idsToDelete = ownedRecs.map((r) => r.id);
-        // Delete in batches of 50
-        for (let i = 0; i < idsToDelete.length; i += 50) {
-          const batch = idsToDelete.slice(i, i + 50);
-          await supabase
-            .from("recommendations")
-            .delete()
-            .in("id", batch);
+        // Auto-delete recommendations for books already in library
+        const filteredRecs = allRecsData.filter((r) =>
+          !normalizedBookTitles.has(normalize(r.title))
+        );
+
+        // Delete owned recommendations from the API
+        const ownedRecs = allRecsData.filter((r) =>
+          normalizedBookTitles.has(normalize(r.title))
+        );
+        if (ownedRecs.length > 0) {
+          const idsToDelete = ownedRecs.map((r) => r.id);
+          // Delete in batches of 50
+          for (let i = 0; i < idsToDelete.length; i += 50) {
+            const batch = idsToDelete.slice(i, i + 50);
+            for (const id of batch) {
+              await api.recommendations.delete(id);
+            }
+          }
         }
-        // Remove from local data
-        const deletedIds = new Set(idsToDelete);
-        allRecsData = allRecsData.filter((r) => !deletedIds.has(r.id));
-      }
 
-      setAllRecs(allRecsData);
-      setRecommendations(allRecsData);
-      setLoading(false);
+        setAllRecs(filteredRecs);
+        setRecommendations(filteredRecs);
+        setLoading(false);
+      } catch (error) {
+        console.error("Error loading recommendations:", error);
+        setLoading(false);
+      }
     };
 
     loadData();
@@ -164,30 +154,21 @@ export default function RecommendationsPage() {
     setAddingLoading(true);
     try {
       const enrichedBook = await enrichBook(bookToAdd);
-      const data = await api.books.list(); const error = null; // 
-        .from("recommendations")
-        .insert({
-          title: enrichedBook.title,
-          author: enrichedBook.author,
-          isbn: enrichedBook.isbn,
-          cover_url: enrichedBook.cover_url,
-          recommended_by: recommendedBy.trim() || null,
-          notes: notes.trim() || null,
-        })
-        .select()
-        .single();
+      const data = await api.recommendations.create({
+        title: enrichedBook.title,
+        description: enrichedBook.author,
+        source: recommendedBy.trim() || null,
+      });
 
-      if (!error && data) {
-        setRecommendations((prev) => [data, ...prev]);
-        setAllRecs((prev) => [data, ...prev]);
-        setSearchQuery("");
-        setRecommendedBy("");
-        setNotes("");
-        setSelectedResult(null);
-        setSearchResults([]);
-        setShowSearchResults(false);
-        setShowAddForm(false);
-      }
+      setRecommendations((prev) => [data, ...prev]);
+      setAllRecs((prev) => [data, ...prev]);
+      setSearchQuery("");
+      setRecommendedBy("");
+      setNotes("");
+      setSelectedResult(null);
+      setSearchResults([]);
+      setShowSearchResults(false);
+      setShowAddForm(false);
     } catch (error) {
       console.error("Error adding recommendation:", error);
     } finally {
@@ -198,11 +179,9 @@ export default function RecommendationsPage() {
   // Delete recommendation
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase.from("recommendations").delete().eq("id", id);
-      if (!error) {
-        setRecommendations((prev) => prev.filter((r) => r.id !== id));
-        setAllRecs((prev) => prev.filter((r) => r.id !== id));
-      }
+      await api.recommendations.delete(id);
+      setRecommendations((prev) => prev.filter((r) => r.id !== id));
+      setAllRecs((prev) => prev.filter((r) => r.id !== id));
       setDeleteConfirm(null);
     } catch (error) {
       console.error("Error deleting:", error);

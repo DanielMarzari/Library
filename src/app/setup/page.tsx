@@ -68,13 +68,17 @@ export default function SetupPage() {
     let ignore = false;
     const load = async () => {
       setLoading(true);
-      const data = await api.books.list(); const error = null; // 
-        .from("books")
-        .select("*")
-        .order("title", { ascending: true });
-      if (!ignore) {
-        if (!error && data) setBooks(data);
-        setLoading(false);
+      try {
+        const data = await api.books.list();
+        if (!ignore) {
+          setBooks(data || []);
+        }
+      } catch (error) {
+        console.error("Error loading books:", error);
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
       }
     };
     load();
@@ -148,7 +152,7 @@ export default function SetupPage() {
           if (enriched.isbn && !book.isbn) updates.isbn = enriched.isbn;
           if (Object.keys(updates).length > 0) {
             updates.updated_at = new Date().toISOString();
-            await supabase.from("books").update(updates).eq("id", book.id);
+            await api.books.update(book.id, updates as Partial<Book>);
           }
         }
       } catch (e) {
@@ -176,7 +180,7 @@ export default function SetupPage() {
         const res = await fetch(url, { method: "HEAD" });
         if (res.ok) {
           const coverUrl = `https://covers.openlibrary.org/b/isbn/${book.isbn}-L.jpg`;
-          await supabase.from("books").update({ cover_url: coverUrl, updated_at: new Date().toISOString() }).eq("id", book.id);
+          await api.books.update(book.id, { cover_url: coverUrl });
           found++;
         }
       } catch {}

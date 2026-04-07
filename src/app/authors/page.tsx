@@ -542,11 +542,7 @@ export default function AuthorsPage() {
     const fetchAuthors = async () => {
       try {
         setLoading(true);
-        const { data: books, error: booksError } = await supabase
-          .from("books")
-          .select("*");
-
-        if (booksError) throw booksError;
+        const books = await api.books.list();
 
         const authorMap = new Map<string, AuthorData>();
 
@@ -596,22 +592,17 @@ export default function AuthorsPage() {
 
         const authorNames = Array.from(authorMap.keys());
         if (authorNames.length > 0) {
-          const { data: authorsMetadata, error: metadataError } = await supabase
-            .from("authors")
-            .select("*")
-            .in("name", authorNames);
-
-          if (metadataError) throw metadataError;
+          const authorsMetadata = await api.authors.list();
 
           authorsMetadata.forEach((metadata: any) => {
             const author = authorMap.get(metadata.name);
             if (author) {
-              author.ethnicity = metadata.ethnicity;
-              author.nationality = metadata.nationality;
-              author.religious_tradition = metadata.religious_tradition || null;
-              author.gender = metadata.gender || null;
-              author.image_url = metadata.image_url;
-              author.profile_url = metadata.profile_url || null;
+              author.ethnicity = metadata.bio || null;
+              author.nationality = null;
+              author.religious_tradition = null;
+              author.gender = null;
+              author.image_url = null;
+              author.profile_url = null;
               author.id = metadata.id;
             }
           });
@@ -678,9 +669,21 @@ export default function AuthorsPage() {
           [field]: value,
         };
 
-        const { error } = await supabase.from("authors").upsert([upsertData], { onConflict: "name" });
+        // Find existing author or create a new one
+        const existingAuthors = await api.authors.list();
+        const existingAuthor = existingAuthors.find((a) => a.name === authorName);
 
-        if (error) throw error;
+        if (existingAuthor) {
+          await api.authors.update(existingAuthor.id, {
+            name: authorName,
+            bio: field === 'ethnicity' ? value : existingAuthor.bio,
+          });
+        } else {
+          await api.authors.create({
+            name: authorName,
+            bio: field === 'ethnicity' ? value : null,
+          });
+        }
 
         setAuthors((prev) =>
           prev.map((author) =>
@@ -709,9 +712,20 @@ export default function AuthorsPage() {
           profile_url: currentAuthor?.profile_url ?? null,
         };
 
-        const { error } = await supabase.from("authors").upsert([upsertData], { onConflict: "name" });
+        // Find existing author or create a new one
+        const existingAuthors = await api.authors.list();
+        const existingAuthor = existingAuthors.find((a) => a.name === authorName);
 
-        if (error) throw error;
+        if (existingAuthor) {
+          await api.authors.update(existingAuthor.id, {
+            name: authorName,
+            bio: currentAuthor?.ethnicity,
+          });
+        } else {
+          await api.authors.create({
+            name: authorName,
+          });
+        }
 
         setAuthors((prev) =>
           prev.map((author) =>
@@ -779,16 +793,29 @@ export default function AuthorsPage() {
             ...updates,
           };
 
-          const { error } = await supabase
-            .from("authors")
-            .upsert([upsertData], { onConflict: "name" });
+          try {
+            // Find existing author or create a new one
+            const existingAuthors = await api.authors.list();
+            const existingAuthor = existingAuthors.find((a) => a.name === authorName);
 
-          if (!error) {
+            if (existingAuthor) {
+              await api.authors.update(existingAuthor.id, {
+                name: authorName,
+                bio: currentAuthor?.ethnicity,
+              });
+            } else {
+              await api.authors.create({
+                name: authorName,
+              });
+            }
+
             setAuthors((prev) =>
               prev.map((a) =>
                 a.name === authorName ? { ...a, ...updates } as AuthorData : a
               )
             );
+          } catch (err) {
+            console.error("Error upserting author:", err);
           }
         }
       } catch (err) {

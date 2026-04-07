@@ -56,13 +56,17 @@ export default function StatsPage() {
   useEffect(() => {
     let ignore = false;
     const load = async () => {
-      const data = await api.books.list(); const error = null; // 
-        .from("books")
-        .select("*")
-        .order("complete_date", { ascending: true });
-      if (!ignore) {
-        if (!error && data) setBooks(data);
-        setLoading(false);
+      try {
+        const data = await api.books.list();
+        if (!ignore) {
+          setBooks(data || []);
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error("Error loading books:", error);
+        if (!ignore) {
+          setLoading(false);
+        }
       }
     };
     load();
@@ -74,11 +78,13 @@ export default function StatsPage() {
   useEffect(() => {
     let ignore = false;
     const load = async () => {
-      const data = await api.books.list(); const error = null; // 
-        .from("reading_updates")
-        .select("*");
-      if (!ignore) {
-        if (!error && data) setReadingUpdates(data as ReadingUpdate[]);
+      try {
+        const data = await api.readingUpdates.list();
+        if (!ignore) {
+          setReadingUpdates(data || []);
+        }
+      } catch (error) {
+        console.error("Error loading reading updates:", error);
       }
     };
     load();
@@ -90,10 +96,14 @@ export default function StatsPage() {
   useEffect(() => {
     let ignore = false;
     const load = async () => {
-      const { data } = await supabase
-        .from("authors")
-        .select("name,gender,ethnicity,nationality");
-      if (!ignore && data) setAuthorMeta(data as AuthorMeta[]);
+      try {
+        const data = await api.authors.list();
+        if (!ignore) {
+          setAuthorMeta(data as AuthorMeta[]);
+        }
+      } catch (error) {
+        console.error("Error loading authors:", error);
+      }
     };
     load();
     return () => { ignore = true; };
