@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { api } from '@/lib/api-client';
 import { Book } from '@/types/book';
 import Link from 'next/link';
 
@@ -105,7 +105,7 @@ export default function SkillsPage() {
   const fetchAndProcessBooks = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('books').select('*');
+      const data = await api.books.list(); const error = null; // .from('books').select('*');
 
       if (error) throw error;
 

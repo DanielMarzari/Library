@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
+import { api } from "@/lib/api-client";
 import { Book } from "@/types/book";
 import { BookDetail } from "@/components/BookDetail";
 import { searchBooks, enrichBook } from "@/lib/bookLookup";
@@ -68,7 +68,7 @@ export default function SetupPage() {
     let ignore = false;
     const load = async () => {
       setLoading(true);
-      const { data, error } = await supabase
+      const data = await api.books.list(); const error = null; // 
         .from("books")
         .select("*")
         .order("title", { ascending: true });

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
+import { api } from '@/lib/api-client';
 import { Book } from '@/types/book';
 
 export const dynamic = 'force-dynamic';
@@ -39,11 +39,7 @@ export default function WrappedPage() {
     const fetchWrappedData = async () => {
       try {
         // Fetch all books
-        const { data: allBooks, error: booksError } = await supabase
-          .from('books')
-          .select('*');
-
-        if (booksError) throw booksError;
+        const allBooks = await api.books.list();
         if (!allBooks || allBooks.length === 0) {
           setHasData(false);
           setLoading(false);
@@ -124,17 +120,20 @@ export default function WrappedPage() {
           const topAuthorCount = authorMap[topAuthorName].count;
 
           // Fetch author image from authors table
-          const { data: authorData } = await supabase
-            .from('authors')
-            .select('name, image_url')
-            .eq('name', topAuthorName)
-            .single();
-
-          favoriteAuthor = {
-            name: topAuthorName,
-            image_url: authorData?.image_url,
-            book_count: topAuthorCount,
-          };
+          try {
+            const authorData = await api.authors.list();
+            const author = authorData.find((a: any) => a.name === topAuthorName);
+            favoriteAuthor = {
+              name: topAuthorName,
+              image_url: author?.image_url,
+              book_count: topAuthorCount,
+            };
+          } catch {
+            favoriteAuthor = {
+              name: topAuthorName,
+              book_count: topAuthorCount,
+            };
+          }
         }
 
         // Calculate reading pace

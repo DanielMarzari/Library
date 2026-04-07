@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { api } from "@/lib/api-client";
 import { Book } from "@/types/book";
 
 // Each milestone has a unique emoji, target, pace label, and description
@@ -45,8 +45,12 @@ export default function GoalsPage() {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      const { data, error } = await supabase.from("books").select("*");
-      if (!error && data) setBooks(data as Book[]);
+      try {
+        const data = await api.books.list();
+        setBooks(data);
+      } catch (error) {
+        console.error("Error fetching books:", error);
+      }
       setLoading(false);
     };
     fetchData();

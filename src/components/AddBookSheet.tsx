@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
-import { supabase } from "@/lib/supabase";
+import { api } from "@/lib/api-client";
 import { Book } from "@/types/book";
 import { BookSearchResult, searchBooks, enrichBook } from "@/lib/bookLookup";
 
@@ -152,14 +152,18 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
     };
     onAdded(newBook);
 
-    await supabase.from("books").insert({
-      title: book.title, author: book.author, isbn: book.isbn || null,
-      cover_url: coverToUse, description: book.description,
-      pages: book.pages, intro_pages: ip || 0, start_page: sp, end_page: ep,
-      status, source: source.trim() || null, volume: volume.trim() || null,
-      lcc: book.lcc || null, ddc: book.ddc || null,
-      topics: editTopics.length > 0 ? editTopics : null,
-    });
+    try {
+      await api.books.create({
+        title: book.title, author: book.author, isbn: book.isbn || undefined,
+        cover_url: coverToUse, description: book.description,
+        pages: book.pages, intro_pages: ip || 0, start_page: sp, end_page: ep,
+        status, source: source.trim() || undefined, volume: volume.trim() || undefined,
+        lcc: book.lcc || undefined, ddc: book.ddc || undefined,
+        topics: editTopics.length > 0 ? editTopics : undefined,
+      });
+    } catch (error) {
+      console.error("Error saving book:", error);
+    }
     setSaving(false);
   };
 
@@ -181,15 +185,19 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
     };
     onAdded(newBook);
 
-    await supabase.from("books").insert({
-      title: manTitle.trim(), author: manAuthor.trim(), status,
-      isbn: manIsbn.trim() || null,
-      cover_url: coverToUse,
-      pages: manPages ? parseInt(manPages) : null,
-      intro_pages: ip || 0, start_page: sp, end_page: ep,
-      source: source.trim() || null, volume: volume.trim() || null,
-      topics: editTopics.length > 0 ? editTopics : null,
-    });
+    try {
+      await api.books.create({
+        title: manTitle.trim(), author: manAuthor.trim(), status,
+        isbn: manIsbn.trim() || undefined,
+        cover_url: coverToUse,
+        pages: manPages ? parseInt(manPages) : undefined,
+        intro_pages: ip || 0, start_page: sp, end_page: ep,
+        source: source.trim() || undefined, volume: volume.trim() || undefined,
+        topics: editTopics.length > 0 ? editTopics : undefined,
+      });
+    } catch (error) {
+      console.error("Error saving book:", error);
+    }
     setSaving(false);
   };
 

@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState, useMemo } from "react";
-import { supabase } from "@/lib/supabase";
+import { api } from "@/lib/api-client";
 import { Book } from "@/types/book";
 import Link from "next/link";
 
@@ -56,7 +56,7 @@ export default function StatsPage() {
   useEffect(() => {
     let ignore = false;
     const load = async () => {
-      const { data, error } = await supabase
+      const data = await api.books.list(); const error = null; // 
         .from("books")
         .select("*")
         .order("complete_date", { ascending: true });
@@ -74,7 +74,7 @@ export default function StatsPage() {
   useEffect(() => {
     let ignore = false;
     const load = async () => {
-      const { data, error } = await supabase
+      const data = await api.books.list(); const error = null; // 
         .from("reading_updates")
         .select("*");
       if (!ignore) {

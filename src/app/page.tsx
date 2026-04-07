@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
-import { supabase } from "@/lib/supabase";
+import { api } from "@/lib/api-client";
 import { Book } from "@/types/book";
 import { BookShelf } from "@/components/BookShelf";
 import { BookDetail } from "@/components/BookDetail";
@@ -78,70 +78,57 @@ export default function Home() {
 
     const load = async () => {
       if (refreshKey === 0) setLoading(true);
-      let query = supabase
-        .from("books")
-        .select("*")
-        .order("created_at", { ascending: false });
 
-      // Fetch reading list/goal data for the "on list" filter
-      if (filter === "on_reading_list") {
-        const [rlRes, glRes, goalsRes] = await Promise.all([
-          supabase.from("reading_list").select("book_id,year"),
-          supabase.from("learning_goal_books").select("book_id,goal_id"),
-          supabase.from("learning_goals").select("id,name").order("name"),
-        ]);
+      try {
+        // Fetch reading list/goal data for the "on list" filter
+        if (filter === "on_reading_list") {
+          const [rlData, glData, goalsData] = await Promise.all([
+            api.readingList.list(),
+            api.learningGoalBooks.list(),
+            api.learningGoals.list(),
+          ]);
 
-        const rlData = rlRes.data || [];
-        const glData = glRes.data || [];
-        const goalsData = (goalsRes.data || []) as Array<{ id: string; name: string }>;
+          // Build available lists: years from reading_list + all goals
+          const years = new Set<number>();
+          rlData.forEach((r: any) => years.add(r.year));
+          const lists: Array<{ id: string; name: string; type: "year" | "goal" }> = [];
+          Array.from(years).sort((a, b) => b - a).forEach(y => lists.push({ id: `year-${y}`, name: `${y} Reading List`, type: "year" }));
+          goalsData.forEach(g => lists.push({ id: g.id, name: g.name, type: "goal" }));
+          setAvailableLists(lists);
 
-        // Build available lists: years from reading_list + all goals
-        const years = new Set<number>();
-        rlData.forEach((r: any) => years.add(r.year));
-        const lists: Array<{ id: string; name: string; type: "year" | "goal" }> = [];
-        Array.from(years).sort((a, b) => b - a).forEach(y => lists.push({ id: `year-${y}`, name: `${y} Reading List`, type: "year" }));
-        goalsData.forEach(g => lists.push({ id: g.id, name: g.name, type: "goal" }));
-        setAvailableLists(lists);
-
-        // Build IDs based on selected list
-        const ids = new Set<string>();
-        if (selectedListId) {
-          if (selectedListId.startsWith("year-")) {
-            const year = parseInt(selectedListId.replace("year-", ""));
-            rlData.filter((r: any) => r.year === year).forEach((r: any) => ids.add(r.book_id));
+          // Build IDs based on selected list
+          const ids = new Set<string>();
+          if (selectedListId) {
+            if (selectedListId.startsWith("year-")) {
+              const year = parseInt(selectedListId.replace("year-", ""));
+              rlData.filter((r: any) => r.year === year).forEach((r: any) => ids.add(r.book_id));
+            } else {
+              glData.filter((r: any) => r.goal_id === selectedListId).forEach((r: any) => ids.add(r.book_id));
+            }
           } else {
-            glData.filter((r: any) => r.goal_id === selectedListId).forEach((r: any) => ids.add(r.book_id));
+            // "All lists" — combine everything
+            rlData.forEach((r: any) => ids.add(r.book_id));
+            glData.forEach((r: any) => ids.add(r.book_id));
           }
-        } else {
-          // "All lists" — combine everything
-          rlData.forEach((r: any) => ids.add(r.book_id));
-          glData.forEach((r: any) => ids.add(r.book_id));
+          setReadingListIds(ids);
         }
-        setReadingListIds(ids);
-      }
 
-      if (filter === "favorites") {
-        query = supabase
-          .from("books")
-          .select("*")
-          .eq("favorite", true)
-          .order("created_at", { ascending: false });
-      } else if (filter !== "all" && filter !== "on_reading_list") {
-        query = query.eq("status", filter);
-      }
+        // Fetch books with filters
+        let params: any = { sort: "created_at DESC" };
 
-      if (search.trim()) {
-        query = query.or(
-          `title.ilike.%${search}%,author.ilike.%${search}%`
-        );
-      }
+        if (filter === "favorites") {
+          params.favorites = true;
+        } else if (filter !== "all" && filter !== "on_reading_list") {
+          params.status = filter;
+        }
 
-      const { data, error } = await query;
+        if (search.trim()) {
+          params.search = search.trim();
+        }
 
-      if (!ignore) {
-        if (error) {
-          console.error("Error fetching books:", error);
-        } else {
+        const data = await api.books.list(params);
+
+        if (!ignore) {
           setBooks((prev) => {
             const optimistic = prev.filter((b) => b._optimistic);
             const real = data || [];
@@ -153,8 +140,11 @@ export default function Home() {
             );
             return [...stillPending, ...real];
           });
+          setLoading(false);
         }
-        setLoading(false);
+      } catch (error) {
+        console.error("Error fetching books:", error);
+        if (!ignore) setLoading(false);
       }
     };
 
@@ -261,21 +251,22 @@ export default function Home() {
   );
 
   const handleDelete = async (id: string) => {
-    const { error } = await supabase.from("books").delete().eq("id", id);
-    if (!error) {
+    try {
+      await api.books.delete(id);
       setBooks((prev) => prev.filter((b) => b.id !== id));
+    } catch (error) {
+      console.error("Error deleting book:", error);
     }
   };
 
   const handleStatusChange = async (id: string, status: Book["status"]) => {
-    const { error } = await supabase
-      .from("books")
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq("id", id);
-    if (!error) {
+    try {
+      await api.books.update(id, { status });
       setBooks((prev) =>
         prev.map((b) => (b.id === id ? { ...b, status } : b))
       );
+    } catch (error) {
+      console.error("Error updating book status:", error);
     }
   };
 
@@ -302,25 +293,26 @@ export default function Home() {
 
   const handleBulkDelete = async () => {
     if (!confirm(`Delete ${selectedIds.size} book(s)?`)) return;
-    const ids = [...selectedIds];
-    const { error } = await supabase.from("books").delete().in("id", ids);
-    if (!error) {
+    try {
+      const ids = [...selectedIds];
+      await Promise.all(ids.map(id => api.books.delete(id)));
       setBooks((prev) => prev.filter((b) => !selectedIds.has(b.id)));
       clearSelection();
+    } catch (error) {
+      console.error("Error bulk deleting books:", error);
     }
   };
 
   const handleBulkStatus = async (status: Book["status"]) => {
-    const ids = [...selectedIds];
-    const { error } = await supabase
-      .from("books")
-      .update({ status, updated_at: new Date().toISOString() })
-      .in("id", ids);
-    if (!error) {
+    try {
+      const ids = [...selectedIds];
+      await Promise.all(ids.map(id => api.books.update(id, { status })));
       setBooks((prev) =>
         prev.map((b) => (selectedIds.has(b.id) ? { ...b, status } : b))
       );
       clearSelection();
+    } catch (error) {
+      console.error("Error bulk updating book status:", error);
     }
   };
 

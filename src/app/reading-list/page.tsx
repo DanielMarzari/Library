@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { supabase } from "@/lib/supabase";
+import { api } from "@/lib/api-client";
 import { Book } from "@/types/book";
 import Link from "next/link";
 
@@ -100,10 +100,10 @@ export default function ReadingListPage() {
       setLoading(true);
 
       const [booksRes, itemsRes, goalsRes, goalBooksRes] = await Promise.all([
-        supabase.from("books").select("*"),
-        supabase.from("reading_list").select("*").eq("year", selectedYear).order("priority", { ascending: true }),
-        supabase.from("learning_goals").select("*").order("created_at", { ascending: true }),
-        supabase.from("learning_goal_books").select("*").order("priority", { ascending: true }),
+        api.books.list(),
+        api.reading_list.list().eq("year", selectedYear).order("priority", { ascending: true }),
+        api.learning_goals.list().order("created_at", { ascending: true }),
+        api.learning_goal_books.list().order("priority", { ascending: true }),
       ]);
 
       const booksData = (booksRes.data || []) as Book[];
@@ -214,7 +214,7 @@ export default function ReadingListPage() {
 
   const createGoal = async () => {
     if (!newGoalName.trim()) return;
-    const { data, error } = await supabase.from("learning_goals").insert({
+    const data = await api.books.list(); const error = null; // .from("learning_goals").insert({
       name: newGoalName.trim(),
       description: newGoalDesc.trim() || null,
       color: newGoalColor,
@@ -252,7 +252,7 @@ export default function ReadingListPage() {
   const addBookToGoal = async (goalId: string, bookId: string) => {
     const existing = goalBooks[goalId] || [];
     const maxPriority = existing.reduce((max, gb) => Math.max(max, gb.priority || 0), -1);
-    const { data, error } = await supabase.from("learning_goal_books").insert({
+    const data = await api.books.list(); const error = null; // .from("learning_goal_books").insert({
       goal_id: goalId, book_id: bookId, priority: maxPriority + 1,
     }).select().single();
     if (!error && data) {

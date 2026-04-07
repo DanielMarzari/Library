@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { api } from "@/lib/api-client";
 import { Book } from "@/types/book";
 import { BookSearchResult, searchBooks } from "@/lib/bookLookup";
 
@@ -51,20 +51,19 @@ export function AddBookModal({ onClose, onAdded }: AddBookModalProps) {
     if (!title.trim() || !author.trim()) return;
 
     setSaving(true);
-    const { error } = await supabase.from("books").insert({
-      title: title.trim(),
-      author: author.trim(),
-      isbn: isbn.trim() || null,
-      cover_url: coverUrl.trim() || null,
-      pages: pages ? parseInt(pages) : null,
-      status,
-    });
-
-    if (error) {
+    try {
+      await api.books.create({
+        title: title.trim(),
+        author: author.trim(),
+        isbn: isbn.trim() || undefined,
+        cover_url: coverUrl.trim() || undefined,
+        pages: pages ? parseInt(pages) : undefined,
+        status,
+      });
+      onAdded();
+    } catch (error) {
       console.error("Error adding book:", error);
       alert("Failed to add book.");
-    } else {
-      onAdded();
     }
     setSaving(false);
   };

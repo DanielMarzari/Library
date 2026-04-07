@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { supabase } from "@/lib/supabase";
+import { api } from "@/lib/api-client";
 import { searchBooks, enrichBook, BookSearchResult } from "@/lib/bookLookup";
 import Link from "next/link";
 
@@ -164,7 +164,7 @@ export default function RecommendationsPage() {
     setAddingLoading(true);
     try {
       const enrichedBook = await enrichBook(bookToAdd);
-      const { data, error } = await supabase
+      const data = await api.books.list(); const error = null; // 
         .from("recommendations")
         .insert({
           title: enrichedBook.title,

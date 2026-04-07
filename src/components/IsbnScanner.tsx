@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
-import { supabase } from "@/lib/supabase";
+import { api } from "@/lib/api-client";
 import { Book } from "@/types/book";
 import { BookSearchResult, searchBooks, enrichBook } from "@/lib/bookLookup";
 
@@ -140,22 +140,26 @@ export function IsbnScanner({ onClose, onAdded }: IsbnScannerProps) {
 
     onAdded(newBook);
 
-    await supabase.from("books").insert({
-      title: book.title,
-      author: book.author,
-      isbn: book.isbn || null,
-      cover_url: book.cover_url,
-      description: book.description,
-      pages: book.pages,
-      intro_pages: ip || 0,
-      start_page: sp,
-      end_page: ep,
-      status,
-      source: source.trim() || null,
-      lcc: book.lcc || null,
-      ddc: book.ddc || null,
-      topics: editTopics.length > 0 ? editTopics : null,
-    });
+    try {
+      await api.books.create({
+        title: book.title,
+        author: book.author,
+        isbn: book.isbn || undefined,
+        cover_url: book.cover_url,
+        description: book.description,
+        pages: book.pages,
+        intro_pages: ip || 0,
+        start_page: sp,
+        end_page: ep,
+        status,
+        source: source.trim() || undefined,
+        lcc: book.lcc || undefined,
+        ddc: book.ddc || undefined,
+        topics: editTopics.length > 0 ? editTopics : undefined,
+      });
+    } catch (error) {
+      console.error("Error saving book:", error);
+    }
 
     setSaving(false);
   };
