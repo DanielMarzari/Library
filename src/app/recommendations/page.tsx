@@ -19,10 +19,11 @@ interface Recommendation {
   interest?: string;
   year?: number;
   lowest_price?: number | null;
+  thriftbooks_price?: number | null;
   created_at: string;
 }
 
-type SortMode = "recent" | "price_asc" | "price_desc" | "alpha";
+type SortMode = "recent" | "abe_asc" | "abe_desc" | "thrift_asc" | "thrift_desc" | "alpha";
 
 interface LibraryBook {
   title: string;
@@ -57,6 +58,7 @@ export default function RecommendationsPage() {
   const [priceProgress, setPriceProgress] = useState({ done: 0, total: 0 });
   const [possibleDupes, setPossibleDupes] = useState<Array<{ rec: Recommendation; libraryMatch: string }>>([]);
   const [showDupes, setShowDupes] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
   const PAGE_SIZE = 60;
 
   const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "").substring(0, 40);
@@ -333,11 +335,17 @@ export default function RecommendationsPage() {
       case "alpha":
         filtered.sort((a, b) => a.title.localeCompare(b.title));
         break;
-      case "price_asc":
+      case "abe_asc":
         filtered.sort((a, b) => (a.lowest_price ?? 9999) - (b.lowest_price ?? 9999));
         break;
-      case "price_desc":
+      case "abe_desc":
         filtered.sort((a, b) => (b.lowest_price ?? 0) - (a.lowest_price ?? 0));
+        break;
+      case "thrift_asc":
+        filtered.sort((a, b) => (a.thriftbooks_price ?? 9999) - (b.thriftbooks_price ?? 9999));
+        break;
+      case "thrift_desc":
+        filtered.sort((a, b) => (b.thriftbooks_price ?? 0) - (a.thriftbooks_price ?? 0));
         break;
       case "recent":
       default:
@@ -350,31 +358,51 @@ export default function RecommendationsPage() {
     return filteredRecs.slice(0, page * PAGE_SIZE);
   }, [filteredRecs, page]);
 
-  // Refresh prices for visible recs that are missing them
+  // Refresh prices for visible recs missing them (both AbeBooks + ThriftBooks)
   const handleRefreshPrices = async () => {
-    const noPriceRecs = paginatedRecs.filter(r => r.lowest_price == null).slice(0, 20);
-    if (noPriceRecs.length === 0) return;
+    const recsToPrice = paginatedRecs.filter(r => r.lowest_price == null || r.thriftbooks_price == null).slice(0, 20);
+    if (recsToPrice.length === 0) return;
     setFetchingPrices(true);
-    setPriceProgress({ done: 0, total: noPriceRecs.length });
+    setPriceProgress({ done: 0, total: recsToPrice.length });
 
-    for (let i = 0; i < noPriceRecs.length; i++) {
-      const rec = noPriceRecs[i];
-      try {
-        const resp = await fetch("/api/fetch-price", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: rec.title, author: rec.author, isbn: rec.isbn, recId: rec.id }),
-        });
-        const data = await resp.json();
-        if (data.price != null) {
-          setRecommendations(prev => prev.map(r => r.id === rec.id ? { ...r, lowest_price: data.price } : r));
-          setAllRecs(prev => prev.map(r => r.id === rec.id ? { ...r, lowest_price: data.price } : r));
-        }
-      } catch (e) {
-        // skip failures
+    for (let i = 0; i < recsToPrice.length; i++) {
+      const rec = recsToPrice[i];
+      const updates: Partial<Recommendation> = {};
+
+      // Fetch AbeBooks price if missing
+      if (rec.lowest_price == null) {
+        try {
+          const resp = await fetch("/api/fetch-price", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: rec.title, author: rec.author, isbn: rec.isbn, recId: rec.id }),
+          });
+          const data = await resp.json();
+          if (data.price != null) updates.lowest_price = data.price;
+        } catch { /* skip */ }
       }
-      setPriceProgress({ done: i + 1, total: noPriceRecs.length });
-      await new Promise(r => setTimeout(r, 1000));
+
+      // Fetch ThriftBooks price if missing
+      if (rec.thriftbooks_price == null) {
+        try {
+          const resp = await fetch("/api/fetch-thriftbooks-price", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: rec.title, author: rec.author, recId: rec.id }),
+          });
+          const data = await resp.json();
+          if (data.price != null) updates.thriftbooks_price = data.price;
+        } catch { /* skip */ }
+      }
+
+      if (Object.keys(updates).length > 0) {
+        const updater = (prev: Recommendation[]) => prev.map(r => r.id === rec.id ? { ...r, ...updates } : r);
+        setRecommendations(updater);
+        setAllRecs(updater);
+      }
+
+      setPriceProgress({ done: i + 1, total: recsToPrice.length });
+      await new Promise(r => setTimeout(r, 1500));
     }
     setFetchingPrices(false);
   };
@@ -523,8 +551,10 @@ export default function RecommendationsPage() {
             {([
               { label: "Recent", value: "recent" as SortMode },
               { label: "A-Z", value: "alpha" as SortMode },
-              { label: "Price ↑", value: "price_asc" as SortMode },
-              { label: "Price ↓", value: "price_desc" as SortMode },
+              { label: "Abe ↓", value: "abe_asc" as SortMode },
+              { label: "Abe ↑", value: "abe_desc" as SortMode },
+              { label: "Thrift ↓", value: "thrift_asc" as SortMode },
+              { label: "Thrift ↑", value: "thrift_desc" as SortMode },
             ]).map(s => (
               <button
                 key={s.value}
@@ -538,14 +568,17 @@ export default function RecommendationsPage() {
             ))}
             <div className="ml-auto flex items-center gap-2">
               {fetchingPrices ? (
-                <span className="text-[10px] text-muted animate-pulse">
-                  Refreshing... {priceProgress.done}/{priceProgress.total}
-                </span>
+                <div className="flex items-center gap-2">
+                  <div className="w-24 bg-surface-2 rounded-full h-1.5 overflow-hidden">
+                    <div className="bg-amber-500 h-full rounded-full transition-all" style={{ width: `${priceProgress.total > 0 ? (priceProgress.done / priceProgress.total) * 100 : 0}%` }} />
+                  </div>
+                  <span className="text-[10px] text-muted">{priceProgress.done}/{priceProgress.total}</span>
+                </div>
               ) : (
                 <button
                   onClick={handleRefreshPrices}
                   className="px-2.5 py-1 bg-amber-500/10 text-amber-500 rounded text-[10px] font-medium hover:bg-amber-500/20 transition-colors"
-                  title="Refresh missing prices for visible books"
+                  title="Fetch AbeBooks + ThriftBooks prices for visible books"
                 >
                   ↻ Refresh Prices
                 </button>
@@ -553,72 +586,88 @@ export default function RecommendationsPage() {
             </div>
           </div>
 
-          {/* Source filter pills */}
-          {allSources.length > 1 && (
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                onClick={() => { setFilterSource(null); setExcludeSource(null); }}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${!filterSource && !excludeSource ? "bg-blue-600 text-white" : "bg-surface-2 text-muted hover:text-foreground"}`}
-              >
-                All Sources
-              </button>
-              {allSources.slice(0, 8).map(([source, count]) => (
-                <button
-                  key={source}
-                  onClick={() => toggleSourceFilter(source)}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
-                    filterSource === source ? "bg-blue-600 text-white" :
-                    excludeSource === source ? "bg-red-500/20 text-red-400 line-through" :
-                    "bg-surface-2 text-muted hover:text-foreground"
-                  }`}
-                >
-                  {excludeSource === source && "− "}{source} <span className="opacity-60">({count})</span>
-                </button>
-              ))}
-            </div>
-          )}
+          {/* Collapsible filter tags */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="flex items-center gap-1.5 text-[10px] text-muted hover:text-foreground transition-colors font-medium uppercase tracking-wider"
+          >
+            <svg className={`w-3 h-3 transition-transform ${showFilters ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+            Filters
+            {(filterTopic || excludeTopic || filterSource || excludeSource) && (
+              <span className="bg-emerald-600 text-white px-1.5 py-0.5 rounded-full text-[9px] normal-case">active</span>
+            )}
+          </button>
 
-          {/* Collection filter pills (Mentioned on Podcast, etc.) */}
-          {allCollections.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {allCollections.map(([coll, count]) => (
-                <button
-                  key={coll}
-                  onClick={() => toggleTopicFilter(coll)}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
-                    filterTopic === coll ? "bg-amber-600 text-white" :
-                    excludeTopic === coll ? "bg-red-500/20 text-red-400 line-through" :
-                    "bg-amber-500/10 text-amber-500 hover:bg-amber-500/20"
-                  }`}
-                >
-                  {excludeTopic === coll && "− "}{coll} <span className="opacity-60">({count})</span>
-                </button>
-              ))}
-            </div>
-          )}
+          {showFilters && (
+            <div className="space-y-2 pl-1">
+              {/* Source filter pills */}
+              {allSources.length > 1 && (
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    onClick={() => { setFilterSource(null); setExcludeSource(null); }}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${!filterSource && !excludeSource ? "bg-blue-600 text-white" : "bg-surface-2 text-muted hover:text-foreground"}`}
+                  >
+                    All Sources
+                  </button>
+                  {allSources.slice(0, 8).map(([source, count]) => (
+                    <button
+                      key={source}
+                      onClick={() => toggleSourceFilter(source)}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                        filterSource === source ? "bg-blue-600 text-white" :
+                        excludeSource === source ? "bg-red-500/20 text-red-400 line-through" :
+                        "bg-surface-2 text-muted hover:text-foreground"
+                      }`}
+                    >
+                      {excludeSource === source && "− "}{source} <span className="opacity-60">({count})</span>
+                    </button>
+                  ))}
+                </div>
+              )}
 
-          {/* Topic filter pills */}
-          {allTopics.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                onClick={() => { setFilterTopic(null); setExcludeTopic(null); }}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${!filterTopic && !excludeTopic ? "bg-emerald-600 text-white" : "bg-surface-2 text-muted hover:text-foreground"}`}
-              >
-                All Topics
-              </button>
-              {allTopics.map(([topic, count]) => (
-                <button
-                  key={topic}
-                  onClick={() => toggleTopicFilter(topic)}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
-                    filterTopic === topic ? "bg-emerald-600 text-white" :
-                    excludeTopic === topic ? "bg-red-500/20 text-red-400 line-through" :
-                    "bg-surface-2 text-muted hover:text-foreground"
-                  }`}
-                >
-                  {excludeTopic === topic && "− "}{topic} <span className="opacity-60">({count})</span>
-                </button>
-              ))}
+              {/* Collection filter pills */}
+              {allCollections.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {allCollections.map(([coll, count]) => (
+                    <button
+                      key={coll}
+                      onClick={() => toggleTopicFilter(coll)}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                        filterTopic === coll ? "bg-amber-600 text-white" :
+                        excludeTopic === coll ? "bg-red-500/20 text-red-400 line-through" :
+                        "bg-amber-500/10 text-amber-500 hover:bg-amber-500/20"
+                      }`}
+                    >
+                      {excludeTopic === coll && "− "}{coll} <span className="opacity-60">({count})</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Topic filter pills */}
+              {allTopics.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    onClick={() => { setFilterTopic(null); setExcludeTopic(null); }}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${!filterTopic && !excludeTopic ? "bg-emerald-600 text-white" : "bg-surface-2 text-muted hover:text-foreground"}`}
+                  >
+                    All Topics
+                  </button>
+                  {allTopics.map(([topic, count]) => (
+                    <button
+                      key={topic}
+                      onClick={() => toggleTopicFilter(topic)}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                        filterTopic === topic ? "bg-emerald-600 text-white" :
+                        excludeTopic === topic ? "bg-red-500/20 text-red-400 line-through" :
+                        "bg-surface-2 text-muted hover:text-foreground"
+                      }`}
+                    >
+                      {excludeTopic === topic && "− "}{topic} <span className="opacity-60">({count})</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -741,12 +790,19 @@ export default function RecommendationsPage() {
                       </div>
                     </div>
 
-                    {/* Price badge */}
-                    {rec.lowest_price != null && (
-                      <span className="px-1.5 py-0.5 bg-amber-500/10 text-amber-500 rounded text-[9px] font-bold flex-shrink-0">
-                        ${rec.lowest_price.toFixed(2)}
-                      </span>
-                    )}
+                    {/* Price badges */}
+                    <div className="flex flex-col gap-0.5 flex-shrink-0 items-end">
+                      {rec.lowest_price != null && (
+                        <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-500 rounded text-[9px] font-bold" title="AbeBooks">
+                          A ${rec.lowest_price.toFixed(2)}
+                        </span>
+                      )}
+                      {rec.thriftbooks_price != null && (
+                        <span className="px-1.5 py-0.5 bg-blue-500/10 text-blue-400 rounded text-[9px] font-bold" title="ThriftBooks">
+                          T ${rec.thriftbooks_price.toFixed(2)}
+                        </span>
+                      )}
+                    </div>
 
                     {/* Source badge */}
                     {rec.recommended_by && (
