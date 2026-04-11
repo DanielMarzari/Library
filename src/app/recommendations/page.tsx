@@ -116,32 +116,75 @@ export default function RecommendationsPage() {
         allRecsData = allRecsData.filter((r) => !deletedIds.has(r.id));
       }
 
-      // Detect fuzzy matches: same author + overlapping title words
-      const normalizeAuthor = (a: string) => a.toLowerCase().replace(/[^a-z]/g, "").substring(0, 30);
-      const titleWords = (t: string) => new Set(t.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 3));
-      const libraryByAuthor: Record<string, Array<{ title: string; words: Set<string> }>> = {};
+      // Detect fuzzy matches: similar author + overlapping title words
+      const authorLastName = (a: string) => {
+        const parts = a.toLowerCase().replace(/[^a-z\s]/g, "").trim().split(/\s+/);
+        return parts[parts.length - 1] || "";
+      };
+      const authorKeys = (a: string): string[] => {
+        // Return multiple keys: full normalized name + last name only
+        const full = a.toLowerCase().replace(/[^a-z]/g, "");
+        const last = authorLastName(a);
+        return last ? [full, last] : [full];
+      };
+      const titleWords = (t: string) => new Set(
+        t.toLowerCase()
+          .replace(/\s*[:]\s*.*/g, "")  // strip subtitle for matching
+          .replace(/[^a-z0-9\s]/g, "")
+          .split(/\s+/)
+          .filter(w => w.length > 2)
+      );
+      // Index library books by all author keys
+      const libraryByKey: Record<string, Array<{ title: string; fullTitle: string; words: Set<string>; author: string }>> = {};
       (books || []).forEach((b) => {
-        const key = normalizeAuthor(b.author || "");
-        if (!key) return;
-        if (!libraryByAuthor[key]) libraryByAuthor[key] = [];
-        libraryByAuthor[key].push({ title: b.title, words: titleWords(b.title) });
+        if (!b.author) return;
+        const keys = authorKeys(b.author);
+        const entry = { title: b.title, fullTitle: b.title, words: titleWords(b.title), author: b.author };
+        keys.forEach(k => {
+          if (!k) return;
+          if (!libraryByKey[k]) libraryByKey[k] = [];
+          libraryByKey[k].push(entry);
+        });
       });
 
       const fuzzyMatches: Array<{ rec: Recommendation; libraryMatch: string }> = [];
+      const fuzzyMatchedIds = new Set<string>();
       allRecsData.forEach((r) => {
         if (!r.author) return;
-        const recAuthorKey = normalizeAuthor(r.author);
-        const authorMatches = libraryByAuthor[recAuthorKey];
-        if (!authorMatches) return;
+        // Try all author key variants to find matches
+        const recKeys = authorKeys(r.author);
+        let candidates: typeof libraryByKey[string] = [];
+        for (const k of recKeys) {
+          if (libraryByKey[k]) candidates = [...candidates, ...libraryByKey[k]];
+        }
+        if (candidates.length === 0) return;
+
+        // Dedupe candidates by title
+        const seen = new Set<string>();
+        candidates = candidates.filter(c => {
+          if (seen.has(c.title)) return false;
+          seen.add(c.title);
+          return true;
+        });
+
         const recWords = titleWords(r.title);
         if (recWords.size === 0) return;
-        for (const lib of authorMatches) {
-          // Count overlapping words
+
+        for (const lib of candidates) {
           let overlap = 0;
           recWords.forEach(w => { if (lib.words.has(w)) overlap++; });
-          const overlapPct = overlap / Math.min(recWords.size, lib.words.size);
-          if (overlapPct >= 0.5 && overlap >= 2) {
-            fuzzyMatches.push({ rec: r, libraryMatch: lib.title });
+          const smaller = Math.min(recWords.size, lib.words.size);
+          const overlapPct = smaller > 0 ? overlap / smaller : 0;
+          // Match if: ≥50% word overlap with at least 1 overlapping word,
+          // OR if one title is a substring of the other (handles "Generous Justice" ⊂ "Generous Justice: How God's...")
+          const recTitleClean = r.title.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+          const libTitleClean = lib.title.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+          const isSubstring = recTitleClean.includes(libTitleClean) || libTitleClean.includes(recTitleClean);
+          if ((overlapPct >= 0.5 && overlap >= 1) || isSubstring) {
+            if (!fuzzyMatchedIds.has(r.id)) {
+              fuzzyMatches.push({ rec: r, libraryMatch: `${lib.title} by ${lib.author}` });
+              fuzzyMatchedIds.add(r.id);
+            }
             break;
           }
         }
