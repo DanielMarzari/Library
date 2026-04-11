@@ -2,6 +2,7 @@
 
 import { useRef, useCallback } from "react";
 import { Book } from "@/types/book";
+import { safeCoverUrl } from "@/lib/coverUrl";
 
 type GridSize = "xs" | "small" | "medium" | "large" | "xl";
 
@@ -123,12 +124,19 @@ function ShelfBook({
             <div className="animate-spin rounded-full h-5 w-5 border-2 border-border-custom border-t-emerald-500 mb-2" />
             <span className="text-[10px] text-muted">Adding...</span>
           </div>
-        ) : book.cover_url ? (
-          <img
-            src={book.cover_url}
-            alt={book.title}
-            className="w-full h-full object-cover"
-          />
+        ) : safeCoverUrl(book.cover_url) ? (
+          <>
+            <img
+              src={safeCoverUrl(book.cover_url)}
+              alt={book.title}
+              className="w-full h-full object-cover"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement?.querySelector('.cover-fallback')?.classList.remove('hidden'); }}
+            />
+            <div className="cover-fallback hidden w-full h-full bg-gradient-to-br from-border-custom to-surface-2 flex flex-col items-center justify-center p-2 text-center absolute inset-0">
+              <span className="text-[10px] font-semibold text-foreground leading-tight line-clamp-3">{book.title}</span>
+              <span className="text-[9px] text-muted mt-1 line-clamp-1">{book.author}</span>
+            </div>
+          </>
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-border-custom to-surface-2 flex flex-col items-center justify-center p-2 text-center">
             <span className="text-[10px] font-semibold text-foreground leading-tight line-clamp-3">

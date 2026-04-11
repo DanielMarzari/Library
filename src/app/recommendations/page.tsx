@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { searchBooks, enrichBook, BookSearchResult } from "@/lib/bookLookup";
 import Link from "next/link";
+import { safeCoverUrl } from "@/lib/coverUrl";
 
 interface Recommendation {
   id: string;
@@ -798,8 +799,8 @@ export default function RecommendationsPage() {
                     className="group flex items-center gap-3 px-4 py-2.5 hover:bg-surface-2/50 transition-colors relative"
                   >
                     {/* Cover thumbnail */}
-                    {rec.cover_url ? (
-                      <img src={rec.cover_url} alt="" className="w-8 h-11 object-cover rounded flex-shrink-0" />
+                    {safeCoverUrl(rec.cover_url) ? (
+                      <img src={safeCoverUrl(rec.cover_url)} alt="" className="w-8 h-11 object-cover rounded flex-shrink-0" />
                     ) : (
                       <div className="w-8 h-11 bg-surface-2 rounded flex-shrink-0 flex items-center justify-center">
                         <span className="text-[10px] text-muted">📖</span>
