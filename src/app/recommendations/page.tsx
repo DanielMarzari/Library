@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { api } from "@/lib/api-client";
+import { supabase } from "@/lib/supabase";
 import { searchBooks, enrichBook, BookSearchResult } from "@/lib/bookLookup";
 import Link from "next/link";
 
@@ -26,6 +26,7 @@ type SortMode = "recent" | "price_asc" | "price_desc" | "alpha";
 
 interface LibraryBook {
   title: string;
+  author: string;
   status: string;
 }
 
@@ -54,6 +55,8 @@ export default function RecommendationsPage() {
   const [sortMode, setSortMode] = useState<SortMode>("recent");
   const [fetchingPrices, setFetchingPrices] = useState(false);
   const [priceProgress, setPriceProgress] = useState({ done: 0, total: 0 });
+  const [possibleDupes, setPossibleDupes] = useState<Array<{ rec: Recommendation; libraryMatch: string }>>([]);
+  const [showDupes, setShowDupes] = useState(true);
   const PAGE_SIZE = 60;
 
   const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "").substring(0, 40);
@@ -61,51 +64,91 @@ export default function RecommendationsPage() {
   // Load recommendations and library titles, auto-removing owned books
   useEffect(() => {
     const loadData = async () => {
-      try {
-        setLoading(true);
+      setLoading(true);
 
-        // Load all recommendations
-        const allRecsData = await api.recommendations.list();
+      // Load ALL recommendations (paginated for large sets)
+      let allRecsData: Recommendation[] = [];
+      let from = 0;
+      const batchSize = 1000;
+      while (true) {
+        const { data: batch } = await supabase
+          .from("recommendations")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .range(from, from + batchSize - 1);
+        if (batch && batch.length > 0) {
+          allRecsData = [...allRecsData, ...batch];
+          if (batch.length < batchSize) break;
+          from += batchSize;
+        } else break;
+      }
 
-        // Load library books
-        const books = await api.books.list();
+      // Load library books
+      const { data: books } = await supabase
+        .from("books")
+        .select("title,author,status");
 
-        const normalizedBookTitles = new Set(
-          (books || []).map((b) => normalize(b.title))
-        );
-        const existingTitles = new Set(
-          (books || []).map((b) => b.title.toLowerCase())
-        );
-        setLibraryTitles(existingTitles);
-        setLibraryBooks(books || []);
+      const normalizedBookTitles = new Set(
+        (books || []).map((b) => normalize(b.title))
+      );
+      const existingTitles = new Set(
+        (books || []).map((b) => b.title.toLowerCase())
+      );
+      setLibraryTitles(existingTitles);
+      setLibraryBooks(books || []);
 
-        // Auto-delete recommendations for books already in library
-        const filteredRecs = allRecsData.filter((r) =>
-          !normalizedBookTitles.has(normalize(r.title))
-        );
+      // Auto-delete recommendations for books already in library (exact normalized title match)
+      const ownedRecs = allRecsData.filter((r) =>
+        normalizedBookTitles.has(normalize(r.title))
+      );
+      if (ownedRecs.length > 0) {
+        const idsToDelete = ownedRecs.map((r) => r.id);
+        for (let i = 0; i < idsToDelete.length; i += 50) {
+          const batch = idsToDelete.slice(i, i + 50);
+          await supabase
+            .from("recommendations")
+            .delete()
+            .in("id", batch);
+        }
+        const deletedIds = new Set(idsToDelete);
+        allRecsData = allRecsData.filter((r) => !deletedIds.has(r.id));
+      }
 
-        // Delete owned recommendations from the API
-        const ownedRecs = allRecsData.filter((r) =>
-          normalizedBookTitles.has(normalize(r.title))
-        );
-        if (ownedRecs.length > 0) {
-          const idsToDelete = ownedRecs.map((r) => r.id);
-          // Delete in batches of 50
-          for (let i = 0; i < idsToDelete.length; i += 50) {
-            const batch = idsToDelete.slice(i, i + 50);
-            for (const id of batch) {
-              await api.recommendations.delete(id);
-            }
+      // Detect fuzzy matches: same author + overlapping title words
+      const normalizeAuthor = (a: string) => a.toLowerCase().replace(/[^a-z]/g, "").substring(0, 30);
+      const titleWords = (t: string) => new Set(t.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 3));
+      const libraryByAuthor: Record<string, Array<{ title: string; words: Set<string> }>> = {};
+      (books || []).forEach((b) => {
+        const key = normalizeAuthor(b.author || "");
+        if (!key) return;
+        if (!libraryByAuthor[key]) libraryByAuthor[key] = [];
+        libraryByAuthor[key].push({ title: b.title, words: titleWords(b.title) });
+      });
+
+      const fuzzyMatches: Array<{ rec: Recommendation; libraryMatch: string }> = [];
+      allRecsData.forEach((r) => {
+        if (!r.author) return;
+        const recAuthorKey = normalizeAuthor(r.author);
+        const authorMatches = libraryByAuthor[recAuthorKey];
+        if (!authorMatches) return;
+        const recWords = titleWords(r.title);
+        if (recWords.size === 0) return;
+        for (const lib of authorMatches) {
+          // Count overlapping words
+          let overlap = 0;
+          recWords.forEach(w => { if (lib.words.has(w)) overlap++; });
+          const overlapPct = overlap / Math.min(recWords.size, lib.words.size);
+          if (overlapPct >= 0.5 && overlap >= 2) {
+            fuzzyMatches.push({ rec: r, libraryMatch: lib.title });
+            break;
           }
         }
+      });
+      setPossibleDupes(fuzzyMatches);
 
-        setAllRecs(filteredRecs);
-        setRecommendations(filteredRecs);
-        setLoading(false);
-      } catch (error) {
-        console.error("Error loading recommendations:", error);
-        setLoading(false);
-      }
+      setAllRecs(allRecsData);
+      setRecommendations(allRecsData);
+      setLoading(false);
     };
 
     loadData();
@@ -154,21 +197,30 @@ export default function RecommendationsPage() {
     setAddingLoading(true);
     try {
       const enrichedBook = await enrichBook(bookToAdd);
-      const data = await api.recommendations.create({
-        title: enrichedBook.title,
-        description: enrichedBook.author,
-        source: recommendedBy.trim() || null,
-      });
+      const { data, error } = await supabase
+        .from("recommendations")
+        .insert({
+          title: enrichedBook.title,
+          author: enrichedBook.author,
+          isbn: enrichedBook.isbn,
+          cover_url: enrichedBook.cover_url,
+          recommended_by: recommendedBy.trim() || null,
+          notes: notes.trim() || null,
+        })
+        .select()
+        .single();
 
-      setRecommendations((prev) => [data, ...prev]);
-      setAllRecs((prev) => [data, ...prev]);
-      setSearchQuery("");
-      setRecommendedBy("");
-      setNotes("");
-      setSelectedResult(null);
-      setSearchResults([]);
-      setShowSearchResults(false);
-      setShowAddForm(false);
+      if (!error && data) {
+        setRecommendations((prev) => [data, ...prev]);
+        setAllRecs((prev) => [data, ...prev]);
+        setSearchQuery("");
+        setRecommendedBy("");
+        setNotes("");
+        setSelectedResult(null);
+        setSearchResults([]);
+        setShowSearchResults(false);
+        setShowAddForm(false);
+      }
     } catch (error) {
       console.error("Error adding recommendation:", error);
     } finally {
@@ -179,9 +231,11 @@ export default function RecommendationsPage() {
   // Delete recommendation
   const handleDelete = async (id: string) => {
     try {
-      await api.recommendations.delete(id);
-      setRecommendations((prev) => prev.filter((r) => r.id !== id));
-      setAllRecs((prev) => prev.filter((r) => r.id !== id));
+      const { error } = await supabase.from("recommendations").delete().eq("id", id);
+      if (!error) {
+        setRecommendations((prev) => prev.filter((r) => r.id !== id));
+        setAllRecs((prev) => prev.filter((r) => r.id !== id));
+      }
       setDeleteConfirm(null);
     } catch (error) {
       console.error("Error deleting:", error);
@@ -583,6 +637,66 @@ export default function RecommendationsPage() {
           </div>
         ) : (
           <>
+            {/* Possible duplicates banner */}
+            {possibleDupes.length > 0 && showDupes && (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-amber-500 text-sm font-semibold">Already Own These?</span>
+                    <span className="text-xs text-muted bg-surface-2 px-2 py-0.5 rounded-full">{possibleDupes.length}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={async () => {
+                        const ids = possibleDupes.map(d => d.rec.id);
+                        for (let i = 0; i < ids.length; i += 50) {
+                          await supabase.from("recommendations").delete().in("id", ids.slice(i, i + 50));
+                        }
+                        const deletedSet = new Set(ids);
+                        setAllRecs(prev => prev.filter(r => !deletedSet.has(r.id)));
+                        setRecommendations(prev => prev.filter(r => !deletedSet.has(r.id)));
+                        setPossibleDupes([]);
+                      }}
+                      className="text-xs text-red-400 hover:text-red-300 font-medium"
+                    >
+                      Remove All
+                    </button>
+                    <button onClick={() => setShowDupes(false)} className="text-xs text-muted hover:text-foreground">Dismiss</button>
+                  </div>
+                </div>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {possibleDupes.map(({ rec, libraryMatch }) => (
+                    <div key={rec.id} className="flex items-center justify-between gap-2 text-xs">
+                      <div className="flex-1 min-w-0">
+                        <span className="text-foreground font-medium">{rec.title}</span>
+                        <span className="text-muted"> by {rec.author}</span>
+                        <span className="text-amber-500/70 ml-2">≈ {libraryMatch}</span>
+                      </div>
+                      <div className="flex gap-1 flex-shrink-0">
+                        <button
+                          onClick={async () => {
+                            await supabase.from("recommendations").delete().eq("id", rec.id);
+                            setAllRecs(prev => prev.filter(r => r.id !== rec.id));
+                            setRecommendations(prev => prev.filter(r => r.id !== rec.id));
+                            setPossibleDupes(prev => prev.filter(d => d.rec.id !== rec.id));
+                          }}
+                          className="px-2 py-0.5 bg-red-500/15 text-red-400 rounded hover:bg-red-500/25 font-medium"
+                        >
+                          Remove
+                        </button>
+                        <button
+                          onClick={() => setPossibleDupes(prev => prev.filter(d => d.rec.id !== rec.id))}
+                          className="px-2 py-0.5 bg-surface-2 text-muted rounded hover:text-foreground font-medium"
+                        >
+                          Keep
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Compact table/list view for large collections */}
             <div className="bg-surface border border-border-custom rounded-xl overflow-hidden">
               <div className="divide-y divide-border-custom">
