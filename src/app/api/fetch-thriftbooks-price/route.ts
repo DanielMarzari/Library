@@ -1,14 +1,5 @@
 import { NextResponse } from "next/server";
 
-function getSupabase() {
-  const { createClient } = require("@supabase/supabase-js");
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-}
-
 export async function POST(request: Request) {
   try {
     const { title, author, recId } = await request.json();
@@ -81,14 +72,8 @@ export async function POST(request: Request) {
     const lowestPrice = Math.min(...prices);
     const roundedPrice = Math.round(lowestPrice * 100) / 100;
 
-    // Save to DB
-    if (recId) {
-      const supabase = getSupabase();
-      await supabase
-        .from("recommendations")
-        .update({ thriftbooks_price: roundedPrice })
-        .eq("id", recId);
-    }
+    // Note: Not saving to DB here since we're using api-client pattern now
+    // The client will update the recommendation with the price via the API
 
     return NextResponse.json({
       price: roundedPrice,

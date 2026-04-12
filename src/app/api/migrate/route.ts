@@ -1,60 +1,96 @@
-import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { getDb } from "@/lib/db";
 
 export async function POST() {
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  try {
+    const db = getDb();
 
-  const checks: Array<{ table: string; columns: string[]; sql: string }> = [
-    {
-      table: "authors",
-      columns: ["religious_tradition", "profile_url"],
-      sql: "ALTER TABLE authors ADD COLUMN IF NOT EXISTS religious_tradition text;\nALTER TABLE authors ADD COLUMN IF NOT EXISTS profile_url text;",
-    },
-    {
-      table: "recommendations",
-      columns: ["thriftbooks_price"],
-      sql: "ALTER TABLE recommendations ADD COLUMN IF NOT EXISTS thriftbooks_price numeric;",
-    },
-    {
-      table: "lending",
-      columns: ["id"],
-      sql: `CREATE TABLE IF NOT EXISTS lending (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  book_id uuid REFERENCES books(id) ON DELETE CASCADE,
-  borrower_name text NOT NULL,
-  lent_date date NOT NULL DEFAULT CURRENT_DATE,
-  due_date date,
-  returned_date date,
-  notes text,
-  created_at timestamptz DEFAULT now()
-);`,
-    },
-  ];
+    // Check and create missing tables/columns for SQLite
+    const checks = [
+      {
+        table: "authors",
+        columns: ["religious_tradition", "profile_url"],
+        sql: `
+          ALTER TABLE authors ADD COLUMN IF NOT EXISTS religious_tradition text;
+          ALTER TABLE authors ADD COLUMN IF NOT EXISTS profile_url text;
+        `,
+      },
+      {
+        table: "recommendations",
+        columns: ["thriftbooks_price"],
+        sql: "ALTER TABLE recommendations ADD COLUMN IF NOT EXISTS thriftbooks_price real;",
+      },
+      {
+        table: "lending",
+        columns: ["id"],
+        sql: `
+          CREATE TABLE IF NOT EXISTS lending (
+            id TEXT PRIMARY KEY,
+            book_id TEXT NOT NULL,
+            lent_to TEXT NOT NULL,
+            lent_date TEXT NOT NULL,
+            return_date TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
+          );
+        `,
+      },
+    ];
 
-  const missing: string[] = [];
+    const missing: string[] = [];
 
-  for (const check of checks) {
-    const { error } = await supabaseAdmin
-      .from(check.table)
-      .select(check.columns.join(","))
-      .limit(1);
-    if (error) {
-      missing.push(check.sql);
+    for (const check of checks) {
+      try {
+        // Try to query the table to see if columns exist
+        const result = db
+          .prepare(`PRAGMA table_info(${check.table})`)
+          .all() as Array<{ name: string }>;
+        const existingColumns = new Set(result.map((r) => r.name));
+        const hasAllColumns = check.columns.every((col) => existingColumns.has(col));
+
+        if (!hasAllColumns) {
+          // Execute the migration SQL
+          const statements = check.sql.split(";").filter((s) => s.trim());
+          for (const stmt of statements) {
+            if (stmt.trim()) {
+              db.exec(stmt);
+            }
+          }
+        }
+      } catch (e) {
+        // Table might not exist, try to create it
+        const statements = check.sql.split(";").filter((s) => s.trim());
+        for (const stmt of statements) {
+          if (stmt.trim()) {
+            try {
+              db.exec(stmt);
+            } catch (innerError) {
+              console.error(`Failed to execute: ${stmt}`, innerError);
+              missing.push(check.sql);
+            }
+          }
+        }
+      }
     }
-  }
 
-  if (missing.length > 0) {
+    if (missing.length > 0) {
+      return NextResponse.json({
+        success: false,
+        message: "Some migrations failed. Check logs for details.",
+        failed: missing,
+      });
+    }
+
     return NextResponse.json({
-      success: false,
-      message:
-        "Missing tables/columns. Please run this SQL in Supabase SQL Editor:\n\n" +
-        missing.join("\n\n"),
+      success: true,
+      message: "All migrations completed successfully",
     });
+  } catch (error) {
+    console.error("Migration error:", error);
+    return NextResponse.json(
+      { success: false, error: "Migration failed", details: String(error) },
+      { status: 500 }
+    );
   }
-
-  return NextResponse.json({ success: true, message: "All tables and columns exist" });
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { supabase } from "@/lib/supabase";
+import { api } from "@/lib/api-client";
 import { Book, ReadingUpdate } from "@/types/book";
 import { enrichBook, searchBooks } from "@/lib/bookLookup";
 import { safeCoverUrl } from "@/lib/coverUrl";
@@ -99,8 +99,12 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
   }, [book.id]);
 
   const loadUpdates = async () => {
-    const { data } = await supabase.from("reading_updates").select("*").eq("book_id", book.id).order("created_at", { ascending: false });
-    if (data) setUpdates(data);
+    try {
+      const data = await api.readingUpdates.list(book.id);
+      setUpdates(data);
+    } catch (error) {
+      console.error("Error loading updates:", error);
+    }
   };
 
   const computedReadingPages = (() => {
@@ -141,33 +145,29 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
   // Duplicate this book
   const handleDuplicate = async () => {
     try {
-      const duplicate: Record<string, unknown> = {
+      const duplicate = {
         title: `${book.title} (copy)`,
         author: book.author,
-        isbn: book.isbn || null,
-        cover_url: book.cover_url || null,
-        description: book.description || null,
-        status: "not_read",
-        rating: null,
-        volume: book.volume || null,
-        pages: book.pages || null,
-        intro_pages: book.intro_pages || null,
-        start_page: book.start_page || null,
-        end_page: book.end_page || null,
-        start_date: null,
-        complete_date: null,
-        source: book.source || null,
-        lcc: book.lcc || null,
-        ddc: book.ddc || null,
-        topics: book.topics || null,
-        auto_topics: book.auto_topics || null,
+        isbn: book.isbn || undefined,
+        cover_url: book.cover_url || undefined,
+        description: book.description || undefined,
+        status: "not_read" as const,
+        rating: undefined,
+        volume: book.volume || undefined,
+        pages: book.pages || undefined,
+        intro_pages: book.intro_pages || undefined,
+        start_page: book.start_page || undefined,
+        end_page: book.end_page || undefined,
+        start_date: undefined,
+        complete_date: undefined,
+        source: book.source || undefined,
+        lcc: book.lcc || undefined,
+        ddc: book.ddc || undefined,
+        topics: book.topics || undefined,
+        auto_topics: book.auto_topics || undefined,
         favorite: false,
       };
-      const { error } = await supabase.from("books").insert(duplicate);
-      if (error) {
-        console.error("Duplicate error:", error);
-        return;
-      }
+      await api.books.create(duplicate);
       onUpdated();
       onClose();
     } catch (err) {
@@ -183,26 +183,26 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
   const doSave = useCallback(async () => {
     const v = valuesRef.current;
     setSaveStatus("saving");
-    const { error } = await supabase.from("books").update({
-      title: v.title.trim(), author: v.author.trim(),
-      cover_url: v.coverUrl.trim() || null,
-      pages: v.pages ? parseInt(v.pages) : null,
-      intro_pages: parseInt(v.introPages) || 0,
-      start_page: parseInt(v.startPage) || 1,
-      end_page: v.endPage ? parseInt(v.endPage) : null,
-      status: v.status, rating: v.rating || null,
-      start_date: v.startDate || null, complete_date: v.completeDate || null,
-      source: v.source.trim() || null, volume: v.volume.trim() || null,
-      lcc: v.lcc.trim() || null, ddc: v.ddc.trim() || null,
-      topics: v.editTopics.length > 0 ? v.editTopics : null,
-      auto_topics: v.autoTopics.length > 0 ? v.autoTopics : null,
-      favorite: v.favorite,
-      updated_at: new Date().toISOString(),
-    }).eq("id", book.id);
-    if (!error) {
+    try {
+      await api.books.update(book.id, {
+        title: v.title.trim(), author: v.author.trim(),
+        cover_url: v.coverUrl.trim() || undefined,
+        pages: v.pages ? parseInt(v.pages) : undefined,
+        intro_pages: parseInt(v.introPages) || 0,
+        start_page: parseInt(v.startPage) || 1,
+        end_page: v.endPage ? parseInt(v.endPage) : undefined,
+        status: v.status, rating: v.rating || undefined,
+        start_date: v.startDate || undefined, complete_date: v.completeDate || undefined,
+        source: v.source.trim() || undefined, volume: v.volume.trim() || undefined,
+        lcc: v.lcc.trim() || undefined, ddc: v.ddc.trim() || undefined,
+        topics: v.editTopics.length > 0 ? v.editTopics : undefined,
+        auto_topics: v.autoTopics.length > 0 ? v.autoTopics : undefined,
+        favorite: v.favorite,
+      });
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus("idle"), 1500);
-    } else {
+    } catch (error) {
+      console.error("Save error:", error);
       setSaveStatus("idle");
     }
   }, [book.id]);
@@ -225,9 +225,9 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
     if (!cp || cp < 0) return;
     const lastPage = updates.length > 0 ? updates[0].current_page : (book.current_page || 0);
     const pagesRead = Math.max(cp - lastPage, 0);
-    const { error } = await supabase.from("reading_updates").insert({ book_id: book.id, current_page: cp, pages_read: pagesRead, notes: updateNotes.trim() || null });
-    if (!error) {
-      const bookUpdate: Record<string, unknown> = { current_page: cp, updated_at: new Date().toISOString() };
+    try {
+      await api.readingUpdates.create({ book_id: book.id, current_page: cp, pages_read: pagesRead, notes: updateNotes.trim() || undefined });
+      const bookUpdate: any = { current_page: cp };
 
       // Auto-set start date on first log if not already reading
       const isFirstLog = updates.length === 0 && (!book.current_page || book.current_page === 0);
@@ -255,15 +255,21 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
         setTimeout(() => setShowConfetti(false), 3000);
       }
 
-      await supabase.from("books").update(bookUpdate).eq("id", book.id);
+      await api.books.update(book.id, bookUpdate);
       setCurrentPage(""); setUpdateNotes(""); setShowAddUpdate(false); loadUpdates();
+    } catch (error) {
+      console.error("Error adding update:", error);
     }
   };
 
   const handleDelete = async () => {
     if (!confirm("Remove this book from your library?")) return;
-    const { error } = await supabase.from("books").delete().eq("id", book.id);
-    if (!error) onDeleted();
+    try {
+      await api.books.delete(book.id);
+      onDeleted();
+    } catch (error) {
+      console.error("Error deleting book:", error);
+    }
   };
 
   const searchCovers = async () => {
@@ -407,8 +413,8 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
         {/* Cover */}
         <div className="relative h-48 bg-gradient-to-b from-surface-2 to-surface flex items-center justify-center">
           <button onClick={() => { setShowCoverSearch(true); searchCovers(); }} className="focus:outline-none hover:opacity-75 transition-opacity" title="Search for cover image">
-            {(coverUrl || safeCoverUrl(book.cover_url)) ? (
-              <img src={coverUrl || safeCoverUrl(book.cover_url)} alt={book.title} className="h-40 rounded-lg shadow-xl shadow-black/50 object-cover cursor-pointer" />
+            {(coverUrl || book.cover_url) ? (
+              <img src={coverUrl || book.cover_url} alt={book.title} className="h-40 rounded-lg shadow-xl shadow-black/50 object-cover cursor-pointer" />
             ) : (
               <div className="h-40 w-28 rounded-lg bg-border-custom flex items-center justify-center cursor-pointer hover:bg-surface-2"><span className="text-muted text-xs">No Cover</span></div>
             )}
