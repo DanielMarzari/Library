@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState, useMemo } from "react";
-import { api } from "@/lib/api-client";
+import { supabase } from "@/lib/supabase";
 import { Book } from "@/types/book";
 import Link from "next/link";
 
@@ -56,17 +56,13 @@ export default function StatsPage() {
   useEffect(() => {
     let ignore = false;
     const load = async () => {
-      try {
-        const data = await api.books.list();
-        if (!ignore) {
-          setBooks(data || []);
-          setLoading(false);
-        }
-      } catch (error) {
-        console.error("Error loading books:", error);
-        if (!ignore) {
-          setLoading(false);
-        }
+      const { data, error } = await supabase
+        .from("books")
+        .select("*")
+        .order("complete_date", { ascending: true });
+      if (!ignore) {
+        if (!error && data) setBooks(data);
+        setLoading(false);
       }
     };
     load();
@@ -78,13 +74,11 @@ export default function StatsPage() {
   useEffect(() => {
     let ignore = false;
     const load = async () => {
-      try {
-        const data = await api.readingUpdates.list();
-        if (!ignore) {
-          setReadingUpdates(data || []);
-        }
-      } catch (error) {
-        console.error("Error loading reading updates:", error);
+      const { data, error } = await supabase
+        .from("reading_updates")
+        .select("*");
+      if (!ignore) {
+        if (!error && data) setReadingUpdates(data as ReadingUpdate[]);
       }
     };
     load();
@@ -96,14 +90,10 @@ export default function StatsPage() {
   useEffect(() => {
     let ignore = false;
     const load = async () => {
-      try {
-        const data = await api.authors.list();
-        if (!ignore) {
-          setAuthorMeta(data as AuthorMeta[]);
-        }
-      } catch (error) {
-        console.error("Error loading authors:", error);
-      }
+      const { data } = await supabase
+        .from("authors")
+        .select("name,gender,ethnicity,nationality");
+      if (!ignore && data) setAuthorMeta(data as AuthorMeta[]);
     };
     load();
     return () => { ignore = true; };
@@ -920,14 +910,17 @@ function ContributionHeatmap({
     weeks.push(weekDays);
   }
 
-  // Month labels with positions
+  // Month labels with positions — use the first day actually in-range per week
   const monthLabels: Array<{ month: string; weekIndex: number }> = [];
   let lastMonth = -1;
+  const today = new Date();
   weeks.forEach((week, weekIdx) => {
-    const month = week[0].getMonth();
+    // Pick a representative day: first day of the week that's in range
+    const rep = week.find(d => d >= startDate && d <= today) || week[0];
+    const month = rep.getMonth();
     if (month !== lastMonth) {
       monthLabels.push({
-        month: week[0].toLocaleDateString("en-US", { month: "short" }),
+        month: rep.toLocaleDateString("en-US", { month: "short" }),
         weekIndex: weekIdx,
       });
       lastMonth = month;
@@ -942,18 +935,21 @@ function ContributionHeatmap({
     <div className="overflow-x-auto">
       <div className="inline-block">
         {/* Month labels */}
-        <div className="flex" style={{ marginLeft: "30px" }}>
-          {monthLabels.map((label, idx) => (
-            <div
-              key={`${label.month}-${idx}`}
-              className="text-xs text-muted font-medium"
-              style={{
-                width: `${(label.weekIndex === monthLabels[idx + 1]?.weekIndex ? monthLabels[idx + 1].weekIndex - label.weekIndex : 4) * 14}px`,
-              }}
-            >
-              {label.month}
-            </div>
-          ))}
+        <div className="flex" style={{ marginLeft: "28px" }}>
+          {monthLabels.map((label, idx) => {
+            const CELL = 16; // 12px cell + 4px gap
+            const nextIdx = monthLabels[idx + 1]?.weekIndex;
+            const span = nextIdx != null ? nextIdx - label.weekIndex : weeks.length - label.weekIndex;
+            return (
+              <div
+                key={`${label.month}-${idx}`}
+                className="text-xs text-muted font-medium"
+                style={{ width: `${span * CELL}px` }}
+              >
+                {label.month}
+              </div>
+            );
+          })}
         </div>
 
         {/* Heatmap grid */}

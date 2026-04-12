@@ -403,9 +403,14 @@ export default function RecommendationsPage() {
   }, [filteredRecs, page]);
 
   // Refresh prices for visible recs missing them (both AbeBooks + ThriftBooks)
+  const PRICE_BATCH = 50; // fetch prices in batches of 50
+
   const handleRefreshPrices = async () => {
-    const recsToPrice = paginatedRecs.filter(r => r.lowest_price == null || r.thriftbooks_price == null).slice(0, 20);
-    if (recsToPrice.length === 0) return;
+    const allMissing = filteredRecs.filter(r => r.lowest_price == null || r.thriftbooks_price == null);
+    if (allMissing.length === 0) return;
+
+    // Take next batch
+    const recsToPrice = allMissing.slice(0, PRICE_BATCH);
     setFetchingPrices(true);
     setPriceProgress({ done: 0, total: recsToPrice.length });
 
@@ -446,7 +451,7 @@ export default function RecommendationsPage() {
       }
 
       setPriceProgress({ done: i + 1, total: recsToPrice.length });
-      await new Promise(r => setTimeout(r, 1500));
+      await new Promise(r => setTimeout(r, 800));
     }
     setFetchingPrices(false);
   };
@@ -622,9 +627,9 @@ export default function RecommendationsPage() {
                 <button
                   onClick={handleRefreshPrices}
                   className="px-2.5 py-1 bg-amber-500/10 text-amber-500 rounded text-[10px] font-medium hover:bg-amber-500/20 transition-colors"
-                  title="Fetch AbeBooks + ThriftBooks prices for visible books"
+                  title="Fetch AbeBooks + ThriftBooks prices (50 at a time)"
                 >
-                  ↻ Refresh Prices
+                  ↻ Refresh Prices {(() => { const n = filteredRecs.filter(r => r.lowest_price == null || r.thriftbooks_price == null).length; return n > 0 ? `(${n} missing)` : ""; })()}
                 </button>
               )}
             </div>
