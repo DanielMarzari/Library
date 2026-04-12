@@ -6,9 +6,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params;
     const db = getDb();
     const body = await request.json();
-    const { year, target_books } = body;
+    // Accept both target and target_books
+    const { year, target, target_books } = body;
 
-    const now = new Date().toISOString();
     const updates: string[] = [];
     const values: any[] = [];
 
@@ -16,13 +16,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       updates.push('year = ?');
       values.push(year);
     }
-    if (target_books !== undefined) {
-      updates.push('target_books = ?');
-      values.push(target_books);
+    const actualTarget = target ?? target_books;
+    if (actualTarget !== undefined) {
+      updates.push('target = ?');
+      values.push(actualTarget);
     }
 
-    updates.push('updated_at = ?');
-    values.push(now);
+    if (updates.length === 0) {
+      return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+    }
+
     values.push(id);
 
     const query = `UPDATE reading_goals SET ${updates.join(', ')} WHERE id = ?`;

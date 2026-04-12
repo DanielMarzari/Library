@@ -10,18 +10,18 @@ export async function GET(request: NextRequest) {
     let stmt;
 
     if (year) {
-      query += ' WHERE year = ? ORDER BY created_at DESC';
+      query += ' WHERE year = ? ORDER BY added_at DESC';
       stmt = db.prepare(query);
       const rows = stmt.all(parseInt(year)) as any[];
       return NextResponse.json(rows);
     }
 
-    stmt = db.prepare(query + ' ORDER BY created_at DESC');
+    stmt = db.prepare(query + ' ORDER BY added_at DESC');
     const rows = stmt.all() as any[];
     return NextResponse.json(rows);
   } catch (error) {
     console.error('GET /api/reading-list error:', error);
-    return NextResponse.json({ error: 'Failed to fetch reading list' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch reading list', details: String(error) }, { status: 500 });
   }
 }
 
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     const now = new Date().toISOString();
 
     const stmt = db.prepare(`
-      INSERT INTO reading_list (id, book_id, year, created_at)
+      INSERT INTO reading_list (id, book_id, year, added_at)
       VALUES (?, ?, ?, ?)
     `);
 
@@ -45,10 +45,10 @@ export async function POST(request: NextRequest) {
       id,
       book_id,
       year,
-      created_at: now,
+      added_at: now,
     });
   } catch (error) {
     console.error('POST /api/reading-list error:', error);
-    return NextResponse.json({ error: 'Failed to create reading list item' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to create reading list item', details: String(error) }, { status: 500 });
   }
 }

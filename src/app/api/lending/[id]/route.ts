@@ -24,9 +24,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params;
     const db = getDb();
     const body = await request.json();
-    const { book_id, lent_to, lent_date, return_date } = body;
+    const { book_id, borrower_name, lent_to, lent_date, due_date, return_date, returned_date, notes } = body;
 
-    const now = new Date().toISOString();
     const updates: string[] = [];
     const values: any[] = [];
 
@@ -34,21 +33,34 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       updates.push('book_id = ?');
       values.push(book_id);
     }
-    if (lent_to !== undefined) {
-      updates.push('lent_to = ?');
-      values.push(lent_to);
+    // Accept both old and new field names
+    const actualBorrower = borrower_name ?? lent_to;
+    if (actualBorrower !== undefined) {
+      updates.push('borrower_name = ?');
+      values.push(actualBorrower);
     }
     if (lent_date !== undefined) {
       updates.push('lent_date = ?');
       values.push(lent_date);
     }
-    if (return_date !== undefined) {
-      updates.push('return_date = ?');
-      values.push(return_date);
+    const actualDueDate = due_date ?? return_date;
+    if (actualDueDate !== undefined) {
+      updates.push('due_date = ?');
+      values.push(actualDueDate);
+    }
+    if (returned_date !== undefined) {
+      updates.push('returned_date = ?');
+      values.push(returned_date);
+    }
+    if (notes !== undefined) {
+      updates.push('notes = ?');
+      values.push(notes);
     }
 
-    updates.push('updated_at = ?');
-    values.push(now);
+    if (updates.length === 0) {
+      return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+    }
+
     values.push(id);
 
     const query = `UPDATE lending SET ${updates.join(', ')} WHERE id = ?`;

@@ -23,40 +23,42 @@ export interface LearningGoal {
   id: string;
   name: string;
   description?: string;
+  color?: string;
   created_at: string;
-  updated_at: string;
 }
 
 export interface LearningGoalBook {
   id: string;
   goal_id: string;
   book_id: string;
-  created_at: string;
+  priority?: number;
+  added_at: string;
 }
 
 export interface ReadingList {
   id: string;
   book_id: string;
   year: number;
-  created_at: string;
+  priority?: number;
+  added_at: string;
 }
 
 export interface ReadingGoal {
   id: string;
   year: number;
-  target_books: number;
+  target: number;
   created_at: string;
-  updated_at: string;
 }
 
 export interface LendingRecord {
   id: string;
   book_id: string;
-  lent_to: string;
+  borrower_name: string;
   lent_date: string;
-  return_date?: string;
+  due_date?: string | null;
+  returned_date?: string | null;
+  notes?: string | null;
   created_at: string;
-  updated_at: string;
 }
 
 async function fetchJson<T>(

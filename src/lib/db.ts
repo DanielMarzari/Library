@@ -22,18 +22,18 @@ function ensureAllTables(db: Database.Database) {
   );
 
   // Books table should already exist from initial migration — skip if present
-  // But ensure all other tables exist
 
   if (!existing.has('authors')) {
     db.exec(`
       CREATE TABLE authors (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
-        bio TEXT,
-        gender TEXT,
         ethnicity TEXT,
+        nationality TEXT,
+        image_url TEXT,
         religious_tradition TEXT,
         profile_url TEXT,
+        gender TEXT,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
@@ -48,15 +48,14 @@ function ensureAllTables(db: Database.Database) {
         author TEXT,
         isbn TEXT,
         cover_url TEXT,
-        description TEXT,
-        source TEXT,
         recommended_by TEXT,
-        topic TEXT,
         notes TEXT,
+        topic TEXT,
+        interest TEXT,
+        year INTEGER,
         lowest_price REAL,
         thriftbooks_price REAL,
-        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
     `);
   }
@@ -67,7 +66,8 @@ function ensureAllTables(db: Database.Database) {
         id TEXT PRIMARY KEY,
         book_id TEXT NOT NULL,
         year INTEGER NOT NULL DEFAULT 2026,
-        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        priority INTEGER DEFAULT 0,
+        added_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
       )
     `);
@@ -78,9 +78,8 @@ function ensureAllTables(db: Database.Database) {
       CREATE TABLE reading_goals (
         id TEXT PRIMARY KEY,
         year INTEGER NOT NULL,
-        target_books INTEGER NOT NULL DEFAULT 12,
-        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        target INTEGER NOT NULL DEFAULT 12,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
     `);
   }
@@ -105,8 +104,8 @@ function ensureAllTables(db: Database.Database) {
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         description TEXT,
-        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        color TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
     `);
   }
@@ -117,7 +116,8 @@ function ensureAllTables(db: Database.Database) {
         id TEXT PRIMARY KEY,
         goal_id TEXT NOT NULL,
         book_id TEXT NOT NULL,
-        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        priority INTEGER DEFAULT 0,
+        added_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (goal_id) REFERENCES learning_goals(id) ON DELETE CASCADE,
         FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
       )
@@ -129,11 +129,12 @@ function ensureAllTables(db: Database.Database) {
       CREATE TABLE lending (
         id TEXT PRIMARY KEY,
         book_id TEXT NOT NULL,
-        lent_to TEXT NOT NULL,
+        borrower_name TEXT NOT NULL,
         lent_date TEXT NOT NULL,
-        return_date TEXT,
+        due_date TEXT,
+        returned_date TEXT,
+        notes TEXT,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
       )
     `);

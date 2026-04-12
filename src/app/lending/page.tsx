@@ -112,9 +112,10 @@ export default function LendingPage() {
 
       await api.lending.create({
         book_id: selectedBook.id,
-        lent_to: borrowerName.trim(),
+        borrower_name: borrowerName.trim(),
         lent_date: new Date().toISOString().split('T')[0],
-        return_date: dueDate || null,
+        due_date: dueDate || null,
+        notes: notes || null,
       });
 
       // Reset form and close modal
@@ -137,11 +138,8 @@ export default function LendingPage() {
   const handleMarkReturned = async (recordId: string) => {
     try {
       await api.lending.update(recordId, {
-        book_id: '',
-        lent_to: '',
-        lent_date: '',
-        return_date: new Date().toISOString().split('T')[0],
-      });
+        returned_date: new Date().toISOString().split('T')[0],
+      } as any);
 
       await fetchData();
     } catch (error) {
