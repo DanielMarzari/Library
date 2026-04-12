@@ -129,6 +129,8 @@ export default function SetupPage() {
   const [coverProgress, setCoverProgress] = useState({ done: 0, total: 0, found: 0 });
   const [cachingCovers, setCachingCovers] = useState(false);
   const [cacheResult, setCacheResult] = useState<string | null>(null);
+  const [migrating, setMigrating] = useState(false);
+  const [migrateResult, setMigrateResult] = useState<string | null>(null);
 
   const handleBatchReimport = useCallback(async () => {
     if (batchRunning) return;
@@ -190,6 +192,20 @@ export default function SetupPage() {
     setCoverRunning(false);
     setRefreshKey((k) => k + 1);
   }, [books, coverRunning]);
+
+  const handleMigrate = useCallback(async () => {
+    setMigrating(true);
+    setMigrateResult(null);
+    try {
+      const res = await fetch("/api/migrate");
+      const data = await res.json();
+      setMigrateResult(data.success ? "✓ Done" : "Some failed");
+    } catch {
+      setMigrateResult("Error");
+    } finally {
+      setMigrating(false);
+    }
+  }, []);
 
   const handleCacheCovers = useCallback(async () => {
     setCachingCovers(true);
@@ -255,6 +271,19 @@ export default function SetupPage() {
                   <>{cacheResult}</>
                 ) : (
                   <>💾 Cache Covers</>
+                )}
+              </button>
+              <button
+                onClick={handleMigrate}
+                disabled={migrating}
+                className="bg-surface-2 hover:bg-border-custom text-foreground px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {migrating ? (
+                  <><div className="animate-spin rounded-full h-3 w-3 border border-border-custom border-t-emerald-500" /> Migrating...</>
+                ) : migrateResult ? (
+                  <>{migrateResult}</>
+                ) : (
+                  <>🔧 Run Migration</>
                 )}
               </button>
               <Link

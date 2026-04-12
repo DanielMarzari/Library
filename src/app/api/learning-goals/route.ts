@@ -1,9 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 
+function ensureTable() {
+  const db = getDb();
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS learning_goals (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  return db;
+}
+
 export async function GET() {
   try {
-    const db = getDb();
+    const db = ensureTable();
     const stmt = db.prepare('SELECT * FROM learning_goals ORDER BY name');
     const rows = stmt.all() as any[];
     return NextResponse.json(rows);
@@ -15,7 +29,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const db = getDb();
+    const db = ensureTable();
     const body = await request.json();
     const { name, description } = body;
 

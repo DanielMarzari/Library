@@ -1,9 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 
+function ensureTable() {
+  const db = getDb();
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS learning_goal_books (
+      id TEXT PRIMARY KEY,
+      goal_id TEXT NOT NULL,
+      book_id TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (goal_id) REFERENCES learning_goals(id) ON DELETE CASCADE,
+      FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
+    )
+  `);
+  return db;
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const db = getDb();
+    const db = ensureTable();
     const goalId = request.nextUrl.searchParams.get('goal_id');
 
     let query = 'SELECT * FROM learning_goal_books';
@@ -27,7 +42,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const db = getDb();
+    const db = ensureTable();
     const body = await request.json();
     const { goal_id, book_id } = body;
 

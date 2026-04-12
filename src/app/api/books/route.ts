@@ -10,7 +10,14 @@ export async function GET(request: NextRequest) {
     const favorites = searchParams.get('favorites') === 'true';
     const sort = searchParams.get('sort') || 'created_at DESC';
 
-    let query = 'SELECT * FROM books WHERE 1=1';
+    // Exclude cover_blob from list queries — it can be huge
+    // We include has_cover_blob flag via CASE instead
+    let query = `SELECT id, title, author, isbn, cover_url, description, status, rating,
+      volume, pages, intro_pages, start_page, end_page, reading_pages,
+      current_page, start_date, complete_date, source, lcc, ddc,
+      topics, auto_topics, favorite, created_at, updated_at,
+      CASE WHEN cover_blob IS NOT NULL AND length(cover_blob) > 0 THEN 1 ELSE 0 END as has_cover_blob
+      FROM books WHERE 1=1`;
     const params: any[] = [];
 
     if (status && status !== 'all') {
@@ -33,12 +40,10 @@ export async function GET(request: NextRequest) {
     const stmt = db.prepare(query);
     const rows = stmt.all(...params) as any[];
 
-    // Parse JSON fields; flag books with cached cover blobs
+    // Parse JSON fields
     const books = rows.map(row => ({
       ...row,
-      cover_blob: undefined, // never send the blob itself to client
-      cover_content_type: undefined,
-      has_cover_blob: row.cover_blob != null && row.cover_blob.length > 0,
+      has_cover_blob: Boolean(row.has_cover_blob),
       topics: row.topics ? JSON.parse(row.topics) : [],
       auto_topics: row.auto_topics ? JSON.parse(row.auto_topics) : [],
       favorite: Boolean(row.favorite),
