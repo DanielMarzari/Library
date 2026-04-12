@@ -1,32 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 
-function ensureTable() {
-  const db = getDb();
-  try {
-    // Check if table exists first
-    const tableCheck = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='learning_goals'").get();
-    if (!tableCheck) {
-      db.exec(`
-        CREATE TABLE learning_goals (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          description TEXT,
-          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      console.log('Created learning_goals table');
-    }
-  } catch (e) {
-    console.error('ensureTable learning_goals error:', e);
-  }
-  return db;
-}
-
 export async function GET() {
   try {
-    const db = ensureTable();
+    const db = getDb();
     const stmt = db.prepare('SELECT * FROM learning_goals ORDER BY name');
     const rows = stmt.all() as any[];
     return NextResponse.json(rows);
@@ -38,7 +15,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const db = ensureTable();
+    const db = getDb();
     const body = await request.json();
     const { name, description } = body;
 
