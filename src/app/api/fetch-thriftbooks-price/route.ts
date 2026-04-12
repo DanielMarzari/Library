@@ -42,14 +42,14 @@ export async function POST(request: Request) {
 
     if (!resp.ok) {
       return NextResponse.json(
-        { error: "Failed to fetch from ThriftBooks" },
+        { error: `ThriftBooks returned ${resp.status}`, price: null, source: "thriftbooks" },
         { status: 502 }
       );
     }
 
     const html = await resp.text();
 
-    // Extract prices: SearchResultListItem-dollarAmount">14.29
+    // Extract prices from search results: SearchResultListItem-dollarAmount">14.29
     const pricePattern = /SearchResultListItem-dollarAmount">([0-9]+\.?[0-9]*)/g;
     const prices: number[] = [];
     let match;
@@ -60,8 +60,20 @@ export async function POST(request: Request) {
       }
     }
 
+    // Fallback: try detail page price format (AllEditionsItem or WorkMeta)
     if (prices.length === 0) {
-      return NextResponse.json({ price: null, source: "thriftbooks" });
+      const altPattern = /\$([0-9]+\.[0-9]{2})/g;
+      let altMatch;
+      while ((altMatch = altPattern.exec(html)) !== null) {
+        const price = parseFloat(altMatch[1]);
+        if (!isNaN(price) && price > 0 && price < 500) {
+          prices.push(price);
+        }
+      }
+    }
+
+    if (prices.length === 0) {
+      return NextResponse.json({ price: null, source: "thriftbooks", htmlLength: html.length });
     }
 
     // ThriftBooks prices include free shipping on orders > $15

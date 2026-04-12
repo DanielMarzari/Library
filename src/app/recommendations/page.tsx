@@ -406,11 +406,9 @@ export default function RecommendationsPage() {
   const PRICE_BATCH = 50; // fetch prices in batches of 50
 
   const handleRefreshPrices = async () => {
-    const allMissing = filteredRecs.filter(r => r.lowest_price == null || r.thriftbooks_price == null);
-    if (allMissing.length === 0) return;
-
-    // Take next batch
-    const recsToPrice = allMissing.slice(0, PRICE_BATCH);
+    // Refresh ALL filtered recs — re-fetch even if they already have a price
+    const recsToPrice = filteredRecs.slice(0, PRICE_BATCH);
+    if (recsToPrice.length === 0) return;
     setFetchingPrices(true);
     setPriceProgress({ done: 0, total: recsToPrice.length });
 
@@ -418,31 +416,28 @@ export default function RecommendationsPage() {
       const rec = recsToPrice[i];
       const updates: Partial<Recommendation> = {};
 
-      // Fetch AbeBooks price if missing
-      if (rec.lowest_price == null) {
-        try {
-          const resp = await fetch("/api/fetch-price", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title: rec.title, author: rec.author, isbn: rec.isbn, recId: rec.id }),
-          });
-          const data = await resp.json();
-          if (data.price != null) updates.lowest_price = data.price;
-        } catch { /* skip */ }
-      }
+      // Always fetch AbeBooks price
+      try {
+        const resp = await fetch("/api/fetch-price", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: rec.title, author: rec.author, isbn: rec.isbn, recId: rec.id }),
+        });
+        const data = await resp.json();
+        if (data.price != null) updates.lowest_price = data.price;
+      } catch { /* skip */ }
 
-      // Fetch ThriftBooks price if missing
-      if (rec.thriftbooks_price == null) {
-        try {
-          const resp = await fetch("/api/fetch-thriftbooks-price", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title: rec.title, author: rec.author, recId: rec.id }),
-          });
-          const data = await resp.json();
-          if (data.price != null) updates.thriftbooks_price = data.price;
-        } catch { /* skip */ }
-      }
+      // Always fetch ThriftBooks price
+      try {
+        const resp = await fetch("/api/fetch-thriftbooks-price", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: rec.title, author: rec.author, recId: rec.id }),
+        });
+        const data = await resp.json();
+        console.log(`[ThriftBooks] "${rec.title}":`, data);
+        if (data.price != null) updates.thriftbooks_price = data.price;
+      } catch (err) { console.error(`[ThriftBooks] "${rec.title}" error:`, err); }
 
       if (Object.keys(updates).length > 0) {
         const updater = (prev: Recommendation[]) => prev.map(r => r.id === rec.id ? { ...r, ...updates } : r);
@@ -598,23 +593,34 @@ export default function RecommendationsPage() {
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[10px] text-muted uppercase tracking-wider font-medium">Sort:</span>
             {([
-              { label: "Recent", value: "recent" as SortMode },
-              { label: "A-Z", value: "alpha" as SortMode },
-              { label: "Abe ↓", value: "abe_asc" as SortMode },
-              { label: "Abe ↑", value: "abe_desc" as SortMode },
-              { label: "Thrift ↓", value: "thrift_asc" as SortMode },
-              { label: "Thrift ↑", value: "thrift_desc" as SortMode },
-            ]).map(s => (
-              <button
-                key={s.value}
-                onClick={() => setSortMode(s.value)}
-                className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                  sortMode === s.value ? "bg-foreground text-background" : "bg-surface-2 text-muted hover:text-foreground"
-                }`}
-              >
-                {s.label}
-              </button>
-            ))}
+              { label: "Recent", value: "recent" as SortMode, color: "" },
+              { label: "A-Z", value: "alpha" as SortMode, color: "" },
+              { label: "Abe ↓", value: "abe_asc" as SortMode, color: "emerald" },
+              { label: "Abe ↑", value: "abe_desc" as SortMode, color: "emerald" },
+              { label: "Thrift ↓", value: "thrift_asc" as SortMode, color: "blue" },
+              { label: "Thrift ↑", value: "thrift_desc" as SortMode, color: "blue" },
+            ]).map(s => {
+              const isActive = sortMode === s.value;
+              const activeClass = s.color === "emerald"
+                ? "bg-emerald-600 text-white"
+                : s.color === "blue"
+                ? "bg-blue-600 text-white"
+                : "bg-foreground text-background";
+              const inactiveClass = s.color === "emerald"
+                ? "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
+                : s.color === "blue"
+                ? "bg-blue-500/10 text-blue-400 hover:bg-blue-500/20"
+                : "bg-surface-2 text-muted hover:text-foreground";
+              return (
+                <button
+                  key={s.value}
+                  onClick={() => setSortMode(s.value)}
+                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${isActive ? activeClass : inactiveClass}`}
+                >
+                  {s.label}
+                </button>
+              );
+            })}
             <div className="ml-auto flex items-center gap-2">
               {fetchingPrices ? (
                 <div className="flex items-center gap-2">
@@ -629,7 +635,7 @@ export default function RecommendationsPage() {
                   className="px-2.5 py-1 bg-amber-500/10 text-amber-500 rounded text-[10px] font-medium hover:bg-amber-500/20 transition-colors"
                   title="Fetch AbeBooks + ThriftBooks prices (50 at a time)"
                 >
-                  ↻ Refresh Prices {(() => { const n = filteredRecs.filter(r => r.lowest_price == null || r.thriftbooks_price == null).length; return n > 0 ? `(${n} missing)` : ""; })()}
+                  ↻ Refresh Prices (next {Math.min(PRICE_BATCH, filteredRecs.length)})
                 </button>
               )}
             </div>
