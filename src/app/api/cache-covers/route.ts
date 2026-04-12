@@ -14,8 +14,12 @@ function ensureCoverColumns() {
   return db;
 }
 
-// POST: Fetch and store cover images for all books that have a cover_url but no cover_blob
-export async function POST() {
+// Allow GET so it can be triggered from browser address bar
+export async function GET() { return cacheCovers(); }
+export async function POST() { return cacheCovers(); }
+
+// Fetch and store cover images for all books that have a cover_url but no cover_blob
+async function cacheCovers() {
   try {
     const db = ensureCoverColumns();
 

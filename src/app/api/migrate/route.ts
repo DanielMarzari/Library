@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 
-export async function POST() {
+// Allow both GET and POST so it can be triggered from browser address bar
+export async function GET() { return runMigrations(); }
+export async function POST() { return runMigrations(); }
+
+async function runMigrations() {
   try {
     const db = getDb();
 
