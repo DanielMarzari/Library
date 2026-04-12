@@ -3,16 +3,24 @@ import { getDb } from '@/lib/db';
 
 function ensureTable() {
   const db = getDb();
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS learning_goal_books (
-      id TEXT PRIMARY KEY,
-      goal_id TEXT NOT NULL,
-      book_id TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (goal_id) REFERENCES learning_goals(id) ON DELETE CASCADE,
-      FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
-    )
-  `);
+  try {
+    const tableCheck = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='learning_goal_books'").get();
+    if (!tableCheck) {
+      db.exec(`
+        CREATE TABLE learning_goal_books (
+          id TEXT PRIMARY KEY,
+          goal_id TEXT NOT NULL,
+          book_id TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (goal_id) REFERENCES learning_goals(id) ON DELETE CASCADE,
+          FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
+        )
+      `);
+      console.log('Created learning_goal_books table');
+    }
+  } catch (e) {
+    console.error('ensureTable learning_goal_books error:', e);
+  }
   return db;
 }
 

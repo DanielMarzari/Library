@@ -99,9 +99,18 @@ async function runMigrations() {
       });
     }
 
+    // Return diagnostic info about all tables
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all() as Array<{ name: string }>;
+    const tableInfo: Record<string, string[]> = {};
+    for (const t of tables) {
+      const cols = db.prepare(`PRAGMA table_info(${t.name})`).all() as Array<{ name: string }>;
+      tableInfo[t.name] = cols.map(c => c.name);
+    }
+
     return NextResponse.json({
       success: true,
       message: "All migrations completed successfully",
+      tables: tableInfo,
     });
   } catch (error) {
     console.error("Migration error:", error);

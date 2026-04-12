@@ -3,15 +3,24 @@ import { getDb } from '@/lib/db';
 
 function ensureTable() {
   const db = getDb();
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS learning_goals (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      description TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
+  try {
+    // Check if table exists first
+    const tableCheck = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='learning_goals'").get();
+    if (!tableCheck) {
+      db.exec(`
+        CREATE TABLE learning_goals (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          description TEXT,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      console.log('Created learning_goals table');
+    }
+  } catch (e) {
+    console.error('ensureTable learning_goals error:', e);
+  }
   return db;
 }
 
@@ -21,9 +30,9 @@ export async function GET() {
     const stmt = db.prepare('SELECT * FROM learning_goals ORDER BY name');
     const rows = stmt.all() as any[];
     return NextResponse.json(rows);
-  } catch (error) {
+  } catch (error: any) {
     console.error('GET /api/learning-goals error:', error);
-    return NextResponse.json({ error: 'Failed to fetch learning goals' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch learning goals', details: error?.message || String(error) }, { status: 500 });
   }
 }
 
@@ -50,8 +59,8 @@ export async function POST(request: NextRequest) {
       created_at: now,
       updated_at: now,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('POST /api/learning-goals error:', error);
-    return NextResponse.json({ error: 'Failed to create learning goal' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to create learning goal', details: error?.message || String(error) }, { status: 500 });
   }
 }
