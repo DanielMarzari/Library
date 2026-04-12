@@ -2,7 +2,7 @@
 
 import { useRef, useCallback } from "react";
 import { Book } from "@/types/book";
-import { safeCoverUrl } from "@/lib/coverUrl";
+import { coverSrc } from "@/lib/coverUrl";
 
 type GridSize = "xs" | "small" | "medium" | "large" | "xl";
 
@@ -124,10 +124,10 @@ function ShelfBook({
             <div className="animate-spin rounded-full h-5 w-5 border-2 border-border-custom border-t-emerald-500 mb-2" />
             <span className="text-[10px] text-muted">Adding...</span>
           </div>
-        ) : safeCoverUrl(book.cover_url) ? (
+        ) : coverSrc(book) ? (
           <>
             <img
-              src={safeCoverUrl(book.cover_url)}
+              src={coverSrc(book)}
               alt={book.title}
               className="w-full h-full object-cover"
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement?.querySelector('.cover-fallback')?.classList.remove('hidden'); }}

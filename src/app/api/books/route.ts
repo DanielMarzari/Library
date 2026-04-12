@@ -33,9 +33,12 @@ export async function GET(request: NextRequest) {
     const stmt = db.prepare(query);
     const rows = stmt.all(...params) as any[];
 
-    // Parse JSON fields
+    // Parse JSON fields; flag books with cached cover blobs
     const books = rows.map(row => ({
       ...row,
+      cover_blob: undefined, // never send the blob itself to client
+      cover_content_type: undefined,
+      has_cover_blob: row.cover_blob != null && row.cover_blob.length > 0,
       topics: row.topics ? JSON.parse(row.topics) : [],
       auto_topics: row.auto_topics ? JSON.parse(row.auto_topics) : [],
       favorite: Boolean(row.favorite),

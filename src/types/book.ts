@@ -4,6 +4,7 @@ export interface Book {
   author: string;
   isbn?: string;
   cover_url?: string;
+  has_cover_blob?: boolean;
   description?: string;
   status: "not_read" | "reading" | "read";
   rating?: number;

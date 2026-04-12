@@ -920,14 +920,16 @@ function ContributionHeatmap({
     weeks.push(weekDays);
   }
 
-  // Month labels with positions
+  // Month labels with positions — use first in-range day per week
   const monthLabels: Array<{ month: string; weekIndex: number }> = [];
   let lastMonth = -1;
+  const today = new Date();
   weeks.forEach((week, weekIdx) => {
-    const month = week[0].getMonth();
+    const rep = week.find(d => d >= startDate && d <= today) || week[0];
+    const month = rep.getMonth();
     if (month !== lastMonth) {
       monthLabels.push({
-        month: week[0].toLocaleDateString("en-US", { month: "short" }),
+        month: rep.toLocaleDateString("en-US", { month: "short" }),
         weekIndex: weekIdx,
       });
       lastMonth = month;
@@ -942,18 +944,21 @@ function ContributionHeatmap({
     <div className="overflow-x-auto">
       <div className="inline-block">
         {/* Month labels */}
-        <div className="flex" style={{ marginLeft: "30px" }}>
-          {monthLabels.map((label, idx) => (
-            <div
-              key={`${label.month}-${idx}`}
-              className="text-xs text-muted font-medium"
-              style={{
-                width: `${(label.weekIndex === monthLabels[idx + 1]?.weekIndex ? monthLabels[idx + 1].weekIndex - label.weekIndex : 4) * 14}px`,
-              }}
-            >
-              {label.month}
-            </div>
-          ))}
+        <div className="flex" style={{ marginLeft: "28px" }}>
+          {monthLabels.map((label, idx) => {
+            const CELL = 16; // 12px cell (w-3) + 4px gap (gap-1)
+            const nextIdx = monthLabels[idx + 1]?.weekIndex;
+            const span = nextIdx != null ? nextIdx - label.weekIndex : weeks.length - label.weekIndex;
+            return (
+              <div
+                key={`${label.month}-${idx}`}
+                className="text-xs text-muted font-medium"
+                style={{ width: `${span * CELL}px` }}
+              >
+                {label.month}
+              </div>
+            );
+          })}
         </div>
 
         {/* Heatmap grid */}
@@ -972,7 +977,7 @@ function ContributionHeatmap({
             {weeks.map((week, weekIdx) => (
               <div key={weekIdx} className="flex flex-col gap-1">
                 {week.map((date, dayIdx) => {
-                  const dateKey = date.toISOString().split("T")[0];
+                  const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
                   const pages = pagesPerDay[dateKey] || 0;
                   const isInRange = date >= startDate && date <= new Date();
 

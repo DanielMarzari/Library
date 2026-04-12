@@ -683,25 +683,50 @@ export default function RecommendationsPage() {
         {/* Possible Duplicates Alert */}
         {possibleDupes.length > 0 && showDupes && (
           <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 mb-4">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-amber-600 mb-2">
-                  <span className="font-bold">{possibleDupes.length}</span> possible duplicates detected
-                </p>
-                <div className="space-y-1 max-h-40 overflow-y-auto">
-                  {possibleDupes.map(({ rec, libraryMatch }, idx) => (
-                    <p key={idx} className="text-xs text-amber-600">
-                      <strong>{rec.title}</strong> might be <strong>{libraryMatch}</strong>
-                    </p>
-                  ))}
-                </div>
-              </div>
+            <div className="flex items-start justify-between mb-2">
+              <p className="text-sm font-medium text-amber-600">
+                <span className="font-bold">{possibleDupes.length}</span> possible duplicate{possibleDupes.length !== 1 ? "s" : ""} detected
+              </p>
               <button
                 onClick={() => setShowDupes(false)}
-                className="flex-shrink-0 text-amber-600 hover:text-amber-700 ml-2"
+                className="flex-shrink-0 text-amber-600 hover:text-amber-700 ml-2 text-xs"
               >
-                ✕
+                hide
               </button>
+            </div>
+            <div className="space-y-1.5 max-h-60 overflow-y-auto">
+              {possibleDupes.map(({ rec, libraryMatch }, idx) => (
+                <div key={idx} className="flex items-center gap-2 text-xs">
+                  <button
+                    onClick={async () => {
+                      // Confirmed duplicate — remove from recommendations
+                      try {
+                        await api.recommendations.delete(rec.id);
+                        setRecommendations(prev => prev.filter(r => r.id !== rec.id));
+                        setAllRecs(prev => prev.filter(r => r.id !== rec.id));
+                        setPossibleDupes(prev => prev.filter((_, i) => i !== idx));
+                      } catch {}
+                    }}
+                    className="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-500 hover:bg-emerald-500/30 flex items-center justify-center font-bold transition-colors"
+                    title="Yes, it's a duplicate — remove it"
+                  >
+                    ✓
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Not a duplicate — dismiss this match
+                      setPossibleDupes(prev => prev.filter((_, i) => i !== idx));
+                    }}
+                    className="flex-shrink-0 w-6 h-6 rounded-full bg-red-500/20 text-red-500 hover:bg-red-500/30 flex items-center justify-center font-bold transition-colors"
+                    title="Not a duplicate — keep it"
+                  >
+                    ✕
+                  </button>
+                  <span className="text-amber-600">
+                    <strong>{rec.title}</strong> <span className="text-amber-600/60">→</span> <strong>{libraryMatch}</strong>
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         )}

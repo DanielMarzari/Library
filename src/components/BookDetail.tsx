@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { api } from "@/lib/api-client";
 import { Book, ReadingUpdate } from "@/types/book";
 import { enrichBook, searchBooks } from "@/lib/bookLookup";
-import { safeCoverUrl } from "@/lib/coverUrl";
+import { coverSrc, safeCoverUrl } from "@/lib/coverUrl";
 
 interface BookDetailProps {
   book: Book;
@@ -62,7 +62,7 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(book.title);
   const [author, setAuthor] = useState(book.author);
-  const [coverUrl, setCoverUrl] = useState(safeCoverUrl(book.cover_url));
+  const [coverUrl, setCoverUrl] = useState(coverSrc(book));
   const [pages, setPages] = useState(book.pages?.toString() || "");
   const [introPages, setIntroPages] = useState(book.intro_pages?.toString() || "0");
   const [startPage, setStartPage] = useState(book.start_page?.toString() || "1");

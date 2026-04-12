@@ -36,6 +36,14 @@ export async function POST() {
           );
         `,
       },
+      {
+        table: "books",
+        columns: ["cover_blob", "cover_content_type"],
+        sql: `
+          ALTER TABLE books ADD COLUMN cover_blob BLOB;
+          ALTER TABLE books ADD COLUMN cover_content_type TEXT;
+        `,
+      },
     ];
 
     const missing: string[] = [];
@@ -50,11 +58,16 @@ export async function POST() {
         const hasAllColumns = check.columns.every((col) => existingColumns.has(col));
 
         if (!hasAllColumns) {
-          // Execute the migration SQL
+          // Execute the migration SQL — each statement individually to handle partial migrations
           const statements = check.sql.split(";").filter((s) => s.trim());
           for (const stmt of statements) {
             if (stmt.trim()) {
-              db.exec(stmt);
+              try {
+                db.exec(stmt);
+              } catch (stmtErr) {
+                // Column might already exist from partial migration — continue
+                console.warn(`Migration statement skipped: ${stmt}`, stmtErr);
+              }
             }
           }
         }
