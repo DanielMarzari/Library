@@ -54,6 +54,10 @@ export default function RecommendationsPage() {
   const [sourceBookQuery, setSourceBookQuery] = useState("");
   const [showSourceBookResults, setShowSourceBookResults] = useState(false);
   const [bookIdMap, setBookIdMap] = useState<Record<string, string>>({});
+  const [topicSearch, setTopicSearch] = useState("");
+  const [showTopicDropdown, setShowTopicDropdown] = useState(false);
+  const [showSourceDropdown, setShowSourceDropdown] = useState(false);
+  const [sourceSearch, setSourceSearch] = useState("");
   const [filterTopic, setFilterTopic] = useState<string | null>(null);
   const [excludeTopic, setExcludeTopic] = useState<string | null>(null);
   const [filterSource, setFilterSource] = useState<string | null>(null);
@@ -451,6 +455,21 @@ export default function RecommendationsPage() {
   // Reset page when filters change
   useEffect(() => { setPage(1); }, [filterTopic, excludeTopic, filterSource, excludeSource, searchFilter]);
 
+  // Close dropdowns on click outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-dropdown]')) {
+        setShowTopicDropdown(false);
+        setShowSourceDropdown(false);
+        setTopicSearch("");
+        setSourceSearch("");
+      }
+    };
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, []);
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
@@ -677,74 +696,147 @@ export default function RecommendationsPage() {
             </div>
           </div>
 
-          {/* Source filter pills */}
-          {allSources.length > 1 && (
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                onClick={() => { setFilterSource(null); setExcludeSource(null); }}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${!filterSource && !excludeSource ? "bg-blue-600 text-white" : "bg-surface-2 text-muted hover:text-foreground"}`}
-              >
-                All Sources
-              </button>
-              {allSources.slice(0, 8).map(([source, count]) => (
+          {/* Compact filter row: Source dropdown + Collection pills + Topic dropdown */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Source dropdown */}
+            {allSources.length > 0 && (
+              <div className="relative" data-dropdown>
                 <button
-                  key={source}
-                  onClick={() => toggleSourceFilter(source)}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
-                    filterSource === source ? "bg-blue-600 text-white" :
-                    excludeSource === source ? "bg-red-500/20 text-red-400 line-through" :
-                    "bg-surface-2 text-muted hover:text-foreground"
+                  onClick={() => { setShowSourceDropdown(!showSourceDropdown); setShowTopicDropdown(false); }}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors border ${
+                    filterSource ? "bg-blue-600 text-white border-blue-600" :
+                    excludeSource ? "bg-red-500/20 text-red-400 border-red-500/30" :
+                    "bg-surface-2 text-muted border-border-custom hover:text-foreground"
                   }`}
                 >
-                  {excludeSource === source && "− "}{source} <span className="opacity-60">({count})</span>
+                  <span>{filterSource ? filterSource : excludeSource ? `Not: ${excludeSource}` : "Source"}</span>
+                  <svg className="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                 </button>
-              ))}
-            </div>
-          )}
+                {showSourceDropdown && (
+                  <div className="absolute top-full left-0 mt-1 bg-surface border border-border-custom rounded-lg shadow-xl z-30 min-w-[220px] max-h-72 overflow-hidden">
+                    <div className="p-2 border-b border-border-custom">
+                      <input
+                        type="text"
+                        placeholder="Search sources..."
+                        value={sourceSearch}
+                        onChange={(e) => setSourceSearch(e.target.value)}
+                        className="w-full bg-surface-2 border border-border-custom rounded px-2 py-1 text-xs text-foreground placeholder-muted focus:outline-none"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="overflow-y-auto max-h-56">
+                      <button
+                        onClick={() => { setFilterSource(null); setExcludeSource(null); setShowSourceDropdown(false); setSourceSearch(""); }}
+                        className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${!filterSource && !excludeSource ? "bg-blue-600/10 text-blue-400 font-medium" : "text-muted hover:bg-surface-2"}`}
+                      >
+                        All Sources
+                      </button>
+                      {allSources
+                        .filter(([s]) => !sourceSearch || s.toLowerCase().includes(sourceSearch.toLowerCase()))
+                        .map(([source, count]) => (
+                        <button
+                          key={source}
+                          onClick={() => { toggleSourceFilter(source); setShowSourceDropdown(false); setSourceSearch(""); }}
+                          className={`w-full text-left px-3 py-1.5 text-xs transition-colors flex justify-between ${
+                            filterSource === source ? "bg-blue-600/10 text-blue-400 font-medium" :
+                            excludeSource === source ? "bg-red-500/10 text-red-400 line-through" :
+                            "text-foreground hover:bg-surface-2"
+                          }`}
+                        >
+                          <span className="truncate">{source}</span>
+                          <span className="text-muted ml-2 flex-shrink-0">{count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
-          {/* Collection filter pills (Mentioned on Podcast, etc.) */}
-          {allCollections.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {allCollections.map(([coll, count]) => (
-                <button
-                  key={coll}
-                  onClick={() => toggleTopicFilter(coll)}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
-                    filterTopic === coll ? "bg-amber-600 text-white" :
-                    excludeTopic === coll ? "bg-red-500/20 text-red-400 line-through" :
-                    "bg-amber-500/10 text-amber-500 hover:bg-amber-500/20"
-                  }`}
-                >
-                  {excludeTopic === coll && "− "}{coll} <span className="opacity-60">({count})</span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Topic filter pills */}
-          {allTopics.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
+            {/* Collection pills inline (only a few) */}
+            {allCollections.map(([coll, count]) => (
               <button
-                onClick={() => { setFilterTopic(null); setExcludeTopic(null); }}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${!filterTopic && !excludeTopic ? "bg-emerald-600 text-white" : "bg-surface-2 text-muted hover:text-foreground"}`}
+                key={coll}
+                onClick={() => toggleTopicFilter(coll)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors border ${
+                  filterTopic === coll ? "bg-amber-600 text-white border-amber-600" :
+                  excludeTopic === coll ? "bg-red-500/20 text-red-400 border-red-500/30 line-through" :
+                  "bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500/20"
+                }`}
               >
-                All Topics
+                {excludeTopic === coll && "− "}{coll} <span className="opacity-60">({count})</span>
               </button>
-              {allTopics.map(([topic, count]) => (
+            ))}
+
+            {/* Topic dropdown */}
+            {allTopics.length > 0 && (
+              <div className="relative" data-dropdown>
                 <button
-                  key={topic}
-                  onClick={() => toggleTopicFilter(topic)}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
-                    filterTopic === topic ? "bg-emerald-600 text-white" :
-                    excludeTopic === topic ? "bg-red-500/20 text-red-400 line-through" :
-                    "bg-surface-2 text-muted hover:text-foreground"
+                  onClick={() => { setShowTopicDropdown(!showTopicDropdown); setShowSourceDropdown(false); }}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors border ${
+                    filterTopic && !allCollections.some(([c]) => c === filterTopic) ? "bg-emerald-600 text-white border-emerald-600" :
+                    excludeTopic && !allCollections.some(([c]) => c === excludeTopic) ? "bg-red-500/20 text-red-400 border-red-500/30" :
+                    "bg-surface-2 text-muted border-border-custom hover:text-foreground"
                   }`}
                 >
-                  {excludeTopic === topic && "− "}{topic} <span className="opacity-60">({count})</span>
+                  <span>{
+                    filterTopic && !allCollections.some(([c]) => c === filterTopic) ? filterTopic :
+                    excludeTopic && !allCollections.some(([c]) => c === excludeTopic) ? `Not: ${excludeTopic}` :
+                    `Topic (${allTopics.length})`
+                  }</span>
+                  <svg className="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                 </button>
-              ))}
-            </div>
-          )}
+                {showTopicDropdown && (
+                  <div className="absolute top-full left-0 mt-1 bg-surface border border-border-custom rounded-lg shadow-xl z-30 min-w-[260px] max-h-80 overflow-hidden">
+                    <div className="p-2 border-b border-border-custom">
+                      <input
+                        type="text"
+                        placeholder="Search topics..."
+                        value={topicSearch}
+                        onChange={(e) => setTopicSearch(e.target.value)}
+                        className="w-full bg-surface-2 border border-border-custom rounded px-2 py-1 text-xs text-foreground placeholder-muted focus:outline-none"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="overflow-y-auto max-h-64">
+                      <button
+                        onClick={() => { setFilterTopic(null); setExcludeTopic(null); setShowTopicDropdown(false); setTopicSearch(""); }}
+                        className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${!filterTopic && !excludeTopic ? "bg-emerald-600/10 text-emerald-400 font-medium" : "text-muted hover:bg-surface-2"}`}
+                      >
+                        All Topics
+                      </button>
+                      {allTopics
+                        .filter(([t]) => !topicSearch || t.toLowerCase().includes(topicSearch.toLowerCase()))
+                        .map(([topic, count]) => (
+                        <button
+                          key={topic}
+                          onClick={() => { toggleTopicFilter(topic); setShowTopicDropdown(false); setTopicSearch(""); }}
+                          className={`w-full text-left px-3 py-1.5 text-xs transition-colors flex justify-between ${
+                            filterTopic === topic ? "bg-emerald-600/10 text-emerald-400 font-medium" :
+                            excludeTopic === topic ? "bg-red-500/10 text-red-400 line-through" :
+                            "text-foreground hover:bg-surface-2"
+                          }`}
+                        >
+                          <span className="truncate">{topic}</span>
+                          <span className="text-muted ml-2 flex-shrink-0">{count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Active filter clear button */}
+            {(filterTopic || excludeTopic || filterSource || excludeSource) && (
+              <button
+                onClick={() => { setFilterTopic(null); setExcludeTopic(null); setFilterSource(null); setExcludeSource(null); }}
+                className="px-2 py-1 rounded-lg text-[11px] font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Possible Duplicates Alert */}
