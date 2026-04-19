@@ -9,7 +9,7 @@ export async function GET() {
     return NextResponse.json(rows);
   } catch (error) {
     console.error('GET /api/recommendations error:', error);
-    return NextResponse.json({ error: 'Failed to fetch recommendations' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch recommendations', details: String(error) }, { status: 500 });
   }
 }
 
@@ -17,28 +17,40 @@ export async function POST(request: NextRequest) {
   try {
     const db = getDb();
     const body = await request.json();
-    const { title, description, source } = body;
+    const {
+      title, author, isbn, cover_url,
+      recommended_by, notes, topic, interest, year,
+      source_book_id,
+      // Accept old field names for backward compat
+      description, source,
+    } = body;
 
     const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const now = new Date().toISOString();
 
+    // Map old field names: description was used for author, source for recommended_by
+    const actualAuthor = author || description || null;
+    const actualRecommendedBy = recommended_by || source || null;
+
     const stmt = db.prepare(`
-      INSERT INTO recommendations (id, title, description, source, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO recommendations (id, title, author, isbn, cover_url, recommended_by, notes, topic, interest, year, source_book_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    stmt.run(id, title, description || null, source || null, now, now);
+    stmt.run(
+      id, title, actualAuthor, isbn || null, cover_url || null,
+      actualRecommendedBy, notes || null, topic || null, interest || null, year || null,
+      source_book_id || null, now
+    );
 
     return NextResponse.json({
-      id,
-      title,
-      description: description || null,
-      source: source || null,
+      id, title, author: actualAuthor, isbn: isbn || null, cover_url: cover_url || null,
+      recommended_by: actualRecommendedBy, notes: notes || null, topic: topic || null,
+      interest: interest || null, year: year || null, source_book_id: source_book_id || null,
       created_at: now,
-      updated_at: now,
     });
   } catch (error) {
     console.error('POST /api/recommendations error:', error);
-    return NextResponse.json({ error: 'Failed to create recommendation' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to create recommendation', details: String(error) }, { status: 500 });
   }
 }

@@ -21,12 +21,14 @@ interface Recommendation {
   year?: number;
   lowest_price?: number | null;
   thriftbooks_price?: number | null;
+  source_book_id?: string | null;
   created_at: string;
 }
 
 type SortMode = "recent" | "abe_asc" | "abe_desc" | "thrift_asc" | "thrift_desc" | "alpha";
 
 interface LibraryBook {
+  id: string;
   title: string;
   author: string;
   status: string;
@@ -47,6 +49,11 @@ export default function RecommendationsPage() {
   const [selectedResult, setSelectedResult] = useState<BookSearchResult | null>(null);
   const [addingLoading, setAddingLoading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [sourceBookId, setSourceBookId] = useState<string | null>(null);
+  const [sourceBookTitle, setSourceBookTitle] = useState("");
+  const [sourceBookQuery, setSourceBookQuery] = useState("");
+  const [showSourceBookResults, setShowSourceBookResults] = useState(false);
+  const [bookIdMap, setBookIdMap] = useState<Record<string, string>>({});
   const [filterTopic, setFilterTopic] = useState<string | null>(null);
   const [excludeTopic, setExcludeTopic] = useState<string | null>(null);
   const [filterSource, setFilterSource] = useState<string | null>(null);
@@ -83,6 +90,10 @@ export default function RecommendationsPage() {
         );
         setLibraryTitles(existingTitles);
         setLibraryBooks(books || []);
+        // Build book ID map for source_book_id lookups
+        const bookMap: Record<string, string> = {};
+        (books || []).forEach(b => { bookMap[b.id] = b.title; });
+        setBookIdMap(bookMap);
 
         // Auto-delete recommendations for books already in library (exact normalized title match)
         const ownedRecs = allRecsData.filter((r) =>
@@ -231,15 +242,22 @@ export default function RecommendationsPage() {
       const enrichedBook = await enrichBook(bookToAdd);
       const data = await api.recommendations.create({
         title: enrichedBook.title,
-        description: enrichedBook.author,
-        source: recommendedBy.trim() || null,
-      });
+        author: enrichedBook.author || null,
+        isbn: enrichedBook.isbn || null,
+        cover_url: enrichedBook.cover_url || null,
+        recommended_by: recommendedBy.trim() || null,
+        notes: notes.trim() || null,
+        source_book_id: sourceBookId || null,
+      } as any);
 
       setRecommendations((prev) => [data as Recommendation, ...prev]);
       setAllRecs((prev) => [data as Recommendation, ...prev]);
       setSearchQuery("");
       setRecommendedBy("");
       setNotes("");
+      setSourceBookId(null);
+      setSourceBookTitle("");
+      setSourceBookQuery("");
       setSelectedResult(null);
       setSearchResults([]);
       setShowSearchResults(false);
@@ -538,6 +556,55 @@ export default function RecommendationsPage() {
                 <input type="text" placeholder="Notes..." value={notes} onChange={(e) => setNotes(e.target.value)}
                   className="bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted focus:outline-none focus:ring-1 focus:ring-emerald-600" />
               </div>
+              {/* Referenced in book search */}
+              <div className="relative">
+                {sourceBookId ? (
+                  <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/30 rounded-lg px-3 py-2">
+                    <span className="text-xs text-blue-400">Referenced in:</span>
+                    <span className="text-sm text-foreground font-medium flex-1 truncate">{sourceBookTitle}</span>
+                    <button onClick={() => { setSourceBookId(null); setSourceBookTitle(""); }} className="text-blue-400 hover:text-blue-300 text-xs">✕</button>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      placeholder="Referenced in book... (search your library)"
+                      value={sourceBookQuery}
+                      onChange={(e) => {
+                        setSourceBookQuery(e.target.value);
+                        setShowSourceBookResults(e.target.value.trim().length >= 2);
+                      }}
+                      className="w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted focus:outline-none focus:ring-1 focus:ring-blue-600"
+                    />
+                    {showSourceBookResults && sourceBookQuery.trim().length >= 2 && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-surface-2 border border-border-custom rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
+                        {libraryBooks
+                          .filter(b => b.title.toLowerCase().includes(sourceBookQuery.toLowerCase()) || b.author?.toLowerCase().includes(sourceBookQuery.toLowerCase()))
+                          .slice(0, 8)
+                          .map((book) => (
+                            <button
+                              key={book.id}
+                              type="button"
+                              onClick={() => {
+                                setSourceBookId(book.id);
+                                setSourceBookTitle(`${book.title} by ${book.author || "Unknown"}`);
+                                setSourceBookQuery("");
+                                setShowSourceBookResults(false);
+                              }}
+                              className="w-full text-left px-3 py-2 hover:bg-border-custom border-b border-border-custom last:border-0 transition-colors"
+                            >
+                              <div className="font-medium text-foreground text-sm">{book.title}</div>
+                              <div className="text-xs text-muted">{book.author || "Unknown"}</div>
+                            </button>
+                          ))}
+                        {libraryBooks.filter(b => b.title.toLowerCase().includes(sourceBookQuery.toLowerCase()) || b.author?.toLowerCase().includes(sourceBookQuery.toLowerCase())).length === 0 && (
+                          <div className="p-3 text-center text-muted text-sm">No matching books</div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
               <button
                 onClick={() => handleAddRecommendation()}
                 disabled={!selectedResult || addingLoading}
@@ -786,6 +853,11 @@ export default function RecommendationsPage() {
                             {coll}
                           </span>
                         ))}
+                        {rec.source_book_id && bookIdMap[rec.source_book_id] && (
+                          <span className="px-1.5 py-0 bg-blue-500/10 text-blue-400 rounded text-[9px] font-medium flex-shrink-0 hidden sm:inline">
+                            via {bookIdMap[rec.source_book_id]}
+                          </span>
+                        )}
                       </div>
                     </div>
 

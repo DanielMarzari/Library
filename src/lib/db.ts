@@ -152,6 +152,7 @@ function ensureAllTables(db: Database.Database) {
     } catch { /* table might not exist yet, that's fine */ }
   };
 
+  addColumnSafe('recommendations', 'source_book_id', 'TEXT');
   addColumnSafe('books', 'cover_blob', 'BLOB');
   addColumnSafe('books', 'cover_content_type', 'TEXT');
   addColumnSafe('recommendations', 'thriftbooks_price', 'REAL');

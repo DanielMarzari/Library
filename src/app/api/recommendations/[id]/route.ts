@@ -24,27 +24,23 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params;
     const db = getDb();
     const body = await request.json();
-    const { title, description, source } = body;
 
-    const now = new Date().toISOString();
     const updates: string[] = [];
     const values: any[] = [];
 
-    if (title !== undefined) {
-      updates.push('title = ?');
-      values.push(title);
-    }
-    if (description !== undefined) {
-      updates.push('description = ?');
-      values.push(description);
-    }
-    if (source !== undefined) {
-      updates.push('source = ?');
-      values.push(source);
+    // All valid recommendation columns
+    const fields = ['title', 'author', 'isbn', 'cover_url', 'recommended_by', 'notes', 'topic', 'interest', 'year', 'lowest_price', 'thriftbooks_price', 'source_book_id'];
+    for (const field of fields) {
+      if (body[field] !== undefined) {
+        updates.push(`${field} = ?`);
+        values.push(body[field]);
+      }
     }
 
-    updates.push('updated_at = ?');
-    values.push(now);
+    if (updates.length === 0) {
+      return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+    }
+
     values.push(id);
 
     const query = `UPDATE recommendations SET ${updates.join(', ')} WHERE id = ?`;
