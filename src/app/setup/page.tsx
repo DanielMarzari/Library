@@ -286,6 +286,13 @@ export default function SetupPage() {
                   <>🔧 Run Migration</>
                 )}
               </button>
+              <a
+                href="/api/export-csv"
+                download
+                className="bg-surface-2 hover:bg-border-custom text-foreground px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
+              >
+                📥 Export CSV
+              </a>
               <Link
                 href="/"
                 className="text-muted hover:text-foreground text-sm font-medium transition-colors"
