@@ -626,33 +626,79 @@ export default function StatsPage() {
           <div className="bg-surface border border-border-custom rounded-xl p-4">
             <div className="flex items-center gap-4 mb-4 text-xs">
               <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm bg-emerald-500" />
-                <span className="text-muted">Read</span>
+                <div className="w-3 h-0.5 bg-emerald-500 rounded" />
+                <span className="text-muted">Read %</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm bg-blue-500" />
-                <span className="text-muted">Reading</span>
+                <div className="w-3 h-0.5 bg-blue-500 rounded" />
+                <span className="text-muted">Reading %</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm bg-rose-400/60" />
-                <span className="text-muted">Unread</span>
+                <div className="w-3 h-0.5 bg-rose-400 rounded" />
+                <span className="text-muted">Unread %</span>
               </div>
             </div>
 
-            <div className="flex items-end gap-2 h-48">
+            <div className="relative" style={{ height: 200 }}>
+              <svg viewBox="0 0 500 200" className="w-full h-full" preserveAspectRatio="none">
+                {/* Grid lines */}
+                {[0, 25, 50, 75, 100].map((pct) => (
+                  <line key={pct} x1="0" y1={200 - pct * 2} x2="500" y2={200 - pct * 2} stroke="#27272a" strokeWidth="1" />
+                ))}
+
+                {/* Read % line */}
+                <polyline
+                  points={stats.lengthData.map((d, i) => `${i * (500 / (stats.lengthData.length - 1))},${200 - d.readPct * 2}`).join(" ")}
+                  fill="none"
+                  stroke="#10b981"
+                  strokeWidth="2"
+                />
+                {/* Reading % line */}
+                <polyline
+                  points={stats.lengthData.map((d, i) => `${i * (500 / (stats.lengthData.length - 1))},${200 - d.readingPct * 2}`).join(" ")}
+                  fill="none"
+                  stroke="#3b82f6"
+                  strokeWidth="2"
+                />
+                {/* Unread % line */}
+                <polyline
+                  points={stats.lengthData.map((d, i) => `${i * (500 / (stats.lengthData.length - 1))},${200 - d.notReadPct * 2}`).join(" ")}
+                  fill="none"
+                  stroke="#fb7185"
+                  strokeWidth="2"
+                />
+
+                {/* Data points */}
+                {stats.lengthData.map((d, i) => {
+                  const x = i * (500 / (stats.lengthData.length - 1));
+                  return (
+                    <g key={d.label}>
+                      <circle cx={x} cy={200 - d.readPct * 2} r="3" fill="#10b981">
+                        <title>{d.label} pages: {d.read} read ({d.readPct.toFixed(0)}%)</title>
+                      </circle>
+                      <circle cx={x} cy={200 - d.readingPct * 2} r="3" fill="#3b82f6">
+                        <title>{d.label} pages: {d.reading} reading ({d.readingPct.toFixed(0)}%)</title>
+                      </circle>
+                      <circle cx={x} cy={200 - d.notReadPct * 2} r="3" fill="#fb7185">
+                        <title>{d.label} pages: {d.notRead} unread ({d.notReadPct.toFixed(0)}%)</title>
+                      </circle>
+                    </g>
+                  );
+                })}
+              </svg>
+
+              {/* Y-axis labels */}
+              <div className="absolute left-0 top-0 h-full flex flex-col justify-between pointer-events-none">
+                <span className="text-[9px] text-muted-2">100%</span>
+                <span className="text-[9px] text-muted-2">50%</span>
+                <span className="text-[9px] text-muted-2">0%</span>
+              </div>
+            </div>
+
+            {/* X-axis labels */}
+            <div className="flex justify-between mt-1">
               {stats.lengthData.map((d) => (
-                <div key={d.label} className="flex-1 flex flex-col items-center h-full justify-end">
-                  {d.total > 0 ? (
-                    <div className="w-full flex flex-col rounded-t overflow-hidden" style={{ height: "100%" }}>
-                      <div className="bg-rose-400/60 transition-all" style={{ flex: d.notReadPct }} />
-                      <div className="bg-blue-500 transition-all" style={{ flex: d.readingPct }} />
-                      <div className="bg-emerald-500 transition-all" style={{ flex: d.readPct }} />
-                    </div>
-                  ) : (
-                    <div className="w-full bg-surface-2 h-2 rounded-t" />
-                  )}
-                  <span className="text-[9px] text-muted mt-2 whitespace-nowrap">{d.label}</span>
-                </div>
+                <span key={d.label} className="text-[9px] text-muted whitespace-nowrap">{d.label}</span>
               ))}
             </div>
             <p className="text-[10px] text-muted-2 text-center mt-1">Book Length (pages)</p>
@@ -792,28 +838,65 @@ export default function StatsPage() {
               </div>
             </div>
 
-            {/* Ethnicity breakdown */}
-            {stats.topEthnicities.length > 0 && (
-              <div>
-                <p className="text-xs text-muted mb-3">Ethnicity (by books owned) — {stats.topEthnicities.reduce((s, e) => s + e[1], 0)} books classified</p>
-                <div className="space-y-2">
-                  {stats.topEthnicities.map(([ethnicity, bookCount]) => (
-                    <div key={ethnicity} className="flex items-center gap-3">
-                      <span className="text-sm text-foreground w-32 flex-shrink-0">{ethnicity}</span>
-                      <div className="flex-1 bg-surface-2 rounded-full h-3 overflow-hidden">
-                        <div
-                          className="bg-emerald-600 h-full rounded-full"
-                          style={{ width: `${(bookCount / stats.topEthnicities[0][1]) * 100}%` }}
-                        />
-                      </div>
-                      <span className="text-xs text-muted w-20 text-right flex-shrink-0">
-                        {bookCount} books · {stats.ethnicityAuthorCounts[ethnicity]} auth.
-                      </span>
+            {/* Ethnicity breakdown — pie chart */}
+            {stats.topEthnicities.length > 0 && (() => {
+              const totalEthBooks = stats.topEthnicities.reduce((s, e) => s + e[1], 0);
+              const PIE_COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316", "#84cc16", "#6366f1", "#14b8a6", "#e11d48"];
+
+              // Build pie slices
+              let cumulativeAngle = 0;
+              const slices = stats.topEthnicities.map(([ethnicity, bookCount], idx) => {
+                const pct = bookCount / totalEthBooks;
+                const startAngle = cumulativeAngle;
+                cumulativeAngle += pct * 360;
+                const endAngle = cumulativeAngle;
+                return { ethnicity, bookCount, pct, startAngle, endAngle, color: PIE_COLORS[idx % PIE_COLORS.length] };
+              });
+
+              const toRad = (deg: number) => (deg - 90) * (Math.PI / 180);
+              const cx = 100, cy = 100, r = 85;
+
+              return (
+                <div>
+                  <p className="text-xs text-muted mb-3">Ethnicity (by books owned) — {totalEthBooks} books classified</p>
+                  <div className="flex flex-col sm:flex-row items-center gap-6">
+                    <svg viewBox="0 0 200 200" className="w-48 h-48 flex-shrink-0">
+                      {slices.map((slice) => {
+                        if (slice.pct >= 0.999) {
+                          return <circle key={slice.ethnicity} cx={cx} cy={cy} r={r} fill={slice.color} />;
+                        }
+                        const startX = cx + r * Math.cos(toRad(slice.startAngle));
+                        const startY = cy + r * Math.sin(toRad(slice.startAngle));
+                        const endX = cx + r * Math.cos(toRad(slice.endAngle));
+                        const endY = cy + r * Math.sin(toRad(slice.endAngle));
+                        const largeArc = slice.endAngle - slice.startAngle > 180 ? 1 : 0;
+
+                        return (
+                          <path
+                            key={slice.ethnicity}
+                            d={`M ${cx} ${cy} L ${startX} ${startY} A ${r} ${r} 0 ${largeArc} 1 ${endX} ${endY} Z`}
+                            fill={slice.color}
+                            stroke="var(--surface)"
+                            strokeWidth="1"
+                          >
+                            <title>{slice.ethnicity}: {slice.bookCount} books ({(slice.pct * 100).toFixed(1)}%)</title>
+                          </path>
+                        );
+                      })}
+                    </svg>
+                    <div className="flex flex-col gap-1.5">
+                      {slices.map((slice) => (
+                        <div key={slice.ethnicity} className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: slice.color }} />
+                          <span className="text-xs text-foreground">{slice.ethnicity}</span>
+                          <span className="text-xs text-muted">({slice.bookCount} · {(slice.pct * 100).toFixed(0)}%)</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         </section>
 
@@ -890,8 +973,8 @@ function ContributionHeatmap({
     const ratio = pages / maxPagesInDay;
     if (ratio >= 0.8) return "bg-emerald-400";
     if (ratio >= 0.6) return "bg-emerald-500";
-    if (ratio >= 0.35) return "bg-emerald-700";
-    return "bg-emerald-950";
+    if (ratio >= 0.35) return "bg-emerald-600";
+    return "bg-emerald-800";
   };
 
   const getHoverColor = (pages: number) => {
@@ -899,8 +982,8 @@ function ContributionHeatmap({
     const ratio = pages / maxPagesInDay;
     if (ratio >= 0.8) return "hover:bg-emerald-300";
     if (ratio >= 0.6) return "hover:bg-emerald-400";
-    if (ratio >= 0.35) return "hover:bg-emerald-600";
-    return "hover:bg-emerald-900";
+    if (ratio >= 0.35) return "hover:bg-emerald-500";
+    return "hover:bg-emerald-700";
   };
 
   // Generate 52 weeks of dates
@@ -1024,8 +1107,8 @@ function ContributionHeatmap({
       <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border-custom text-xs">
         <span className="text-muted">Less</span>
         <div className="w-3 h-3 rounded-sm bg-surface-2" />
-        <div className="w-3 h-3 rounded-sm bg-emerald-950" />
-        <div className="w-3 h-3 rounded-sm bg-emerald-700" />
+        <div className="w-3 h-3 rounded-sm bg-emerald-800" />
+        <div className="w-3 h-3 rounded-sm bg-emerald-600" />
         <div className="w-3 h-3 rounded-sm bg-emerald-500" />
         <div className="w-3 h-3 rounded-sm bg-emerald-400" />
         <span className="text-muted">More</span>
