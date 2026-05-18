@@ -480,7 +480,7 @@ export default function Home() {
                   {filterButtons.map((f) => {
                     // "Read" button has 3 states: all → read → exclude_read → all
                     const isActive = filter === f.value || (f.value === "read" && filter === "exclude_read");
-                    const displayLabel = f.value === "read" && filter === "exclude_read" ? "Not Read ∪ Reading" : f.label;
+                    const showStrikethrough = f.value === "read" && filter === "exclude_read";
                     return (
                       <button
                         key={f.value}
@@ -506,7 +506,7 @@ export default function Home() {
                             : "bg-surface text-muted hover:text-foreground"
                         }`}
                       >
-                        {displayLabel}
+                        {showStrikethrough ? <span className="line-through">{f.label}</span> : f.label}
                       </button>
                     );
                   })}

@@ -195,12 +195,11 @@ export default function StatsPage() {
     const booksPerMonth = recentBooks.length / (daysSinceJan1 / 30.44);
     const booksPerWeek = recentBooks.length / (daysSinceJan1 / 7);
 
-    // Pages per day for recent
-    const recentPages = recentBooks.reduce(
-      (s, b) => s + (b.reading_pages || b.pages || 0),
-      0
-    );
-    const avgPagesPerDay = Math.round(recentPages / daysSinceJan1);
+    // Pages per day — from April 1 of current year, only counting days with activity
+    const apr1 = new Date(now.getFullYear(), 3, 1); // month is 0-indexed, so 3 = April
+    const apr1Key = apr1.toISOString().split('T')[0];
+    // We'll compute this after pagesPerDay is built (see below); placeholder here
+    let avgPagesPerDay = 0;
 
     // Avg days per book
     const booksWithDates = read.filter((b) => b.start_date && b.complete_date);
@@ -311,6 +310,15 @@ export default function StatsPage() {
 
     const totalHeatmapPages = Object.values(pagesPerDay).reduce((a, b) => a + b, 0);
     const maxPagesInDay = Math.max(...Object.values(pagesPerDay), 1);
+
+    // Compute avgPagesPerDay: April 1 to present, only days with activity
+    const activeDaysSinceApr1 = Object.entries(pagesPerDay).filter(
+      ([dateKey, pages]) => dateKey >= apr1Key && pages > 0
+    );
+    if (activeDaysSinceApr1.length > 0) {
+      const totalPagesApr1 = activeDaysSinceApr1.reduce((s, [, p]) => s + p, 0);
+      avgPagesPerDay = Math.round(totalPagesApr1 / activeDaysSinceApr1.length);
+    }
 
     // --- Author stats ---
     const authorCounts: Record<string, { books: number; read: number }> = {};
