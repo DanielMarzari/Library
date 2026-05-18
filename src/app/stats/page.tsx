@@ -626,79 +626,40 @@ export default function StatsPage() {
           <div className="bg-surface border border-border-custom rounded-xl p-4">
             <div className="flex items-center gap-4 mb-4 text-xs">
               <div className="flex items-center gap-1.5">
-                <div className="w-3 h-0.5 bg-emerald-500 rounded" />
-                <span className="text-muted">Read %</span>
+                <div className="w-3 h-3 rounded-sm bg-emerald-500" />
+                <span className="text-muted">Read</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-3 h-0.5 bg-blue-500 rounded" />
-                <span className="text-muted">Reading %</span>
+                <div className="w-3 h-3 rounded-sm bg-blue-500" />
+                <span className="text-muted">Reading</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-3 h-0.5 bg-rose-400 rounded" />
-                <span className="text-muted">Unread %</span>
+                <div className="w-3 h-3 rounded-sm bg-rose-400/60" />
+                <span className="text-muted">Unread</span>
               </div>
             </div>
 
-            <div className="relative" style={{ height: 200 }}>
-              <svg viewBox="0 0 500 200" className="w-full h-full" preserveAspectRatio="none">
-                {/* Grid lines */}
-                {[0, 25, 50, 75, 100].map((pct) => (
-                  <line key={pct} x1="0" y1={200 - pct * 2} x2="500" y2={200 - pct * 2} stroke="#27272a" strokeWidth="1" />
-                ))}
-
-                {/* Read % line */}
-                <polyline
-                  points={stats.lengthData.map((d, i) => `${i * (500 / (stats.lengthData.length - 1))},${200 - d.readPct * 2}`).join(" ")}
-                  fill="none"
-                  stroke="#10b981"
-                  strokeWidth="2"
-                />
-                {/* Reading % line */}
-                <polyline
-                  points={stats.lengthData.map((d, i) => `${i * (500 / (stats.lengthData.length - 1))},${200 - d.readingPct * 2}`).join(" ")}
-                  fill="none"
-                  stroke="#3b82f6"
-                  strokeWidth="2"
-                />
-                {/* Unread % line */}
-                <polyline
-                  points={stats.lengthData.map((d, i) => `${i * (500 / (stats.lengthData.length - 1))},${200 - d.notReadPct * 2}`).join(" ")}
-                  fill="none"
-                  stroke="#fb7185"
-                  strokeWidth="2"
-                />
-
-                {/* Data points */}
-                {stats.lengthData.map((d, i) => {
-                  const x = i * (500 / (stats.lengthData.length - 1));
-                  return (
-                    <g key={d.label}>
-                      <circle cx={x} cy={200 - d.readPct * 2} r="3" fill="#10b981">
-                        <title>{d.label} pages: {d.read} read ({d.readPct.toFixed(0)}%)</title>
-                      </circle>
-                      <circle cx={x} cy={200 - d.readingPct * 2} r="3" fill="#3b82f6">
-                        <title>{d.label} pages: {d.reading} reading ({d.readingPct.toFixed(0)}%)</title>
-                      </circle>
-                      <circle cx={x} cy={200 - d.notReadPct * 2} r="3" fill="#fb7185">
-                        <title>{d.label} pages: {d.notRead} unread ({d.notReadPct.toFixed(0)}%)</title>
-                      </circle>
-                    </g>
-                  );
-                })}
-              </svg>
-
-              {/* Y-axis labels */}
-              <div className="absolute left-0 top-0 h-full flex flex-col justify-between pointer-events-none">
-                <span className="text-[9px] text-muted-2">100%</span>
-                <span className="text-[9px] text-muted-2">50%</span>
-                <span className="text-[9px] text-muted-2">0%</span>
-              </div>
-            </div>
-
-            {/* X-axis labels */}
-            <div className="flex justify-between mt-1">
+            <div className="flex items-end gap-2 h-48">
               {stats.lengthData.map((d) => (
-                <span key={d.label} className="text-[9px] text-muted whitespace-nowrap">{d.label}</span>
+                <div key={d.label} className="flex-1 flex flex-col items-center h-full justify-end">
+                  {d.total > 0 ? (
+                    <div className="w-full flex flex-col rounded overflow-hidden" style={{ height: "100%" }}>
+                      <div className="bg-rose-400/60 transition-all" style={{ flex: d.notReadPct }}>
+                        {d.notReadPct > 15 && <span className="text-[8px] text-white/70 flex items-center justify-center h-full">{d.notRead}</span>}
+                      </div>
+                      <div className="bg-blue-500 transition-all" style={{ flex: d.readingPct }}>
+                        {d.readingPct > 15 && <span className="text-[8px] text-white/70 flex items-center justify-center h-full">{d.reading}</span>}
+                      </div>
+                      <div className="bg-emerald-500 transition-all" style={{ flex: d.readPct }}>
+                        {d.readPct > 15 && <span className="text-[8px] text-white/70 flex items-center justify-center h-full">{d.read}</span>}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="w-full bg-surface-2 h-2 rounded" />
+                  )}
+                  <span className="text-[9px] text-muted mt-2 whitespace-nowrap">{d.label}</span>
+                  <span className="text-[8px] text-muted-2">{d.total}</span>
+                </div>
               ))}
             </div>
             <p className="text-[10px] text-muted-2 text-center mt-1">Book Length (pages)</p>

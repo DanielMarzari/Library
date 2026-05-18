@@ -10,7 +10,7 @@ import { BookDetail } from "@/components/BookDetail";
 import { AddBookSheet } from "@/components/AddBookSheet";
 import Link from "next/link";
 
-type FilterStatus = "all" | "not_read" | "reading" | "read" | "favorites" | "on_reading_list";
+type FilterStatus = "all" | "not_read" | "reading" | "read" | "exclude_read" | "favorites" | "on_reading_list";
 type SortMode = "recent" | "alpha" | "rating" | "lcc" | "ddc" | "pages_asc" | "pages_desc";
 type HeaderTab = "filter" | "sort";
 type GridSize = "xs" | "small" | "medium" | "large" | "xl";
@@ -41,6 +41,10 @@ export default function Home() {
     if (savedTheme) setTheme(savedTheme);
     const savedGrid = localStorage.getItem("library-grid-size") as GridSize | null;
     if (savedGrid) setGridSize(savedGrid);
+    const savedFilter = localStorage.getItem("library-filter") as FilterStatus | null;
+    if (savedFilter) setFilter(savedFilter);
+    const savedSort = localStorage.getItem("library-sort") as SortMode | null;
+    if (savedSort) setSortMode(savedSort);
   }, []);
 
   // Apply theme class to <html>
@@ -57,6 +61,14 @@ export default function Home() {
   useEffect(() => {
     localStorage.setItem("library-grid-size", gridSize);
   }, [gridSize]);
+
+  useEffect(() => {
+    localStorage.setItem("library-filter", filter);
+  }, [filter]);
+
+  useEffect(() => {
+    localStorage.setItem("library-sort", sortMode);
+  }, [sortMode]);
 
   // Multi-select state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -118,6 +130,8 @@ export default function Home() {
 
         if (filter === "favorites") {
           params.favorites = true;
+        } else if (filter === "exclude_read") {
+          // No server-side filter — we'll filter client-side
         } else if (filter !== "all" && filter !== "on_reading_list") {
           params.status = filter;
         }
@@ -160,6 +174,11 @@ export default function Home() {
     // Apply reading list filter if active
     if (filter === "on_reading_list" && readingListIds.size > 0) {
       sorted = sorted.filter(b => readingListIds.has(b.id));
+    }
+
+    // Exclude read books
+    if (filter === "exclude_read") {
+      sorted = sorted.filter(b => b.status !== "read");
     }
 
     switch (sortMode) {
@@ -458,22 +477,39 @@ export default function Home() {
             {headerTab === "filter" && (
               <div className="space-y-2">
                 <div className="flex gap-1.5 overflow-x-auto pb-1">
-                  {filterButtons.map((f) => (
-                    <button
-                      key={f.value}
-                      onClick={() => {
-                        setFilter(f.value);
-                        if (f.value !== "on_reading_list") setSelectedListId(null);
-                      }}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
-                        filter === f.value
-                          ? "bg-emerald-600 text-white"
-                          : "bg-surface text-muted hover:text-foreground"
-                      }`}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
+                  {filterButtons.map((f) => {
+                    // "Read" button has 3 states: all → read → exclude_read → all
+                    const isActive = filter === f.value || (f.value === "read" && filter === "exclude_read");
+                    const displayLabel = f.value === "read" && filter === "exclude_read" ? "Not Read ∪ Reading" : f.label;
+                    return (
+                      <button
+                        key={f.value}
+                        onClick={() => {
+                          if (f.value === "read") {
+                            if (filter === "read") {
+                              setFilter("exclude_read");
+                            } else if (filter === "exclude_read") {
+                              setFilter("all");
+                            } else {
+                              setFilter("read");
+                            }
+                          } else {
+                            setFilter(f.value);
+                          }
+                          if (f.value !== "on_reading_list") setSelectedListId(null);
+                        }}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                          isActive
+                            ? filter === "exclude_read" && f.value === "read"
+                              ? "bg-rose-600 text-white"
+                              : "bg-emerald-600 text-white"
+                            : "bg-surface text-muted hover:text-foreground"
+                        }`}
+                      >
+                        {displayLabel}
+                      </button>
+                    );
+                  })}
                   {filter === "on_reading_list" && availableLists.length > 0 && (
                     <select
                       value={selectedListId || ""}

@@ -70,6 +70,12 @@ export default function RecommendationsPage() {
   const [priceProgress, setPriceProgress] = useState({ done: 0, total: 0 });
   const [possibleDupes, setPossibleDupes] = useState<Array<{ rec: Recommendation; libraryMatch: string }>>([]);
   const [showDupes, setShowDupes] = useState(true);
+  const [dismissedDupeIds, setDismissedDupeIds] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem("library-dismissed-dupes");
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch { return new Set(); }
+  });
   const PAGE_SIZE = 60;
 
   const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "").substring(0, 40);
@@ -173,12 +179,13 @@ export default function RecommendationsPage() {
             recWords.forEach(w => { if (lib.words.has(w)) overlap++; });
             const smaller = Math.min(recWords.size, lib.words.size);
             const overlapPct = smaller > 0 ? overlap / smaller : 0;
-            // Match if: ≥50% word overlap with at least 1 overlapping word,
-            // OR if one title is a substring of the other (handles "Generous Justice" ⊂ "Generous Justice: How God's...")
+            // Substring check (handles "Generous Justice" ⊂ "Generous Justice: How God's...")
             const recTitleClean = r.title.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
             const libTitleClean = lib.title.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
-            const isSubstring = recTitleClean.includes(libTitleClean) || libTitleClean.includes(recTitleClean);
-            if ((overlapPct >= 0.5 && overlap >= 1) || isSubstring) {
+            const isSubstring = (recTitleClean.length >= 8 && libTitleClean.includes(recTitleClean)) ||
+                                (libTitleClean.length >= 8 && recTitleClean.includes(libTitleClean));
+            // Require: substring match of 8+ chars, OR ≥60% word overlap with at least 2 overlapping words
+            if (isSubstring || (overlapPct >= 0.6 && overlap >= 2)) {
               if (!fuzzyMatchedIds.has(r.id)) {
                 fuzzyMatches.push({ rec: r, libraryMatch: `${lib.title} by ${lib.author}` });
                 fuzzyMatchedIds.add(r.id);
@@ -187,7 +194,9 @@ export default function RecommendationsPage() {
             }
           }
         });
-        setPossibleDupes(fuzzyMatches);
+        // Filter out previously dismissed duplicates
+        const savedDismissed = (() => { try { const s = localStorage.getItem("library-dismissed-dupes"); return s ? new Set(JSON.parse(s)) : new Set(); } catch { return new Set(); } })();
+        setPossibleDupes(fuzzyMatches.filter(m => !savedDismissed.has(m.rec.id)));
 
         setAllRecs(allRecsData);
         setRecommendations(allRecsData);
@@ -873,7 +882,11 @@ export default function RecommendationsPage() {
                   </button>
                   <button
                     onClick={() => {
-                      // Not a duplicate — dismiss this match
+                      // Not a duplicate — dismiss this match and persist
+                      const newDismissed = new Set(dismissedDupeIds);
+                      newDismissed.add(rec.id);
+                      setDismissedDupeIds(newDismissed);
+                      try { localStorage.setItem("library-dismissed-dupes", JSON.stringify([...newDismissed])); } catch {}
                       setPossibleDupes(prev => prev.filter((_, i) => i !== idx));
                     }}
                     className="flex-shrink-0 w-6 h-6 rounded-full bg-red-500/20 text-red-500 hover:bg-red-500/30 flex items-center justify-center font-bold transition-colors"
