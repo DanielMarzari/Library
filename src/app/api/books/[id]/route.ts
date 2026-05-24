@@ -81,6 +81,19 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       values.push(isbn);
     }
     if (cover_url !== undefined) {
+      // If the user is changing the cover URL, invalidate the cached blob so
+      // the next /api/covers/[id] read lazy-fetches the new image. We do this
+      // only on an actual change so unrelated autosaves don't blow away the cache.
+      const existing = db
+        .prepare('SELECT cover_url FROM books WHERE id = ?')
+        .get(id) as { cover_url: string | null } | undefined;
+      const normalize = (v: string | null | undefined) => (v ?? '').trim();
+      if (existing && normalize(existing.cover_url) !== normalize(cover_url)) {
+        updates.push('cover_blob = ?');
+        values.push(null);
+        updates.push('cover_content_type = ?');
+        values.push(null);
+      }
       updates.push('cover_url = ?');
       values.push(cover_url);
     }

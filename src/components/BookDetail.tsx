@@ -62,7 +62,10 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(book.title);
   const [author, setAuthor] = useState(book.author);
-  const [coverUrl, setCoverUrl] = useState(coverSrc(book));
+  // coverUrl holds the *raw* external URL the user edits — never the proxy path.
+  // Display uses `displayCoverSrc` below, which prefers a typed-in preview URL
+  // but otherwise routes through /api/covers/[id] so the blob cache works.
+  const [coverUrl, setCoverUrl] = useState(book.cover_url || "");
   const [pages, setPages] = useState(book.pages?.toString() || "");
   const [introPages, setIntroPages] = useState(book.intro_pages?.toString() || "0");
   const [startPage, setStartPage] = useState(book.start_page?.toString() || "1");
@@ -93,6 +96,17 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
   const [coverOptions, setCoverOptions] = useState<string[]>([]);
   const [coverSearchLoading, setCoverSearchLoading] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
+
+  // What to actually render in the <img>. If the user has typed a new URL that
+  // differs from what's saved on the book, show that URL directly so they get an
+  // immediate preview. Otherwise route through the proxy (which lazy-caches and
+  // serves the blob) using a fingerprinted URL for cache busting.
+  const displayCoverSrc = (() => {
+    const typed = coverUrl.trim();
+    const saved = (book.cover_url || "").trim();
+    if (typed && typed !== saved) return safeCoverUrl(typed);
+    return coverSrc(book);
+  })();
 
   useEffect(() => {
     loadUpdates();
@@ -417,8 +431,8 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
         {/* Cover */}
         <div className="relative h-48 bg-gradient-to-b from-surface-2 to-surface flex items-center justify-center">
           <button onClick={() => { setShowCoverSearch(true); searchCovers(); }} className="focus:outline-none hover:opacity-75 transition-opacity" title="Search for cover image">
-            {coverUrl ? (
-              <img src={coverUrl} alt={book.title} className="h-40 rounded-lg shadow-xl shadow-black/50 object-cover cursor-pointer" />
+            {displayCoverSrc ? (
+              <img src={displayCoverSrc} alt={book.title} className="h-40 rounded-lg shadow-xl shadow-black/50 object-cover cursor-pointer" />
             ) : (
               <div className="h-40 w-28 rounded-lg bg-border-custom flex items-center justify-center cursor-pointer hover:bg-surface-2"><span className="text-muted text-xs">No Cover</span></div>
             )}
