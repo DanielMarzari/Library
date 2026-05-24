@@ -5,7 +5,12 @@ import { Book, ReadingUpdate } from '@/types/book';
 export interface Author {
   id: string;
   name: string;
-  bio?: string;
+  ethnicity?: string | null;
+  nationality?: string | null;
+  religious_tradition?: string | null;
+  gender?: string | null;
+  image_url?: string | null;
+  profile_url?: string | null;
   created_at: string;
   updated_at: string;
 }

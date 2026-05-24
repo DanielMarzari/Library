@@ -1,3 +1,5 @@
+export type ItemType = "book" | "article";
+
 export interface Book {
   id: string;
   title: string;
@@ -23,6 +25,12 @@ export interface Book {
   topics?: string[];
   auto_topics?: string[];
   favorite?: boolean;
+  // Article-specific fields (item_type === "article")
+  item_type?: ItemType;
+  doi?: string;
+  journal?: string;
+  publication_year?: number;
+  url?: string;
   created_at: string;
   updated_at: string;
   _optimistic?: boolean;

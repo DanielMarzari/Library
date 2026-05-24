@@ -7,6 +7,7 @@ import { api } from "@/lib/api-client";
 import { Book } from "@/types/book";
 import { BookDetail } from "@/components/BookDetail";
 import { searchBooks, enrichBook } from "@/lib/bookLookup";
+import { coverSrc } from "@/lib/coverUrl";
 import Link from "next/link";
 
 type MissingField =
@@ -349,9 +350,9 @@ export default function SetupPage() {
                 onClick={() => setSelectedBook(book)}
                 className="w-full flex items-center gap-3 bg-surface border border-border-custom rounded-xl p-3 hover:border-border-custom transition-colors text-left"
               >
-                {book.cover_url ? (
+                {coverSrc(book) ? (
                   <img
-                    src={book.cover_url}
+                    src={coverSrc(book)}
                     alt={book.title}
                     className="w-10 h-14 rounded object-cover flex-shrink-0"
                   />

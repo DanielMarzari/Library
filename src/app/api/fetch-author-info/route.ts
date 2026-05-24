@@ -155,7 +155,11 @@ async function fetchFromWikidata(authorName: string): Promise<WikidataResult> {
     if (claims.P18?.[0]?.mainsnak?.datavalue?.value) {
       const filename = claims.P18[0].mainsnak.datavalue.value;
       const encodedFilename = encodeURIComponent(filename.replace(/ /g, "_"));
-      result.image_url = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodedFilename}?width=400`;
+      // GIF/SVG lose animation/vector behavior when thumbnailed — serve the original.
+      const isAnimated = /\.(gif|svg)$/i.test(filename);
+      result.image_url = isAnimated
+        ? `https://commons.wikimedia.org/wiki/Special:FilePath/${encodedFilename}`
+        : `https://commons.wikimedia.org/wiki/Special:FilePath/${encodedFilename}?width=400`;
     }
   } catch (err) {
     console.error(`Wikidata fetch error for ${authorName}:`, err);

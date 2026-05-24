@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api-client';
 import { Book } from '@/types/book';
+import { coverSrc } from '@/lib/coverUrl';
 
 interface LendingRecord {
   id: string;
@@ -273,9 +274,9 @@ export default function LendingPage() {
                   <div className="flex gap-6">
                     {/* Book Cover */}
                     <div className="flex-shrink-0">
-                      {record.book?.cover_url ? (
+                      {record.book && coverSrc(record.book) ? (
                         <img
-                          src={record.book.cover_url}
+                          src={coverSrc(record.book)}
                           alt={record.book?.title || 'Book cover'}
                           className="w-20 h-28 rounded-lg object-cover"
                         />
@@ -371,9 +372,9 @@ export default function LendingPage() {
                   <div className="flex gap-6">
                     {/* Book Cover */}
                     <div className="flex-shrink-0">
-                      {record.book?.cover_url ? (
+                      {record.book && coverSrc(record.book) ? (
                         <img
-                          src={record.book.cover_url}
+                          src={coverSrc(record.book)}
                           alt={record.book?.title || 'Book cover'}
                           className="w-20 h-28 rounded-lg object-cover"
                         />

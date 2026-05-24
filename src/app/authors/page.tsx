@@ -597,12 +597,12 @@ export default function AuthorsPage() {
           authorsMetadata.forEach((metadata: any) => {
             const author = authorMap.get(metadata.name);
             if (author) {
-              author.ethnicity = metadata.bio || null;
-              author.nationality = null;
-              author.religious_tradition = null;
-              author.gender = null;
-              author.image_url = null;
-              author.profile_url = null;
+              author.ethnicity = metadata.ethnicity ?? null;
+              author.nationality = metadata.nationality ?? null;
+              author.religious_tradition = metadata.religious_tradition ?? null;
+              author.gender = metadata.gender ?? null;
+              author.image_url = metadata.image_url ?? null;
+              author.profile_url = metadata.profile_url ?? null;
               author.id = metadata.id;
             }
           });
@@ -656,9 +656,8 @@ export default function AuthorsPage() {
   const handleSaveMetadata = useCallback(
     async (authorName: string, field: "ethnicity" | "nationality" | "religious_tradition" | "gender", value: string | null) => {
       try {
-        // Get current author data to preserve other fields
         const currentAuthor = authors.find((a) => a.name === authorName);
-        const upsertData: Record<string, unknown> = {
+        const upsertData = {
           name: authorName,
           ethnicity: currentAuthor?.ethnicity ?? null,
           nationality: currentAuthor?.nationality ?? null,
@@ -669,20 +668,13 @@ export default function AuthorsPage() {
           [field]: value,
         };
 
-        // Find existing author or create a new one
         const existingAuthors = await api.authors.list();
         const existingAuthor = existingAuthors.find((a) => a.name === authorName);
 
         if (existingAuthor) {
-          await api.authors.update(existingAuthor.id, {
-            name: authorName,
-            bio: field === 'ethnicity' ? value : existingAuthor.bio,
-          });
+          await api.authors.update(existingAuthor.id, upsertData);
         } else {
-          await api.authors.create({
-            name: authorName,
-            bio: field === 'ethnicity' ? value : null,
-          });
+          await api.authors.create(upsertData);
         }
 
         setAuthors((prev) =>
@@ -703,28 +695,23 @@ export default function AuthorsPage() {
     async (authorName: string, imageUrl: string) => {
       try {
         const currentAuthor = authors.find((a) => a.name === authorName);
-        const upsertData: Record<string, unknown> = {
+        const upsertData = {
           name: authorName,
           ethnicity: currentAuthor?.ethnicity ?? null,
           nationality: currentAuthor?.nationality ?? null,
           religious_tradition: currentAuthor?.religious_tradition ?? null,
+          gender: currentAuthor?.gender ?? null,
           image_url: imageUrl,
           profile_url: currentAuthor?.profile_url ?? null,
         };
 
-        // Find existing author or create a new one
         const existingAuthors = await api.authors.list();
         const existingAuthor = existingAuthors.find((a) => a.name === authorName);
 
         if (existingAuthor) {
-          await api.authors.update(existingAuthor.id, {
-            name: authorName,
-            bio: currentAuthor?.ethnicity,
-          });
+          await api.authors.update(existingAuthor.id, upsertData);
         } else {
-          await api.authors.create({
-            name: authorName,
-          });
+          await api.authors.create(upsertData);
         }
 
         setAuthors((prev) =>
@@ -794,19 +781,13 @@ export default function AuthorsPage() {
           };
 
           try {
-            // Find existing author or create a new one
             const existingAuthors = await api.authors.list();
             const existingAuthor = existingAuthors.find((a) => a.name === authorName);
 
             if (existingAuthor) {
-              await api.authors.update(existingAuthor.id, {
-                name: authorName,
-                bio: currentAuthor?.ethnicity,
-              });
+              await api.authors.update(existingAuthor.id, upsertData);
             } else {
-              await api.authors.create({
-                name: authorName,
-              });
+              await api.authors.create(upsertData);
             }
 
             setAuthors((prev) =>

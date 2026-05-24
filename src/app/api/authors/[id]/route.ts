@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 
+const UPDATABLE_FIELDS = [
+  'name',
+  'ethnicity',
+  'nationality',
+  'religious_tradition',
+  'gender',
+  'image_url',
+  'profile_url',
+] as const;
+
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const db = getDb();
-    const stmt = db.prepare('SELECT * FROM authors WHERE id = ?');
-    const row = stmt.get(id) as any;
+    const row = db.prepare('SELECT * FROM authors WHERE id = ?').get(id);
 
     if (!row) {
       return NextResponse.json({ error: 'Author not found' }, { status: 404 });
@@ -23,36 +32,37 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { id } = await params;
     const db = getDb();
-    const body = await request.json();
-    const { name, bio } = body;
+    const body = (await request.json()) as Record<string, string | null | undefined>;
 
     const now = new Date().toISOString();
     const updates: string[] = [];
-    const values: any[] = [];
+    const values: Array<string | null> = [];
 
-    if (name !== undefined) {
-      updates.push('name = ?');
-      values.push(name);
+    for (const field of UPDATABLE_FIELDS) {
+      if (body[field] !== undefined) {
+        updates.push(`${field} = ?`);
+        values.push(body[field] ?? null);
+      }
     }
-    if (bio !== undefined) {
-      updates.push('bio = ?');
-      values.push(bio);
+
+    if (updates.length === 0) {
+      const row = db.prepare('SELECT * FROM authors WHERE id = ?').get(id);
+      if (!row) return NextResponse.json({ error: 'Author not found' }, { status: 404 });
+      return NextResponse.json(row);
     }
 
     updates.push('updated_at = ?');
     values.push(now);
     values.push(id);
 
-    const query = `UPDATE authors SET ${updates.join(', ')} WHERE id = ?`;
-    const stmt = db.prepare(query);
+    const stmt = db.prepare(`UPDATE authors SET ${updates.join(', ')} WHERE id = ?`);
     const result = stmt.run(...values);
 
     if (result.changes === 0) {
       return NextResponse.json({ error: 'Author not found' }, { status: 404 });
     }
 
-    const getStmt = db.prepare('SELECT * FROM authors WHERE id = ?');
-    const row = getStmt.get(id) as any;
+    const row = db.prepare('SELECT * FROM authors WHERE id = ?').get(id);
     return NextResponse.json(row);
   } catch (error) {
     console.error('PUT /api/authors/[id] error:', error);
@@ -64,8 +74,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   try {
     const { id } = await params;
     const db = getDb();
-    const stmt = db.prepare('DELETE FROM authors WHERE id = ?');
-    const result = stmt.run(id);
+    const result = db.prepare('DELETE FROM authors WHERE id = ?').run(id);
 
     if (result.changes === 0) {
       return NextResponse.json({ error: 'Author not found' }, { status: 404 });

@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { api } from "@/lib/api-client";
 import { Book } from "@/types/book";
+import { coverSrc } from "@/lib/coverUrl";
 import Link from "next/link";
 
 interface ReadingListItem {
@@ -378,8 +379,8 @@ export default function ReadingListPage() {
                   const isReading = gb.book.status === "reading";
                   return (
                     <div key={gb.id} className={`flex items-center gap-3 px-4 py-2.5 group ${isRead ? "opacity-60" : ""}`}>
-                      {gb.book.cover_url ? (
-                        <img src={gb.book.cover_url} alt="" className="w-8 h-11 object-cover rounded flex-shrink-0" />
+                      {coverSrc(gb.book) ? (
+                        <img src={coverSrc(gb.book)} alt="" className="w-8 h-11 object-cover rounded flex-shrink-0" />
                       ) : (
                         <div className="w-8 h-11 bg-surface-2 rounded flex-shrink-0 flex items-center justify-center">
                           <span className="text-[10px] text-muted">📖</span>
@@ -727,8 +728,8 @@ export default function ReadingListPage() {
                       onDragEnd={() => setDraggedId(null)}
                       className={`flex items-center gap-3 px-4 py-3 group transition-colors ${draggedId === item.id ? "opacity-50 bg-surface-2" : "hover:bg-surface-2/50"}`}
                     >
-                      {item.book?.cover_url && (
-                        <img src={item.book.cover_url} alt="" className="w-10 h-14 object-cover rounded flex-shrink-0" />
+                      {item.book && coverSrc(item.book) && (
+                        <img src={coverSrc(item.book)} alt="" className="w-10 h-14 object-cover rounded flex-shrink-0" />
                       )}
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm font-medium truncate ${isCompleted ? "text-muted line-through" : "text-foreground"}`}>{item.book?.title}</p>

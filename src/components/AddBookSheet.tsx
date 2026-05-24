@@ -4,7 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { api } from "@/lib/api-client";
 import { Book } from "@/types/book";
-import { BookSearchResult, searchBooks, enrichBook } from "@/lib/bookLookup";
+import {
+  ArticleSearchResult,
+  BookSearchResult,
+  enrichBook,
+  looksLikeDoi,
+  lookupDoi,
+  searchBooks,
+} from "@/lib/bookLookup";
 
 interface AddBookSheetProps {
   onClose: () => void;
@@ -12,7 +19,15 @@ interface AddBookSheetProps {
   recentSources: string[];
 }
 
-type Mode = "choose" | "camera" | "isbn" | "manual" | "pick" | "confirm";
+type Mode =
+  | "choose"
+  | "camera"
+  | "isbn"
+  | "manual"
+  | "pick"
+  | "confirm"
+  | "article"
+  | "article-confirm";
 
 export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetProps) {
   const [mode, setMode] = useState<Mode>("choose");
@@ -43,6 +58,16 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
   const [manPages, setManPages] = useState("");
   const [manCoverUrl, setManCoverUrl] = useState("");
   const [confirmCoverUrl, setConfirmCoverUrl] = useState("");
+
+  // Article (DOI) fields
+  const [doiInput, setDoiInput] = useState("");
+  const [doiLookingUp, setDoiLookingUp] = useState(false);
+  const [article, setArticle] = useState<ArticleSearchResult | null>(null);
+  const [articleTitle, setArticleTitle] = useState("");
+  const [articleAuthor, setArticleAuthor] = useState("");
+  const [articleJournal, setArticleJournal] = useState("");
+  const [articleYear, setArticleYear] = useState("");
+  const [articleUrl, setArticleUrl] = useState("");
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerContainerId = "isbn-scanner";
@@ -167,6 +192,78 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
     setSaving(false);
   };
 
+  const handleDoiLookup = async () => {
+    const raw = doiInput.trim();
+    if (!raw) return;
+    if (!looksLikeDoi(raw)) {
+      setError("That doesn't look like a DOI. Expected format: 10.xxxx/...");
+      return;
+    }
+    setDoiLookingUp(true);
+    setError("");
+    const found = await lookupDoi(raw);
+    setDoiLookingUp(false);
+    if (!found) {
+      setError(`Could not find an article for DOI: ${raw}`);
+      return;
+    }
+    setArticle(found);
+    setArticleTitle(found.title);
+    setArticleAuthor(found.author);
+    setArticleJournal(found.journal || "");
+    setArticleYear(found.publication_year ? String(found.publication_year) : "");
+    setArticleUrl(found.url || `https://doi.org/${found.doi}`);
+    if (found.pages) setEndPage(String(found.pages));
+    setMode("article-confirm");
+  };
+
+  const handleArticleAdd = async () => {
+    if (!article || !articleTitle.trim() || !articleAuthor.trim()) return;
+    setSaving(true);
+
+    const ip = parseInt(introPages) || 0;
+    const sp = parseInt(startPage) || 1;
+    const ep = parseInt(endPage) || null;
+    const yearNum = parseInt(articleYear);
+    const newBook: Partial<Book> = {
+      title: articleTitle.trim(),
+      author: articleAuthor.trim(),
+      status,
+      item_type: "article",
+      doi: article.doi,
+      journal: articleJournal.trim() || undefined,
+      publication_year: Number.isFinite(yearNum) ? yearNum : undefined,
+      url: articleUrl.trim() || undefined,
+      pages: article.pages || (ep || undefined),
+      source: source.trim() || undefined,
+      topics: editTopics.length > 0 ? editTopics : undefined,
+    };
+    onAdded(newBook);
+
+    try {
+      await api.books.create({
+        title: articleTitle.trim(),
+        author: articleAuthor.trim(),
+        status,
+        item_type: "article",
+        doi: article.doi,
+        journal: articleJournal.trim() || undefined,
+        publication_year: Number.isFinite(yearNum) ? yearNum : undefined,
+        url: articleUrl.trim() || undefined,
+        description: article.description || undefined,
+        pages: article.pages || undefined,
+        intro_pages: ip || 0,
+        start_page: sp,
+        end_page: ep,
+        source: source.trim() || undefined,
+        topics: editTopics.length > 0 ? editTopics : undefined,
+      });
+    } catch (err) {
+      console.error("Error saving article:", err);
+    }
+    setSaving(false);
+  };
+
   const handleManualAdd = async () => {
     if (!manTitle.trim() || !manAuthor.trim()) return;
     setSaving(true);
@@ -209,6 +306,7 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
   const reset = () => {
     setResults([]); setSelected(null); setError(""); setQuery("");
     setMode("choose"); stopCamera();
+    setDoiInput(""); setArticle(null);
   };
 
   const inputCls = "w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600";
@@ -313,7 +411,17 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
       <div className="relative bg-surface border border-border-custom rounded-t-2xl sm:rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-semibold">
-            {mode === "confirm" ? "Confirm Book" : mode === "pick" ? "Select a Book" : mode === "manual" ? "Add Manually" : "Add a Book"}
+            {mode === "confirm"
+              ? "Confirm Book"
+              : mode === "pick"
+              ? "Select a Book"
+              : mode === "manual"
+              ? "Add Manually"
+              : mode === "article"
+              ? "Add Article"
+              : mode === "article-confirm"
+              ? "Confirm Article"
+              : "Add to Library"}
           </h2>
           <button onClick={onClose} className="text-muted hover:text-foreground text-xl">×</button>
         </div>
@@ -328,6 +436,10 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
             <button onClick={() => setMode("isbn")}
               className="w-full bg-surface-2 hover:bg-border-custom text-foreground py-4 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-3">
               <span className="text-xl">🔍</span> Search by Title, Author, or ISBN
+            </button>
+            <button onClick={() => setMode("article")}
+              className="w-full bg-surface-2 hover:bg-border-custom text-foreground py-4 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-3">
+              <span className="text-xl">📄</span> Add Article by DOI
             </button>
             <button onClick={() => setMode("manual")}
               className="w-full bg-surface-2 hover:bg-border-custom text-foreground py-4 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-3">
@@ -442,6 +554,84 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
             </div>
           </div>
         ))}
+
+        {/* === ARTICLE (DOI LOOKUP) === */}
+        {mode === "article" && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs text-muted mb-1">DOI</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={doiInput}
+                  onChange={(e) => setDoiInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleDoiLookup(); }}
+                  placeholder="10.1038/nature12373 or https://doi.org/..."
+                  autoFocus
+                  className={inputCls}
+                />
+                <button
+                  onClick={handleDoiLookup}
+                  disabled={!doiInput.trim() || doiLookingUp}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  {doiLookingUp ? "..." : "Lookup"}
+                </button>
+              </div>
+              <p className="text-[11px] text-muted-2 mt-1">
+                Looks up article metadata from Crossref.
+              </p>
+            </div>
+            <button onClick={() => { setMode("choose"); setError(""); }} className="w-full bg-surface-2 hover:bg-border-custom py-2.5 rounded-lg text-sm font-medium transition-colors">Back</button>
+          </div>
+        )}
+
+        {/* === CONFIRM ARTICLE === */}
+        {mode === "article-confirm" && article && (
+          <div className="space-y-4">
+            <div className="bg-surface-2 border border-border-custom rounded-lg p-3 text-xs text-muted">
+              DOI: <span className="text-foreground font-mono">{article.doi}</span>
+            </div>
+
+            <div>
+              <label className="block text-xs text-muted mb-1">Title *</label>
+              <input type="text" value={articleTitle} onChange={(e) => setArticleTitle(e.target.value)} className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-xs text-muted mb-1">Author(s) *</label>
+              <input type="text" value={articleAuthor} onChange={(e) => setArticleAuthor(e.target.value)} className={inputCls} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-muted mb-1">Journal</label>
+                <input type="text" value={articleJournal} onChange={(e) => setArticleJournal(e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className="block text-xs text-muted mb-1">Year</label>
+                <input type="text" inputMode="numeric" pattern="[0-9]*" value={articleYear} onChange={(e) => setArticleYear(e.target.value)} className={inputCls} />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-muted mb-1">URL</label>
+              <input type="url" value={articleUrl} onChange={(e) => setArticleUrl(e.target.value)} className={inputCls} />
+            </div>
+
+            {sharedFields}
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleArticleAdd}
+                disabled={saving || !articleTitle.trim() || !articleAuthor.trim()}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                {saving ? "Adding..." : "Add Article"}
+              </button>
+              <button onClick={() => { setMode("article"); setArticle(null); }} className="px-4 py-2.5 bg-surface-2 hover:bg-border-custom rounded-lg text-sm font-medium transition-colors">
+                Back
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* === MANUAL ADD === */}
         {mode === "manual" && (

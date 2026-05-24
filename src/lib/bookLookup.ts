@@ -12,6 +12,83 @@ export interface BookSearchResult {
   topics?: string[];
 }
 
+export interface ArticleSearchResult {
+  title: string;
+  author: string;
+  doi: string;
+  journal: string | null;
+  publication_year: number | null;
+  url: string | null;
+  description: string | null;
+  pages: number | null;
+}
+
+// Strip a leading "https://doi.org/" or "doi:" prefix from a DOI string.
+export function normalizeDoi(input: string): string {
+  const trimmed = input.trim();
+  const m = trimmed.match(/(10\.\d{4,9}\/[^\s]+)/);
+  return m ? m[1] : trimmed;
+}
+
+export function looksLikeDoi(input: string): boolean {
+  return /(10\.\d{4,9}\/[^\s]+)/.test(input.trim());
+}
+
+// Fetch article metadata from Crossref by DOI.
+// Crossref REST API: https://api.crossref.org/works/{doi}
+export async function lookupDoi(rawDoi: string): Promise<ArticleSearchResult | null> {
+  const doi = normalizeDoi(rawDoi);
+  if (!doi) return null;
+
+  try {
+    const res = await fetch(`https://api.crossref.org/works/${encodeURIComponent(doi)}`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const work = data.message;
+    if (!work) return null;
+
+    const title = Array.isArray(work.title) ? work.title[0] : work.title;
+    const authors: string[] = Array.isArray(work.author)
+      ? work.author
+          .map((a: { given?: string; family?: string; name?: string }) =>
+            a.name || [a.given, a.family].filter(Boolean).join(" ")
+          )
+          .filter(Boolean)
+      : [];
+    const journal = Array.isArray(work["container-title"])
+      ? work["container-title"][0]
+      : work["container-title"];
+    const yearParts =
+      work.issued?.["date-parts"]?.[0] ||
+      work["published-print"]?.["date-parts"]?.[0] ||
+      work["published-online"]?.["date-parts"]?.[0];
+    const publication_year = Array.isArray(yearParts) ? yearParts[0] : null;
+    const pageRange: string | undefined = work.page;
+    let pages: number | null = null;
+    if (pageRange) {
+      const m = pageRange.match(/(\d+)\s*[-–]\s*(\d+)/);
+      if (m) pages = parseInt(m[2], 10) - parseInt(m[1], 10) + 1;
+    }
+
+    return {
+      title: title || "Untitled article",
+      author: authors.join(", ") || "Unknown Author",
+      doi,
+      journal: journal || null,
+      publication_year: publication_year || null,
+      url: work.URL || `https://doi.org/${doi}`,
+      description: work.abstract
+        ? work.abstract.replace(/<[^>]+>/g, "").slice(0, 500)
+        : null,
+      pages,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // Strip edition/anniversary junk from titles
 function cleanTitle(raw: string): { title: string; subtitle?: string } {
   let text = raw;

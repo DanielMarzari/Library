@@ -1,6 +1,7 @@
 "use client";
 
 import { Book } from "@/types/book";
+import { coverSrc } from "@/lib/coverUrl";
 
 interface BookCardProps {
   book: Book;
@@ -29,8 +30,8 @@ const nextStatus: Record<Book["status"], Book["status"]> = {
 export function BookCard({ book, onDelete, onStatusChange }: BookCardProps) {
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex gap-4 hover:border-zinc-700 transition-colors">
-      {book.cover_url ? (
-        <img src={book.cover_url} alt={book.title} className="w-16 h-24 rounded-md object-cover flex-shrink-0" />
+      {coverSrc(book) ? (
+        <img src={coverSrc(book)} alt={book.title} className="w-16 h-24 rounded-md object-cover flex-shrink-0" />
       ) : (
         <div className="w-16 h-24 rounded-md bg-zinc-800 flex items-center justify-center flex-shrink-0">
           <span className="text-zinc-600 text-xs text-center px-1">No Cover</span>

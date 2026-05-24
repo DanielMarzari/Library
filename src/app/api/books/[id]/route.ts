@@ -56,6 +56,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       topics,
       auto_topics,
       favorite,
+      item_type,
+      doi,
+      journal,
+      publication_year,
+      url,
     } = body;
 
     const now = new Date().toISOString();
@@ -150,6 +155,26 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (favorite !== undefined) {
       updates.push('favorite = ?');
       values.push(favorite ? 1 : 0);
+    }
+    if (item_type !== undefined) {
+      updates.push('item_type = ?');
+      values.push(item_type === 'article' ? 'article' : 'book');
+    }
+    if (doi !== undefined) {
+      updates.push('doi = ?');
+      values.push(doi);
+    }
+    if (journal !== undefined) {
+      updates.push('journal = ?');
+      values.push(journal);
+    }
+    if (publication_year !== undefined) {
+      updates.push('publication_year = ?');
+      values.push(publication_year);
+    }
+    if (url !== undefined) {
+      updates.push('url = ?');
+      values.push(url);
     }
 
     updates.push('updated_at = ?');

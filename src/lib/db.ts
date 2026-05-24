@@ -160,4 +160,11 @@ function ensureAllTables(db: Database.Database) {
   addColumnSafe('authors', 'profile_url', 'TEXT');
   addColumnSafe('authors', 'gender', 'TEXT');
   addColumnSafe('authors', 'ethnicity', 'TEXT');
+
+  // Article support — items in `books` can be either a book or an article.
+  addColumnSafe('books', 'item_type', "TEXT NOT NULL DEFAULT 'book'");
+  addColumnSafe('books', 'doi', 'TEXT');
+  addColumnSafe('books', 'journal', 'TEXT');
+  addColumnSafe('books', 'publication_year', 'INTEGER');
+  addColumnSafe('books', 'url', 'TEXT');
 }

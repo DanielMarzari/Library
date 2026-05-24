@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
       volume, pages, intro_pages, start_page, end_page, reading_pages,
       current_page, start_date, complete_date, source, lcc, ddc,
       topics, auto_topics, favorite, created_at, updated_at,
+      item_type, doi, journal, publication_year, url,
       CASE WHEN cover_blob IS NOT NULL AND length(cover_blob) > 0 THEN 1 ELSE 0 END as has_cover_blob
       FROM books WHERE 1=1`;
     const params: any[] = [];
@@ -84,18 +85,26 @@ export async function POST(request: NextRequest) {
       topics,
       auto_topics,
       favorite,
+      item_type,
+      doi,
+      journal,
+      publication_year,
+      url,
     } = body;
 
-    const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
     const now = new Date().toISOString();
+    const resolvedItemType = item_type === 'article' ? 'article' : 'book';
 
     const stmt = db.prepare(`
       INSERT INTO books (
         id, title, author, isbn, cover_url, description, status, rating,
         volume, pages, intro_pages, start_page, end_page, reading_pages,
         current_page, start_date, complete_date, source, lcc, ddc,
-        topics, auto_topics, favorite, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        topics, auto_topics, favorite,
+        item_type, doi, journal, publication_year, url,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -122,6 +131,11 @@ export async function POST(request: NextRequest) {
       topics ? JSON.stringify(topics) : JSON.stringify([]),
       auto_topics ? JSON.stringify(auto_topics) : JSON.stringify([]),
       favorite ? 1 : 0,
+      resolvedItemType,
+      doi || null,
+      journal || null,
+      publication_year || null,
+      url || null,
       now,
       now
     );
@@ -150,6 +164,11 @@ export async function POST(request: NextRequest) {
       topics: topics || [],
       auto_topics: auto_topics || [],
       favorite: Boolean(favorite),
+      item_type: resolvedItemType,
+      doi: doi || null,
+      journal: journal || null,
+      publication_year: publication_year || null,
+      url: url || null,
       created_at: now,
       updated_at: now,
     });

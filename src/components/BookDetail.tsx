@@ -417,8 +417,8 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
         {/* Cover */}
         <div className="relative h-48 bg-gradient-to-b from-surface-2 to-surface flex items-center justify-center">
           <button onClick={() => { setShowCoverSearch(true); searchCovers(); }} className="focus:outline-none hover:opacity-75 transition-opacity" title="Search for cover image">
-            {(coverUrl || book.cover_url) ? (
-              <img src={coverUrl || book.cover_url} alt={book.title} className="h-40 rounded-lg shadow-xl shadow-black/50 object-cover cursor-pointer" />
+            {coverUrl ? (
+              <img src={coverUrl} alt={book.title} className="h-40 rounded-lg shadow-xl shadow-black/50 object-cover cursor-pointer" />
             ) : (
               <div className="h-40 w-28 rounded-lg bg-border-custom flex items-center justify-center cursor-pointer hover:bg-surface-2"><span className="text-muted text-xs">No Cover</span></div>
             )}
