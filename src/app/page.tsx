@@ -392,6 +392,7 @@ export default function Home() {
                   <p className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-2 font-semibold">Manage</p>
                   <Link href="/lending" className={navLinkCls} onClick={() => setShowNav(false)}>Lending</Link>
                   <Link href="/setup" className={navLinkCls} onClick={() => setShowNav(false)}>Setup</Link>
+                  <Link href="/mockups" className={navLinkCls} onClick={() => setShowNav(false)}>Mockups</Link>
 
                   <div className="border-t border-border-custom my-1.5" />
                   <div className="px-3 py-2 space-y-3">
