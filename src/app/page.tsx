@@ -657,8 +657,8 @@ export default function Home() {
           book={selectedBook}
           onClose={() => setSelectedBook(null)}
           onUpdated={() => {
-            setSelectedBook(null);
-            // Background refetch — no loading flash
+            // Background refetch — no loading flash. Detail panel stays open
+            // so autosaves can keep firing while the main shelf catches up.
             refetch();
           }}
           onDeleted={() => {

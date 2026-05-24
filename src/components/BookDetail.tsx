@@ -215,11 +215,14 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
       });
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus("idle"), 1500);
+      // Tell the parent the list is stale so the main shelf re-fetches and
+      // re-renders covers (in particular, picks up a swapped cover_url).
+      onUpdated();
     } catch (error) {
       console.error("Save error:", error);
       setSaveStatus("idle");
     }
-  }, [book.id]);
+  }, [book.id, onUpdated]);
 
   // Stable scheduleAutoSave — call from onChange handlers
   const scheduleAutoSave = useCallback(() => {
