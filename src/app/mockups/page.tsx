@@ -12,44 +12,51 @@ interface Mockup {
   vibe: string;
   bg: string;
   text: string;
+  sublinks?: { label: string; href: string }[];
 }
 
 const MOCKUPS: Mockup[] = [
   {
     id: "1",
-    name: "Warm Stacks",
-    tagline: "Old library, parchment & walnut",
+    name: "Bento Pop",
+    tagline: "Colorful tiles · mobile-first",
     description:
-      "Cream paper background with walnut shelves, burgundy accents, and serif type. Books sit on rendered shelves with subtle wood grain. Designed to feel like a private study.",
-    palette: ["#F4EBDC", "#3A2418", "#7B2C2C", "#C9A86A"],
-    font: "Cormorant Garamond + Crimson Pro",
-    vibe: "Cozy · Scholarly · Tactile",
-    bg: "linear-gradient(135deg, #F4EBDC 0%, #E8D9BD 100%)",
-    text: "#3A2418",
+      "Modern bento dashboard with mixed-size tiles, color-coded by status. Big covers, stats, streaks, goal progress. Now with sub-pages: book detail, reading list, and authors — all built mobile-first with a bottom tab bar.",
+    palette: ["#FFF9EE", "#0B0B16", "#FFD166", "#06D6A0", "#EF476F", "#C8B6FF"],
+    font: "Space Grotesk + Inter",
+    vibe: "Playful · Modern · Mobile-first",
+    bg: "linear-gradient(135deg, #FFE9B7 0%, #FFB6D8 60%, #B7E4FF 100%)",
+    text: "#0B0B16",
+    sublinks: [
+      { label: "Dashboard", href: "/mockups/1" },
+      { label: "Book", href: "/mockups/1/book" },
+      { label: "Reading list", href: "/mockups/1/list" },
+      { label: "Authors", href: "/mockups/1/authors" },
+    ],
   },
   {
     id: "2",
-    name: "Editorial",
-    tagline: "Black, ivory, and oversized serif",
+    name: "The Catalog",
+    tagline: "Card-catalog · everything on one page",
     description:
-      "High-contrast magazine layout. Huge Playfair Display titles, narrow columns, generous whitespace, and a single restrained accent. Reads like a hand-set quarterly journal.",
-    palette: ["#FAF7F2", "#0A0A0A", "#D74E7D", "#9E9E9E"],
-    font: "Playfair Display + Source Serif 4",
-    vibe: "Minimal · Typographic · Calm",
-    bg: "linear-gradient(135deg, #FAF7F2 0%, #EDE7DC 100%)",
-    text: "#0A0A0A",
+      "Academic library aesthetic — sepia paper, ruled rows, classification numbers (LCC), serif type, monospace call numbers. Every book in the collection visible on a single scrolling index, alongside a subject index and a personal circulation slip.",
+    palette: ["#F2E8D5", "#1F1A14", "#7A2E1F", "#B08020", "#3F5B36"],
+    font: "Libre Bodoni + Libre Caslon + JetBrains Mono",
+    vibe: "Scholarly · Dense · Tactile",
+    bg: "repeating-linear-gradient(0deg, #F2E8D5 0, #F2E8D5 18px, #E5D7B5 18px, #E5D7B5 19px)",
+    text: "#1F1A14",
   },
   {
     id: "3",
-    name: "Bento Pop",
-    tagline: "Bright tiles, big covers, color-coded",
+    name: "Reel",
+    tagline: "Dark · cinematic · diary",
     description:
-      "Bento-grid dashboard with playful color blocks per status. Covers float in mixed-size tiles next to stats and currently-reading widgets. Inter + Space Grotesk for a modern, snappy feel.",
-    palette: ["#FFFFFF", "#0B0B16", "#FFD166", "#06D6A0", "#EF476F"],
-    font: "Space Grotesk + Inter",
-    vibe: "Playful · Colorful · Modern",
-    bg: "linear-gradient(135deg, #FFE9B7 0%, #FFB6D8 60%, #B7E4FF 100%)",
-    text: "#0B0B16",
+      "Letterboxd-for-books vibe. Featured book is a full-bleed hero with its own cover as a blurred backdrop. Bebas Neue display, poster-grid for the whole shelf, IMDb-yellow rating chips, and a chronological reading diary feed. Moody and obsessive — for the collector.",
+    palette: ["#0A0A0F", "#F5F5F7", "#FF3B5C", "#F5C518", "#3DDBD9", "#A78BFA"],
+    font: "Bebas Neue + Inter Tight + DM Mono",
+    vibe: "Moody · Bold · Image-driven",
+    bg: "radial-gradient(at top, #1F1F2A 0%, #0A0A0F 70%)",
+    text: "#F5F5F7",
   },
 ];
 
@@ -61,12 +68,13 @@ export default function MockupsIndex() {
         <div className="flex items-center justify-between mb-12">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-muted-2 mb-2">
-              Design exploration
+              Design exploration · v2
             </p>
             <h1 className="text-4xl font-bold text-emerald-500">Mockups</h1>
             <p className="text-muted mt-2 max-w-2xl">
-              Three alternative directions for the Library look & feel. Click any tile
-              to walk through a full mockup. Mock data only — nothing here writes.
+              Three directions. Bento Pop now has multiple sub-pages for mobile,
+              The Catalog shows every book on one academic page, and Reel is a
+              moody cinematic take. Mock data only — nothing here writes.
             </p>
           </div>
           <Link
@@ -80,37 +88,38 @@ export default function MockupsIndex() {
         {/* Preview grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {MOCKUPS.map((m) => (
-            <Link
+            <div
               key={m.id}
-              href={`/mockups/${m.id}`}
-              className="group block rounded-2xl overflow-hidden border border-border-custom hover:border-emerald-500/60 transition-colors"
+              className="block rounded-2xl overflow-hidden border border-border-custom hover:border-emerald-500/60 transition-colors"
             >
-              {/* Preview swatch */}
-              <div
-                className="aspect-[4/3] flex flex-col items-center justify-center p-6 relative"
-                style={{ background: m.bg, color: m.text }}
-              >
-                <p
-                  className="text-[10px] uppercase tracking-[0.25em] mb-2 opacity-70"
+              <Link href={`/mockups/${m.id}`} className="block">
+                {/* Preview swatch */}
+                <div
+                  className="aspect-[4/3] flex flex-col items-center justify-center p-6 relative"
+                  style={{ background: m.bg, color: m.text }}
                 >
-                  Mockup {m.id}
-                </p>
-                <p className="text-3xl font-semibold text-center leading-tight">
-                  {m.name}
-                </p>
-                <p className="text-sm opacity-70 mt-2 text-center">{m.tagline}</p>
+                  <p className="text-[10px] uppercase tracking-[0.25em] mb-2 opacity-70">
+                    Mockup {m.id}
+                  </p>
+                  <p className="text-3xl font-semibold text-center leading-tight">
+                    {m.name}
+                  </p>
+                  <p className="text-sm opacity-70 mt-2 text-center">
+                    {m.tagline}
+                  </p>
 
-                {/* Palette swatches */}
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
-                  {m.palette.map((c) => (
-                    <div
-                      key={c}
-                      className="w-5 h-5 rounded-full border border-black/10 shadow"
-                      style={{ backgroundColor: c }}
-                    />
-                  ))}
+                  {/* Palette swatches */}
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
+                    {m.palette.map((c) => (
+                      <div
+                        key={c}
+                        className="w-5 h-5 rounded-full border border-black/10 shadow"
+                        style={{ backgroundColor: c }}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
+              </Link>
 
               {/* Description */}
               <div className="p-5 bg-surface">
@@ -118,18 +127,35 @@ export default function MockupsIndex() {
                   <span className="text-xs uppercase tracking-wider text-emerald-500 font-semibold">
                     {m.vibe}
                   </span>
-                  <span className="text-muted-2 text-sm group-hover:text-foreground transition-colors">
+                  <Link
+                    href={`/mockups/${m.id}`}
+                    className="text-muted-2 text-sm hover:text-foreground transition-colors"
+                  >
                     View →
-                  </span>
+                  </Link>
                 </div>
                 <p className="text-sm text-muted leading-relaxed mb-3">
                   {m.description}
                 </p>
-                <p className="text-xs text-muted-2">
+                <p className="text-xs text-muted-2 mb-3">
                   <span className="text-muted">Fonts:</span> {m.font}
                 </p>
+
+                {m.sublinks && (
+                  <div className="flex flex-wrap gap-1.5 pt-3 border-t border-border-custom">
+                    {m.sublinks.map((s) => (
+                      <Link
+                        key={s.href}
+                        href={s.href}
+                        className="text-[11px] px-2.5 py-1 rounded-full bg-surface-2 hover:bg-border-custom text-foreground transition-colors"
+                      >
+                        {s.label}
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
-            </Link>
+            </div>
           ))}
         </div>
 
@@ -138,8 +164,7 @@ export default function MockupsIndex() {
           <p className="text-sm text-muted">
             <span className="text-foreground font-medium">How to use these:</span>{" "}
             pick a direction (or steal pieces from each), and I&apos;ll port the
-            real Library views into the chosen system — palette, type, card design,
-            and shelf layout.
+            real Library views into the chosen system.
           </p>
         </div>
       </div>

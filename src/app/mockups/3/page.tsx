@@ -4,28 +4,39 @@ import Link from "next/link";
 import { MOCK_BOOKS, MOCK_STATS } from "../data";
 
 // -----------------------------------------------------------------------------
-// Mockup 3 — "Bento Pop"
-// Bright modern dashboard. Mixed-size bento tiles, color-coded by status,
-// playful palette, Space Grotesk display + Inter UI. Big covers floating in
-// pastel cells alongside stats widgets.
+// Mockup 3 — "Reel" (SURPRISE)
+// Dark cinematic mood, Letterboxd-meets-album-art. Hero panel with a featured
+// book whose cover is blown up + blurred as the backdrop. Big poster-grid of
+// all books. Vivid colour bursts from each cover. Vibe: a private reading
+// diary curated like a film collection. Bebas Neue display + Inter Tight body.
 // -----------------------------------------------------------------------------
 
 const palette = {
-  bg: "#FFF9EE",
-  ink: "#0B0B16",
-  inkSoft: "#5C5C70",
-  yellow: "#FFD166",
-  green: "#06D6A0",
-  pink: "#EF476F",
-  blue: "#118AB2",
-  lilac: "#C8B6FF",
-  card: "#FFFFFF",
+  bg: "#0A0A0F",
+  surface: "#15151D",
+  surfaceHi: "#1F1F2A",
+  ink: "#F5F5F7",
+  inkSoft: "#8E8E9A",
+  inkFaint: "#4A4A55",
+  // Hot accents — used sparingly like film festival posters
+  hot: "#FF3B5C",
+  amber: "#F5C518", // IMDb yellow
+  cyan: "#3DDBD9",
+  violet: "#A78BFA",
 };
 
-const fontImport = `https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap`;
+const fontImport = `https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter+Tight:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap`;
 
-export default function MockupBentoPop() {
+const display: React.CSSProperties = {
+  fontFamily: "'Bebas Neue', 'Inter Tight', sans-serif",
+  letterSpacing: "0.01em",
+};
+const body: React.CSSProperties = { fontFamily: "'Inter Tight', sans-serif" };
+const mono: React.CSSProperties = { fontFamily: "'DM Mono', monospace" };
+
+export default function MockupReel() {
   const reading = MOCK_BOOKS.filter((b) => b.status === "reading");
+  const finished = MOCK_BOOKS.filter((b) => b.status === "read");
   const featured = reading[0];
 
   return (
@@ -34,288 +45,423 @@ export default function MockupBentoPop() {
       <link rel="stylesheet" href={fontImport} />
       <div
         style={{
-          background: `radial-gradient(at 0% 0%, ${palette.yellow}66 0%, transparent 40%), radial-gradient(at 100% 0%, ${palette.lilac}66 0%, transparent 50%), radial-gradient(at 50% 100%, ${palette.green}33 0%, transparent 50%), ${palette.bg}`,
-          minHeight: "100vh",
+          background: palette.bg,
           color: palette.ink,
-          fontFamily: "'Inter', sans-serif",
+          minHeight: "100vh",
+          ...body,
         }}
       >
-        <div className="max-w-7xl mx-auto px-5 py-8">
-          {/* Top bar */}
-          <header className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-3">
-              <div
-                className="w-10 h-10 rounded-full grid place-items-center text-white font-bold"
-                style={{ background: palette.ink, fontFamily: "'Space Grotesk', sans-serif" }}
-              >
-                L
-              </div>
-              <p
-                className="text-2xl font-bold"
-                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-              >
-                library
-                <span style={{ color: palette.pink }}>.</span>
-              </p>
+        {/* Top nav */}
+        <header className="sticky top-0 z-30 backdrop-blur-xl" style={{ background: `${palette.bg}cc`, borderBottom: `1px solid ${palette.surfaceHi}` }}>
+          <div className="max-w-7xl mx-auto px-5 sm:px-8 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <ReelLogo />
+              <p className="text-2xl tracking-[0.08em]" style={display}>REEL</p>
             </div>
-            <nav className="hidden md:flex items-center gap-1 p-1 rounded-full" style={{ background: palette.card, border: `1px solid ${palette.ink}10` }}>
-              {["Shelf", "Reading", "Authors", "Stats"].map((l, i) => (
+            <nav className="hidden md:flex items-center gap-7 text-sm" style={mono}>
+              {["DIARY", "SHELF", "LISTS", "PROFILE"].map((l, i) => (
                 <a
                   key={l}
-                  className="px-4 py-2 text-sm font-medium rounded-full transition-colors cursor-pointer hover:bg-black/5"
+                  className="hover:opacity-100 transition-opacity"
                   style={{
-                    background: i === 0 ? palette.ink : "transparent",
-                    color: i === 0 ? palette.bg : palette.ink,
+                    color: i === 0 ? palette.hot : palette.inkSoft,
+                    opacity: i === 0 ? 1 : 0.8,
                   }}
                 >
                   {l}
                 </a>
               ))}
             </nav>
-            <button
-              className="px-4 py-2 rounded-full text-sm font-semibold text-white"
-              style={{ background: palette.pink, fontFamily: "'Space Grotesk', sans-serif" }}
+            <Link
+              href="/mockups"
+              className="text-xs px-3 py-1.5 border"
+              style={{ ...mono, borderColor: palette.surfaceHi, color: palette.inkSoft }}
             >
-              + Add Book
-            </button>
-          </header>
-
-          {/* Hero greeting */}
-          <div className="mb-8">
-            <h1
-              className="text-5xl md:text-6xl font-bold leading-[1.05] tracking-tight"
-              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-            >
-              Hi, Dan.{" "}
-              <span style={{ color: palette.inkSoft }}>You&apos;ve read</span>{" "}
-              <span
-                style={{
-                  background: `linear-gradient(120deg, ${palette.pink}, ${palette.yellow})`,
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }}
-              >
-                {MOCK_STATS.pagesRead.toLocaleString()} pages
-              </span>{" "}
-              <span style={{ color: palette.inkSoft }}>this year.</span>
-            </h1>
+              ← mockups
+            </Link>
           </div>
+        </header>
 
-          {/* BENTO GRID */}
-          <div className="grid grid-cols-12 gap-4 auto-rows-[140px]">
-            {/* Currently reading hero — 6 cols × 4 rows */}
-            {featured && (
-              <div
-                className="col-span-12 md:col-span-6 row-span-4 rounded-3xl p-6 relative overflow-hidden"
-                style={{ background: palette.ink, color: palette.bg }}
-              >
-                <div
-                  className="absolute -right-12 -bottom-12 w-64 h-64 rounded-full opacity-30"
-                  style={{ background: palette.pink, filter: "blur(40px)" }}
-                />
-                <div
-                  className="absolute -left-12 -top-12 w-48 h-48 rounded-full opacity-30"
-                  style={{ background: palette.yellow, filter: "blur(30px)" }}
-                />
-                <div className="relative h-full flex gap-5">
-                  <img src={featured.cover} alt={featured.title} className="w-32 aspect-[2/3] object-cover rounded-xl shadow-2xl" />
-                  <div className="flex-1 flex flex-col">
-                    <p className="text-xs uppercase tracking-wider opacity-60 mb-2" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                      Now reading
-                    </p>
-                    <p className="text-3xl font-bold leading-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                      {featured.title}
-                    </p>
-                    <p className="opacity-70 mt-1">{featured.author}</p>
-                    <div className="mt-auto">
-                      <div className="flex justify-between text-sm mb-2">
-                        <span>Page {Math.round((featured.pages * (featured.progress || 0)) / 100)} of {featured.pages}</span>
-                        <span className="font-bold" style={{ color: palette.yellow }}>{featured.progress}%</span>
-                      </div>
-                      <div className="h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.15)" }}>
-                        <div
-                          className="h-full rounded-full"
-                          style={{ width: `${featured.progress}%`, background: `linear-gradient(90deg, ${palette.yellow}, ${palette.pink})` }}
-                        />
-                      </div>
+        {/* HERO: featured book as backdrop */}
+        {featured && (
+          <section className="relative overflow-hidden" style={{ minHeight: "92vh" }}>
+            {/* Blurred backdrop */}
+            <img
+              src={featured.cover}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{ filter: "blur(60px) saturate(1.4)", opacity: 0.55, transform: "scale(1.2)" }}
+            />
+            <div
+              className="absolute inset-0"
+              style={{
+                background: `linear-gradient(180deg, ${palette.bg}00 0%, ${palette.bg}40 30%, ${palette.bg}d0 70%, ${palette.bg} 100%)`,
+              }}
+            />
+
+            <div className="relative max-w-7xl mx-auto px-5 sm:px-8 py-12 sm:py-20">
+              <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-8 items-end" style={{ minHeight: "70vh" }}>
+                {/* Poster */}
+                <div className="relative">
+                  <img
+                    src={featured.cover}
+                    alt={featured.title}
+                    className="w-48 sm:w-64 aspect-[2/3] object-cover mx-auto md:mx-0 shadow-2xl"
+                    style={{ boxShadow: "0 30px 60px -20px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.05)" }}
+                  />
+                  <div
+                    className="absolute -top-3 -right-3 px-3 py-1 text-xs font-bold tracking-wider"
+                    style={{ background: palette.hot, color: "#FFF", ...display }}
+                  >
+                    NOW READING
+                  </div>
+                </div>
+
+                {/* Title block */}
+                <div>
+                  <p className="text-xs mb-4 tracking-[0.4em]" style={{ ...mono, color: palette.amber }}>
+                    DIARY ENTRY · {new Date().toLocaleDateString("en-US", { dateStyle: "long" }).toUpperCase()}
+                  </p>
+                  <h1
+                    className="leading-[0.85] mb-3"
+                    style={{
+                      ...display,
+                      fontSize: "clamp(3rem, 9vw, 8rem)",
+                    }}
+                  >
+                    {featured.title.toUpperCase()}
+                  </h1>
+                  <p
+                    className="text-lg sm:text-2xl mb-6"
+                    style={{ color: palette.inkSoft, ...body }}
+                  >
+                    <span style={{ color: palette.ink }}>{featured.author}</span> · {featured.year}
+                  </p>
+
+                  {/* Stat strip */}
+                  <div className="flex flex-wrap gap-x-8 gap-y-3 mb-6" style={mono}>
+                    <Stat label="PAGE" value={`${Math.round((featured.pages * (featured.progress || 0)) / 100)} / ${featured.pages}`} />
+                    <Stat label="PROGRESS" value={`${featured.progress}%`} color={palette.hot} />
+                    <Stat label="STARTED" value="MAY 19" />
+                    <Stat label="DAYS IN" value="6" />
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="mb-7 max-w-md">
+                    <div className="h-1 w-full overflow-hidden" style={{ background: palette.surfaceHi }}>
+                      <div
+                        className="h-full"
+                        style={{
+                          width: `${featured.progress}%`,
+                          background: `linear-gradient(90deg, ${palette.hot}, ${palette.amber})`,
+                        }}
+                      />
                     </div>
+                  </div>
+
+                  {/* Topics as tags */}
+                  <div className="flex flex-wrap gap-2 mb-7">
+                    {featured.topics.map((t) => (
+                      <span
+                        key={t}
+                        className="text-[10px] tracking-[0.2em] px-2.5 py-1 border"
+                        style={{
+                          ...mono,
+                          borderColor: palette.surfaceHi,
+                          color: palette.inkSoft,
+                        }}
+                      >
+                        {t.toUpperCase()}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* CTAs */}
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      className="px-6 py-3 tracking-[0.15em] text-sm"
+                      style={{ background: palette.ink, color: palette.bg, ...display }}
+                    >
+                      ▶ LOG PROGRESS
+                    </button>
+                    <button
+                      className="px-6 py-3 tracking-[0.15em] text-sm border"
+                      style={{ borderColor: palette.ink, color: palette.ink, ...display }}
+                    >
+                      ★ RATE WHEN DONE
+                    </button>
                   </div>
                 </div>
               </div>
-            )}
+            </div>
+          </section>
+        )}
 
-            {/* Stats trio */}
-            <BentoStat color={palette.green} label="Books read" value={MOCK_STATS.read} sub="↑ 3 from last yr" />
-            <BentoStat color={palette.yellow} label="In progress" value={MOCK_STATS.reading} sub="2 close to done" inkOnLight />
-            <BentoStat color={palette.lilac} label="Avg. rating" value={MOCK_STATS.avgRating.toFixed(1)} sub="★★★★☆ overall" inkOnLight />
-
-            {/* Goal tile */}
-            <div className="col-span-6 md:col-span-3 row-span-2 rounded-3xl p-5 flex flex-col" style={{ background: palette.card, border: `1px solid ${palette.ink}10` }}>
-              <p className="text-xs uppercase tracking-wider font-semibold" style={{ color: palette.inkSoft, fontFamily: "'Space Grotesk', sans-serif" }}>
-                Goal &apos;26
+        <div className="max-w-7xl mx-auto px-5 sm:px-8 pb-16">
+          {/* Year-in-review banner */}
+          <section className="my-12">
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+              <h2
+                className="text-3xl sm:text-5xl"
+                style={display}
+              >
+                YEAR IN <span style={{ color: palette.amber }}>REVIEW</span>
+              </h2>
+              <p style={{ ...mono, color: palette.inkSoft }} className="text-xs tracking-[0.3em]">
+                2026 · IN PROGRESS
               </p>
-              <p className="text-3xl font-bold mt-1" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                {MOCK_STATS.read}/24
-              </p>
-              <div className="h-2 rounded-full overflow-hidden mt-3" style={{ background: palette.ink + "10" }}>
-                <div className="h-full rounded-full" style={{ width: `${(MOCK_STATS.read / 24) * 100}%`, background: palette.pink }} />
-              </div>
-              <p className="text-xs mt-2" style={{ color: palette.inkSoft }}>On pace · 33% there</p>
             </div>
 
-            {/* Up next pile */}
-            <div className="col-span-6 md:col-span-3 row-span-2 rounded-3xl p-5" style={{ background: palette.card, border: `1px solid ${palette.ink}10` }}>
-              <p className="text-xs uppercase tracking-wider font-semibold mb-3" style={{ color: palette.inkSoft, fontFamily: "'Space Grotesk', sans-serif" }}>
-                Up next
-              </p>
-              <div className="flex gap-1.5">
-                {MOCK_BOOKS.filter((b) => b.status === "not_read").slice(0, 4).map((b, i) => (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-px" style={{ background: palette.surfaceHi }}>
+              {[
+                { label: "VOLUMES", value: MOCK_STATS.totalBooks, sub: "TOTAL", color: palette.ink },
+                { label: "FINISHED", value: MOCK_STATS.read, sub: "READ", color: palette.amber },
+                { label: "PAGES", value: MOCK_STATS.pagesRead.toLocaleString(), sub: "DEVOURED", color: palette.hot },
+                { label: "AVG RATING", value: `${MOCK_STATS.avgRating.toFixed(1)}★`, sub: "BIASED HIGH", color: palette.cyan },
+              ].map((s) => (
+                <div
+                  key={s.label}
+                  className="p-5 sm:p-7"
+                  style={{ background: palette.surface }}
+                >
+                  <p
+                    className="text-[10px] tracking-[0.3em]"
+                    style={{ ...mono, color: palette.inkSoft }}
+                  >
+                    {s.label}
+                  </p>
+                  <p
+                    className="text-4xl sm:text-6xl mt-2 leading-none"
+                    style={{ ...display, color: s.color }}
+                  >
+                    {s.value}
+                  </p>
+                  <p className="text-[10px] mt-2 tracking-[0.25em]" style={{ ...mono, color: palette.inkSoft }}>
+                    {s.sub}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Diary feed */}
+          <section className="mb-16">
+            <h2 className="text-3xl sm:text-5xl mb-6" style={display}>
+              READING DIARY
+            </h2>
+
+            <div className="space-y-px" style={{ background: palette.surfaceHi }}>
+              {[
+                { date: "TODAY", label: "PROGRESS", book: featured!, snippet: "Finished Part II. The Grand Inquisitor still floors me.", icon: "▶", color: palette.hot },
+                { date: "MAY 12", label: "RATED", book: MOCK_BOOKS[1], snippet: "Eco at his most playful and ferocious. ★★★★★", icon: "★", color: palette.amber },
+                { date: "MAY 04", label: "FINISHED", book: MOCK_BOOKS[2], snippet: "MU. Closed the book on Hofstadter — humbled.", icon: "✓", color: palette.cyan },
+                { date: "APR 21", label: "STARTED", book: MOCK_BOOKS[4], snippet: "Calvino's cities feel timely again.", icon: "→", color: palette.violet },
+              ].map((e, i) => (
+                <article
+                  key={i}
+                  className="grid grid-cols-[60px_60px_1fr_auto] sm:grid-cols-[100px_70px_1fr_auto] gap-3 sm:gap-5 items-center p-3 sm:p-4"
+                  style={{ background: palette.surface }}
+                >
+                  <p className="text-xs tracking-[0.2em]" style={{ ...mono, color: palette.inkSoft }}>
+                    {e.date}
+                  </p>
                   <img
-                    key={b.id}
-                    src={b.cover}
-                    alt={b.title}
-                    className="w-12 aspect-[2/3] object-cover rounded-md shadow-md"
-                    style={{ transform: `rotate(${(i - 1.5) * 4}deg)`, marginLeft: i === 0 ? 0 : "-12px" }}
+                    src={e.book.cover}
+                    alt=""
+                    className="w-12 sm:w-14 aspect-[2/3] object-cover"
                   />
-                ))}
-              </div>
-              <p className="text-xs mt-3" style={{ color: palette.inkSoft }}>
-                {MOCK_BOOKS.filter((b) => b.status === "not_read").length} on the queue
-              </p>
-            </div>
-
-            {/* Recently read — wide row of covers */}
-            <div className="col-span-12 row-span-3 rounded-3xl p-6" style={{ background: palette.card, border: `1px solid ${palette.ink}10` }}>
-              <div className="flex items-baseline justify-between mb-4">
-                <h3 className="text-2xl font-bold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                  Recently finished
-                </h3>
-                <a className="text-sm font-medium cursor-pointer" style={{ color: palette.pink }}>
-                  See all →
-                </a>
-              </div>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
-                {MOCK_BOOKS.filter((b) => b.status === "read").slice(0, 8).map((b) => (
-                  <div key={b.id} className="group cursor-pointer">
-                    <div className="relative">
-                      <img src={b.cover} alt={b.title} className="w-full aspect-[2/3] object-cover rounded-xl shadow-lg group-hover:scale-105 transition-transform" />
-                      {b.rating === 5 && (
-                        <div className="absolute -top-1.5 -right-1.5 w-7 h-7 rounded-full grid place-items-center text-xs font-bold" style={{ background: palette.yellow }}>
-                          ★
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-xs font-semibold mt-2 line-clamp-1" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                      {b.title}
+                  <div className="min-w-0">
+                    <p className="text-[10px] tracking-[0.3em] mb-1" style={{ ...mono, color: e.color }}>
+                      {e.icon} {e.label}
                     </p>
-                    <p className="text-[10px]" style={{ color: palette.inkSoft }}>
-                      {b.author}
+                    <p className="font-bold leading-tight text-sm sm:text-lg" style={display}>
+                      {e.book.title.toUpperCase()}
+                    </p>
+                    <p className="text-xs sm:text-sm mt-1 hidden sm:block" style={{ color: palette.inkSoft }}>
+                      {e.snippet}
                     </p>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Tag cloud */}
-            <div className="col-span-12 md:col-span-6 row-span-2 rounded-3xl p-6" style={{ background: palette.green, color: palette.ink }}>
-              <p className="text-xs uppercase tracking-wider font-semibold mb-3" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                Your interests
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {Array.from(new Set(MOCK_BOOKS.flatMap((b) => b.topics))).map((t, i) => (
-                  <span
-                    key={t}
-                    className="px-3 py-1.5 rounded-full text-sm font-medium"
-                    style={{
-                      background: i % 2 === 0 ? palette.ink : palette.card,
-                      color: i % 2 === 0 ? palette.bg : palette.ink,
-                      fontSize: `${0.85 + (i % 3) * 0.1}rem`,
-                    }}
-                  >
-                    {t}
+                  <span className="text-xs tracking-widest hidden sm:inline" style={{ ...mono, color: palette.inkFaint }}>
+                    →
                   </span>
-                ))}
-              </div>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          {/* The shelf — poster grid */}
+          <section className="mb-16">
+            <div className="flex items-end justify-between gap-3 mb-6">
+              <h2 className="text-3xl sm:text-5xl" style={display}>
+                THE COLLECTION
+              </h2>
+              <p style={{ ...mono, color: palette.inkSoft }} className="text-xs tracking-[0.3em] mb-1">
+                {MOCK_BOOKS.length} POSTERS
+              </p>
             </div>
 
-            {/* Achievement / streak */}
-            <div className="col-span-6 md:col-span-3 row-span-2 rounded-3xl p-5 flex flex-col justify-between" style={{ background: palette.pink, color: "#FFF" }}>
-              <p className="text-xs uppercase tracking-wider font-semibold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                Streak
-              </p>
-              <div>
-                <p className="text-5xl font-bold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                  12
-                </p>
-                <p className="text-sm opacity-90">days in a row 🔥</p>
-              </div>
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 sm:gap-4">
+              {MOCK_BOOKS.map((b, i) => (
+                <Poster b={b} i={i} key={b.id} />
+              ))}
             </div>
+          </section>
 
-            {/* Random pick */}
-            <div className="col-span-6 md:col-span-3 row-span-2 rounded-3xl p-5" style={{ background: palette.lilac, color: palette.ink }}>
-              <p className="text-xs uppercase tracking-wider font-semibold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                Surprise me
-              </p>
-              <p className="text-lg font-bold mt-2 leading-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                Pick one from your queue
-              </p>
-              <button
-                className="mt-3 px-3 py-1.5 rounded-full text-xs font-semibold"
-                style={{ background: palette.ink, color: palette.bg }}
-              >
-                Roll →
-              </button>
-            </div>
-          </div>
+          {/* Pull quote */}
+          <section className="my-20 max-w-3xl mx-auto text-center">
+            <p
+              className="leading-[1.05]"
+              style={{ ...display, fontSize: "clamp(2rem, 5vw, 4rem)", color: palette.amber }}
+            >
+              &ldquo;A book is a dream that you hold in your hand.&rdquo;
+            </p>
+            <p
+              className="text-xs tracking-[0.4em] mt-4"
+              style={{ ...mono, color: palette.inkSoft }}
+            >
+              — NEIL GAIMAN
+            </p>
+          </section>
 
           {/* Footer */}
-          <footer className="mt-10 text-center text-xs" style={{ color: palette.inkSoft }}>
-            Mockup 3 · Bento Pop · Space Grotesk + Inter
+          <footer
+            className="pt-8 border-t flex flex-col sm:flex-row gap-3 items-center justify-between"
+            style={{ borderColor: palette.surfaceHi }}
+          >
+            <p className="text-xs tracking-[0.3em]" style={{ ...mono, color: palette.inkSoft }}>
+              MOCKUP 03 · REEL · A PRIVATE READING DIARY
+            </p>
+            <p className="text-xs tracking-[0.3em]" style={{ ...mono, color: palette.inkFaint }}>
+              BEBAS NEUE · INTER TIGHT · DM MONO
+            </p>
           </footer>
         </div>
-
-        {/* Back */}
-        <Link
-          href="/mockups"
-          className="fixed top-4 right-4 px-3 py-2 rounded-full text-xs font-medium shadow"
-          style={{ background: palette.card, color: palette.ink, border: `1px solid ${palette.ink}20`, fontFamily: "'Space Grotesk', sans-serif" }}
-        >
-          ← Mockups
-        </Link>
       </div>
     </>
   );
 }
 
-function BentoStat({
-  color,
-  label,
-  value,
-  sub,
-  inkOnLight,
-}: {
-  color: string;
-  label: string;
-  value: string | number;
-  sub: string;
-  inkOnLight?: boolean;
-}) {
-  const text = inkOnLight ? "#0B0B16" : "#FFFFFF";
+function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div
-      className="col-span-6 md:col-span-2 row-span-2 rounded-3xl p-5 flex flex-col justify-between"
-      style={{ background: color, color: text }}
-    >
-      <p className="text-xs uppercase tracking-wider font-semibold opacity-90" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+    <div>
+      <p className="text-[10px] tracking-[0.3em]" style={{ color: "#8E8E9A" }}>
         {label}
       </p>
-      <div>
-        <p className="text-4xl font-bold leading-none" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-          {value}
-        </p>
-        <p className="text-xs mt-1 opacity-80">{sub}</p>
+      <p
+        className="text-xl mt-0.5 leading-none tabular-nums"
+        style={{ color: color || "#F5F5F7", ...display }}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function Poster({ b, i }: { b: typeof MOCK_BOOKS[number]; i: number }) {
+  const accentByIndex = [
+    "#FF3B5C", "#F5C518", "#3DDBD9", "#A78BFA", "#FF8A3B",
+  ];
+  const accent = accentByIndex[i % accentByIndex.length];
+  return (
+    <div className="group cursor-pointer">
+      <div className="relative aspect-[2/3] overflow-hidden">
+        <img
+          src={b.cover}
+          alt={b.title}
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          style={{
+            filter: b.status === "not_read" ? "grayscale(0.4)" : "none",
+          }}
+        />
+
+        {/* Vignette */}
+        <div
+          className="absolute inset-0 opacity-60"
+          style={{
+            background:
+              "linear-gradient(180deg, transparent 0%, transparent 50%, rgba(0,0,0,0.85) 100%)",
+          }}
+        />
+
+        {/* Rating */}
+        {b.rating && (
+          <div
+            className="absolute top-2 left-2 px-1.5 py-0.5 text-[10px] font-bold tracking-wider"
+            style={{ ...mono, background: "#F5C518", color: "#0A0A0F" }}
+          >
+            {b.rating}.0★
+          </div>
+        )}
+
+        {/* Status tape */}
+        {b.status === "reading" && (
+          <div
+            className="absolute top-2 right-2 px-1.5 py-0.5 text-[9px] tracking-[0.2em]"
+            style={{ ...mono, background: "#FF3B5C", color: "#FFF" }}
+          >
+            READING
+          </div>
+        )}
+        {b.status === "not_read" && (
+          <div
+            className="absolute top-2 right-2 px-1.5 py-0.5 text-[9px] tracking-[0.2em] border"
+            style={{ ...mono, color: "#F5F5F7", borderColor: "#F5F5F7", background: "rgba(0,0,0,0.4)" }}
+          >
+            QUEUED
+          </div>
+        )}
+
+        {/* Title overlay */}
+        <div className="absolute bottom-0 left-0 right-0 p-2.5">
+          <p
+            className="text-[10px] tracking-[0.2em] mb-0.5"
+            style={{ ...mono, color: accent }}
+          >
+            {b.year}
+          </p>
+          <p
+            className="text-sm sm:text-base leading-tight line-clamp-2"
+            style={{ ...display, color: "#FFF" }}
+          >
+            {b.title.toUpperCase()}
+          </p>
+        </div>
+
+        {/* Hover overlay */}
+        <div
+          className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+          style={{ background: "rgba(10,10,15,0.85)" }}
+        >
+          <div className="text-center p-3">
+            <p
+              className="text-[10px] tracking-[0.3em] mb-2"
+              style={{ ...mono, color: accent }}
+            >
+              VIEW ENTRY
+            </p>
+            <p className="text-sm font-bold" style={display}>
+              {b.author.toUpperCase()}
+            </p>
+            <p className="text-[10px] mt-1" style={{ color: "#8E8E9A" }}>
+              {b.pages} pp
+            </p>
+          </div>
+        </div>
       </div>
     </div>
+  );
+}
+
+function ReelLogo() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden>
+      <circle cx="14" cy="14" r="12" stroke="#FF3B5C" strokeWidth="1.5" />
+      <circle cx="14" cy="14" r="3" fill="#FF3B5C" />
+      <circle cx="14" cy="5" r="1.2" fill="#FF3B5C" />
+      <circle cx="14" cy="23" r="1.2" fill="#FF3B5C" />
+      <circle cx="5" cy="14" r="1.2" fill="#FF3B5C" />
+      <circle cx="23" cy="14" r="1.2" fill="#FF3B5C" />
+    </svg>
   );
 }
