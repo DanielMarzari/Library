@@ -103,13 +103,20 @@ export default function BentoDashboard() {
           </Link>
         )}
 
-        {/* Stats — 3 tiles */}
-        <StatTile color={bento.green} label="Books read" value={MOCK_STATS.read} sub="↑ 3 from last yr" />
-        <StatTile color={bento.yellow} label="In progress" value={MOCK_STATS.reading} sub="2 close to done" inkOnLight />
-        <StatTile color={bento.lilac} label="Avg. rating" value={MOCK_STATS.avgRating.toFixed(1)} sub="★★★★☆ overall" inkOnLight />
+        {/* Stats — 3 tiles linking to stats */}
+        <Link href="/mockups/1/stats" className="contents">
+          <StatTile color={bento.green} label="Books read" value={MOCK_STATS.read} sub="↑ 3 from last yr" />
+        </Link>
+        <Link href="/mockups/1/stats" className="contents">
+          <StatTile color={bento.yellow} label="In progress" value={MOCK_STATS.reading} sub="2 close to done" inkOnLight />
+        </Link>
+        <Link href="/mockups/1/stats" className="contents">
+          <StatTile color={bento.lilac} label="Avg. rating" value={MOCK_STATS.avgRating.toFixed(1)} sub="★★★★☆ overall" inkOnLight />
+        </Link>
 
         {/* Goal */}
-        <div
+        <Link
+          href="/mockups/1/goals"
           className="col-span-6 md:col-span-3 md:row-span-2 rounded-3xl p-4 sm:p-5 flex flex-col"
           style={{ background: bento.card, border: `1px solid ${bento.ink}10`, minHeight: "130px" }}
         >
@@ -137,7 +144,7 @@ export default function BentoDashboard() {
           <p className="text-xs mt-2" style={{ color: bento.inkSoft }}>
             On pace · 33% there
           </p>
-        </div>
+        </Link>
 
         {/* Up next pile */}
         <Link

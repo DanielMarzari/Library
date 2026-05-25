@@ -19,9 +19,9 @@ const MOCKUPS: Mockup[] = [
   {
     id: "1",
     name: "Bento Pop",
-    tagline: "Colorful tiles · mobile-first",
+    tagline: "Full preview — every page in this style",
     description:
-      "Modern bento dashboard with mixed-size tiles, color-coded by status. Includes a dedicated shelf view (spines + covers), book detail, reading list with status filters, and an authors page. Built mobile-first with a bottom tab bar.",
+      "Complete Bento-styled preview of the app: dashboard, shelf, book detail, reading list, authors, stats, lending, recommendations, goals, year-in-review, and skills. Built mobile-first with a bottom tab bar and a slide-out 'More' menu. Real site untouched.",
     palette: ["#FFF9EE", "#0B0B16", "#FFD166", "#06D6A0", "#EF476F", "#C8B6FF"],
     font: "Space Grotesk + Inter",
     vibe: "Playful · Modern · Mobile-first",
@@ -30,9 +30,15 @@ const MOCKUPS: Mockup[] = [
     sublinks: [
       { label: "Home", href: "/mockups/1" },
       { label: "Shelf", href: "/mockups/1/shelf" },
-      { label: "Reading list", href: "/mockups/1/list" },
+      { label: "Reading", href: "/mockups/1/list" },
       { label: "Authors", href: "/mockups/1/authors" },
       { label: "Book", href: "/mockups/1/book" },
+      { label: "Stats", href: "/mockups/1/stats" },
+      { label: "Lending", href: "/mockups/1/lending" },
+      { label: "Recs", href: "/mockups/1/recommendations" },
+      { label: "Goals", href: "/mockups/1/goals" },
+      { label: "Wrapped", href: "/mockups/1/wrapped" },
+      { label: "Skills", href: "/mockups/1/expertise" },
     ],
   },
   {

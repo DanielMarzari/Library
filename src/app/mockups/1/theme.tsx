@@ -1,6 +1,9 @@
+"use client";
+
 // Shared theme + chrome for the Bento Pop mockup pages.
 
 import Link from "next/link";
+import { useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 
 export const bento = {
@@ -12,6 +15,7 @@ export const bento = {
   pink: "#EF476F",
   blue: "#118AB2",
   lilac: "#C8B6FF",
+  orange: "#FF8A3B",
   card: "#FFFFFF",
 };
 
@@ -21,14 +25,36 @@ export const bentoFontImport =
 export const display: CSSProperties = { fontFamily: "'Space Grotesk', sans-serif" };
 export const body: CSSProperties = { fontFamily: "'Inter', sans-serif" };
 
-const TABS = [
+// Primary mobile bottom tabs (the four most-used screens)
+const PRIMARY_TABS = [
   { label: "Home", href: "/mockups/1", icon: HomeIcon, key: "home" },
   { label: "Shelf", href: "/mockups/1/shelf", icon: ShelfIcon, key: "shelf" },
   { label: "Reading", href: "/mockups/1/list", icon: ListIcon, key: "list" },
   { label: "Authors", href: "/mockups/1/authors", icon: PeopleIcon, key: "authors" },
 ] as const;
 
-export type BentoTab = "home" | "shelf" | "list" | "authors" | "book";
+// "More" overflow — accessed via top bar (and a 5th mobile-nav button)
+const MORE_TABS = [
+  { label: "Stats", href: "/mockups/1/stats", key: "stats", color: "#06D6A0" },
+  { label: "Lending", href: "/mockups/1/lending", key: "lending", color: "#FF8A3B" },
+  { label: "Recommendations", href: "/mockups/1/recommendations", key: "recs", color: "#C8B6FF" },
+  { label: "Goals", href: "/mockups/1/goals", key: "goals", color: "#EF476F" },
+  { label: "Wrapped", href: "/mockups/1/wrapped", key: "wrapped", color: "#FFD166" },
+  { label: "Skills", href: "/mockups/1/expertise", key: "expertise", color: "#118AB2" },
+] as const;
+
+export type BentoTab =
+  | "home"
+  | "shelf"
+  | "list"
+  | "authors"
+  | "book"
+  | "stats"
+  | "lending"
+  | "recs"
+  | "goals"
+  | "wrapped"
+  | "expertise";
 
 export function BentoShell({
   current,
@@ -37,6 +63,8 @@ export function BentoShell({
   current: BentoTab;
   children: ReactNode;
 }) {
+  const [moreOpen, setMoreOpen] = useState(false);
+
   return (
     <>
       {/* eslint-disable-next-line @next/next/no-css-tags */}
@@ -49,9 +77,9 @@ export function BentoShell({
           ...body,
         }}
       >
-        {/* Top bar (desktop) / compact header (mobile) */}
-        <header className="max-w-7xl mx-auto px-4 sm:px-5 pt-5 pb-3 flex items-center justify-between">
-          <Link href="/mockups/1" className="flex items-center gap-2.5">
+        {/* Top bar */}
+        <header className="max-w-7xl mx-auto px-4 sm:px-5 pt-5 pb-3 flex items-center justify-between gap-2">
+          <Link href="/mockups/1" className="flex items-center gap-2.5 flex-shrink-0">
             <div
               className="w-9 h-9 rounded-full grid place-items-center text-white font-bold text-sm"
               style={{ background: bento.ink, ...display }}
@@ -59,16 +87,16 @@ export function BentoShell({
               L
             </div>
             <p className="text-xl font-bold" style={display}>
-              library
-              <span style={{ color: bento.pink }}>.</span>
+              library<span style={{ color: bento.pink }}>.</span>
             </p>
           </Link>
 
+          {/* Desktop primary nav */}
           <nav
             className="hidden md:flex items-center gap-1 p-1 rounded-full"
             style={{ background: bento.card, border: `1px solid ${bento.ink}10` }}
           >
-            {TABS.map((t) => {
+            {PRIMARY_TABS.map((t) => {
               const active = current === t.key;
               return (
                 <Link
@@ -84,20 +112,98 @@ export function BentoShell({
                 </Link>
               );
             })}
+            <MoreButton
+              activeKey={current}
+              open={moreOpen}
+              onToggle={() => setMoreOpen((o) => !o)}
+            />
           </nav>
 
-          <Link
-            href="/mockups"
-            className="px-3 py-2 rounded-full text-xs font-medium border"
-            style={{
-              borderColor: bento.ink + "20",
-              background: bento.card,
-              ...display,
-            }}
-          >
-            ← Mockups
-          </Link>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Mobile "More" trigger */}
+            <button
+              className="md:hidden w-9 h-9 rounded-full grid place-items-center"
+              style={{ background: bento.card, border: `1px solid ${bento.ink}10` }}
+              onClick={() => setMoreOpen((o) => !o)}
+              aria-label="More"
+            >
+              <DotsIcon />
+            </button>
+            <Link
+              href="/mockups"
+              className="hidden sm:inline-flex px-3 py-2 rounded-full text-xs font-medium border whitespace-nowrap"
+              style={{ borderColor: bento.ink + "20", background: bento.card, ...display }}
+            >
+              ← Mockups
+            </Link>
+          </div>
         </header>
+
+        {/* Slide-out "More" sheet — used by both desktop dropdown and mobile button */}
+        {moreOpen && (
+          <>
+            <div
+              className="fixed inset-0 bg-black/30 z-40"
+              onClick={() => setMoreOpen(false)}
+            />
+            <div
+              className="fixed top-0 right-0 bottom-0 w-72 z-50 p-5 overflow-y-auto"
+              style={{
+                background: bento.card,
+                borderLeft: `1px solid ${bento.ink}10`,
+                boxShadow: "-10px 0 30px rgba(0,0,0,0.1)",
+              }}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <p
+                  className="text-[10px] uppercase tracking-wider font-semibold"
+                  style={{ color: bento.inkSoft, ...display }}
+                >
+                  All pages
+                </p>
+                <button
+                  onClick={() => setMoreOpen(false)}
+                  className="text-xl"
+                  style={{ color: bento.inkSoft }}
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="space-y-1">
+                <NavGroup label="Primary" />
+                {PRIMARY_TABS.map((t) => (
+                  <NavLink
+                    key={t.key}
+                    href={t.href}
+                    label={t.label}
+                    active={current === t.key}
+                    onClick={() => setMoreOpen(false)}
+                  />
+                ))}
+
+                <NavGroup label="More" />
+                {MORE_TABS.map((t) => (
+                  <NavLink
+                    key={t.key}
+                    href={t.href}
+                    label={t.label}
+                    color={t.color}
+                    active={current === t.key}
+                    onClick={() => setMoreOpen(false)}
+                  />
+                ))}
+
+                <NavGroup label="Other" />
+                <NavLink
+                  href="/mockups"
+                  label="Back to all mockups"
+                  onClick={() => setMoreOpen(false)}
+                />
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Page content */}
         <main className="max-w-7xl mx-auto px-4 sm:px-5 pb-28 md:pb-10">
@@ -106,14 +212,14 @@ export function BentoShell({
 
         {/* Mobile bottom tab bar */}
         <nav
-          className="md:hidden fixed bottom-0 inset-x-0 px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-2 z-40"
+          className="md:hidden fixed bottom-0 inset-x-0 px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-2 z-30"
           style={{ background: `${bento.bg}f0`, backdropFilter: "blur(10px)" }}
         >
           <div
             className="flex items-center justify-around rounded-full px-2 py-2 shadow-lg"
             style={{ background: bento.card, border: `1px solid ${bento.ink}10` }}
           >
-            {TABS.map((t) => {
+            {PRIMARY_TABS.map((t) => {
               const active = current === t.key;
               const Icon = t.icon;
               return (
@@ -127,19 +233,94 @@ export function BentoShell({
                   }}
                 >
                   <Icon />
-                  <span
-                    className="text-[10px] mt-0.5 font-semibold"
-                    style={display}
-                  >
+                  <span className="text-[10px] mt-0.5 font-semibold" style={display}>
                     {t.label}
                   </span>
                 </Link>
               );
             })}
+            <button
+              onClick={() => setMoreOpen(true)}
+              className="flex flex-col items-center justify-center flex-1 py-1.5 rounded-full"
+              style={{ color: bento.inkSoft }}
+            >
+              <DotsIcon />
+              <span className="text-[10px] mt-0.5 font-semibold" style={display}>
+                More
+              </span>
+            </button>
           </div>
         </nav>
       </div>
     </>
+  );
+}
+
+function MoreButton({
+  open,
+  onToggle,
+}: {
+  activeKey: BentoTab;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      className="px-4 py-2 text-sm font-medium rounded-full transition-colors flex items-center gap-1.5"
+      style={{
+        background: open ? bento.ink : "transparent",
+        color: open ? bento.bg : bento.ink,
+      }}
+    >
+      More
+      <span style={{ fontSize: "10px" }}>{open ? "▲" : "▼"}</span>
+    </button>
+  );
+}
+
+function NavGroup({ label }: { label: string }) {
+  return (
+    <p
+      className="text-[10px] uppercase tracking-wider font-semibold mt-4 mb-1 px-3"
+      style={{ color: bento.inkSoft, ...display }}
+    >
+      {label}
+    </p>
+  );
+}
+
+function NavLink({
+  href,
+  label,
+  active,
+  color,
+  onClick,
+}: {
+  href: string;
+  label: string;
+  active?: boolean;
+  color?: string;
+  onClick?: () => void;
+}) {
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      className="block px-3 py-2 rounded-xl text-sm font-medium transition-colors flex items-center gap-2.5"
+      style={{
+        background: active ? bento.ink : "transparent",
+        color: active ? bento.bg : bento.ink,
+      }}
+    >
+      {color && (
+        <span
+          className="w-2 h-2 rounded-full flex-shrink-0"
+          style={{ background: color }}
+        />
+      )}
+      <span>{label}</span>
+    </Link>
   );
 }
 
@@ -189,11 +370,12 @@ function ShelfIcon() {
   );
 }
 
-function BookIcon() {
+function DotsIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 4h11a3 3 0 0 1 3 3v14H7a3 3 0 0 1-3-3V4z" />
-      <path d="M4 18a3 3 0 0 1 3-3h11" />
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+      <circle cx="6" cy="12" r="1.8" />
+      <circle cx="12" cy="12" r="1.8" />
+      <circle cx="18" cy="12" r="1.8" />
     </svg>
   );
 }
