@@ -48,7 +48,12 @@ function buildAuthors(books: MockBook[], meta: LibraryAuthor[]): AuthorCard[] {
       }
     });
   });
-  return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  // Primary sort: most READ (the user's actual reading depth).
+  // Tie-breaker: most OWNED, so authors with the same read count are ordered
+  // by collection size.
+  return Array.from(map.values()).sort(
+    (a, b) => b.read - a.read || b.count - a.count
+  );
 }
 
 export default function BentoAuthors() {

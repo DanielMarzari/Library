@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { api } from "@/lib/api-client";
 import { BentoShell, bento, display } from "../theme";
 import { useBooks } from "../useLibraryData";
 import { AddBookModal } from "../modals";
@@ -14,7 +13,6 @@ export default function BentoShelf() {
   const { books, loading, refetch } = useBooks();
   const [filter, setFilter] = useState<Filter>("all");
   const [showAdd, setShowAdd] = useState(false);
-  const [busyId, setBusyId] = useState<string | null>(null);
 
   const filtered = books.filter((b) => {
     if (filter === "all") return true;
@@ -34,24 +32,6 @@ export default function BentoShelf() {
     not_read: books.filter((b) => b.status === "not_read").length,
     read: books.filter((b) => b.status === "read").length,
     favorites: books.filter((b) => !!b.favorite || b.rating === 5).length,
-  };
-
-  const cycleStatus = async (b: MockBook) => {
-    if (busyId) return;
-    setBusyId(b.id);
-    try {
-      const next: MockBook["status"] =
-        b.status === "not_read" ? "reading" : b.status === "reading" ? "read" : "not_read";
-      const now = new Date().toISOString().split("T")[0];
-      await api.books.update(b.id, {
-        status: next,
-        start_date: next === "reading" && !b.start_date ? now : undefined,
-        complete_date: next === "read" ? now : undefined,
-      });
-      refetch();
-    } finally {
-      setBusyId(null);
-    }
   };
 
   return (
@@ -139,14 +119,9 @@ export default function BentoShelf() {
                 </span>
               </h2>
             </div>
-            <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-5">
               {s.books.map((b) => (
-                <CoverCard
-                  key={b.id}
-                  b={b}
-                  busy={busyId === b.id}
-                  onCycleStatus={() => cycleStatus(b)}
-                />
+                <CoverCard key={b.id} b={b} />
               ))}
             </div>
           </section>
@@ -169,82 +144,60 @@ export default function BentoShelf() {
   );
 }
 
-function CoverCard({
-  b,
-  busy,
-  onCycleStatus,
-}: {
-  b: MockBook;
-  busy: boolean;
-  onCycleStatus: () => void;
-}) {
+function CoverCard({ b }: { b: MockBook }) {
   return (
-    <div className="group relative">
-      <Link href={`/mockups/1/book?id=${encodeURIComponent(b.id)}`} className="block">
-        <div className="relative">
-          {b.cover ? (
-            <img
-              src={b.cover}
-              alt={b.title}
-              className="w-full aspect-[2/3] object-cover rounded-xl shadow-lg group-hover:scale-105 group-hover:shadow-2xl transition-all"
-              style={{ filter: b.status === "not_read" ? "saturate(0.7)" : "none" }}
-            />
-          ) : (
-            <div
-              className="w-full aspect-[2/3] rounded-xl shadow-lg flex flex-col items-center justify-center p-2 text-center"
-              style={{ background: `linear-gradient(135deg, ${bento.lilac}, ${bento.pink})`, color: "#FFF" }}
-            >
-              <span className="text-[10px] font-bold leading-tight line-clamp-3" style={display}>
-                {b.title}
-              </span>
-            </div>
-          )}
-          {(b.favorite || b.rating === 5) && (
-            <div
-              className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-full grid place-items-center text-xs font-bold shadow-lg"
-              style={{ background: bento.yellow, ...display }}
-            >
-              ★
-            </div>
-          )}
-          {b.status === "reading" && b.progress !== undefined && (
-            <div className="absolute bottom-1 left-1 right-1 h-1 rounded-full overflow-hidden" style={{ background: "rgba(0,0,0,0.3)" }}>
-              <div
-                className="h-full"
-                style={{
-                  width: `${b.progress}%`,
-                  background: `linear-gradient(90deg, ${bento.yellow}, ${bento.pink})`,
-                }}
-              />
-            </div>
-          )}
-        </div>
-        <p className="text-[11px] sm:text-xs font-semibold mt-2 leading-tight line-clamp-2" style={display}>
-          {b.title}
-        </p>
-        <p className="text-[10px] mt-0.5" style={{ color: bento.inkSoft }}>
-          {b.author}
-        </p>
-      </Link>
+    <Link href={`/mockups/1/book?id=${encodeURIComponent(b.id)}`} className="group block">
+      <div className="relative">
+        {b.cover ? (
+          <img
+            src={b.cover}
+            alt={b.title}
+            className="w-full aspect-[2/3] object-cover rounded-xl shadow-lg group-hover:scale-[1.02] group-hover:shadow-2xl transition-all"
+            style={{ filter: b.status === "not_read" ? "saturate(0.85)" : "none" }}
+          />
+        ) : (
+          <div
+            className="w-full aspect-[2/3] rounded-xl shadow-lg flex flex-col items-center justify-center p-3 text-center"
+            style={{ background: `linear-gradient(135deg, ${bento.lilac}, ${bento.pink})`, color: "#FFF" }}
+          >
+            <span className="text-sm font-bold leading-tight line-clamp-4" style={display}>
+              {b.title}
+            </span>
+          </div>
+        )}
 
-      {/* Status pill — tap to cycle. Sits on top so it doesn't trigger the Link. */}
-      <button
-        onClick={(e) => {
-          e.preventDefault();
-          onCycleStatus();
-        }}
-        disabled={busy}
-        className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full ring-2 ring-white grid place-items-center text-[10px] disabled:opacity-50"
-        title={`Status: ${b.status} — tap to cycle`}
-        style={{
-          background:
-            b.status === "reading" ? bento.yellow : b.status === "read" ? bento.green : bento.lilac,
-          color: bento.ink,
-          ...display,
-        }}
-      >
-        {b.status === "reading" ? "📖" : b.status === "read" ? "✓" : "•"}
-      </button>
-    </div>
+        {/* 5★ / favorite badge */}
+        {(b.favorite || b.rating === 5) && (
+          <div
+            className="absolute top-2 right-2 w-7 h-7 rounded-full grid place-items-center text-sm font-bold shadow-lg"
+            style={{ background: bento.yellow, ...display }}
+          >
+            ★
+          </div>
+        )}
+
+        {/* Progress bar for in-progress books */}
+        {b.status === "reading" && b.progress !== undefined && (
+          <div
+            className="absolute bottom-2 left-2 right-2 h-1.5 rounded-full overflow-hidden"
+            style={{ background: "rgba(0,0,0,0.35)" }}
+          >
+            <div
+              className="h-full"
+              style={{
+                width: `${b.progress}%`,
+                background: `linear-gradient(90deg, ${bento.yellow}, ${bento.pink})`,
+              }}
+            />
+          </div>
+        )}
+      </div>
+      <p className="text-sm font-semibold mt-2.5 leading-tight line-clamp-2" style={display}>
+        {b.title}
+      </p>
+      <p className="text-xs mt-0.5" style={{ color: bento.inkSoft }}>
+        {b.author}
+      </p>
+    </Link>
   );
 }

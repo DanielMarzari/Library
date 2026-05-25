@@ -720,6 +720,12 @@ export function LogProgressModal({
 }
 
 // ---- 3) EDIT BOOK ----------------------------------------------------------
+//
+// Full editor — pulls the complete Book record from /api/books/[id] so it can
+// edit every field (not just what's in MockBook). Supports articles too via
+// item_type === "article" — DOI / journal / year / URL sections appear when
+// editing an article. Includes Duplicate (creates a "(copy)" of the row) and
+// Refetch (re-enriches via Open Library / Google Books and fills empty fields).
 
 export function EditBookModal({
   book,
@@ -732,17 +738,117 @@ export function EditBookModal({
   onSuccess: () => void;
   onDelete?: () => void;
 }) {
+  // Full record state — populated from /api/books/[id]
+  const [loading, setLoading] = useState(true);
+  const [full, setFull] = useState<Book | null>(null);
+
   const [title, setTitle] = useState(book.title);
   const [author, setAuthor] = useState(book.author);
-  const [pages, setPages] = useState(book.pages ? String(book.pages) : "");
+  const [isbn, setIsbn] = useState("");
   const [coverUrl, setCoverUrl] = useState(book.cover_url || "");
   const [status, setStatus] = useState<Book["status"]>(book.status);
   const [rating, setRating] = useState(book.rating || 0);
   const [favorite, setFavorite] = useState(!!book.favorite);
+  const [description, setDescription] = useState("");
+
+  // Page details
+  const [pages, setPages] = useState(book.pages ? String(book.pages) : "");
+  const [introPages, setIntroPages] = useState("");
+  const [startPage, setStartPage] = useState("1");
+  const [endPage, setEndPage] = useState("");
+  const [currentPage, setCurrentPage] = useState("");
+
+  // Dates
+  const [startDate, setStartDate] = useState(book.start_date || "");
+  const [completeDate, setCompleteDate] = useState(book.complete_date || "");
+
+  // Acquisition / classification
+  const [source, setSource] = useState(book.source || "");
+  const [volume, setVolume] = useState("");
+  const [lcc, setLcc] = useState("");
+  const [ddc, setDdc] = useState("");
+
+  // Topics — chip editor (manual + auto from OL)
+  const [topics, setTopics] = useState<string[]>([]);
+  const [autoTopics, setAutoTopics] = useState<string[]>([]);
+  const [topicInput, setTopicInput] = useState("");
+
+  // Article fields
+  const [itemType, setItemType] = useState<"book" | "article">("book");
+  const [doi, setDoi] = useState("");
+  const [journal, setJournal] = useState("");
+  const [pubYear, setPubYear] = useState("");
+  const [url, setUrl] = useState("");
+
+  // UI state
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [refetching, setRefetching] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
+  const [refetchMsg, setRefetchMsg] = useState("");
   const [error, setError] = useState("");
 
+  // Fetch the full record so we can edit every field, not just the MockBook subset.
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      try {
+        const f = await api.books.get(book.id);
+        if (cancel) return;
+        setFull(f);
+        setTitle(f.title || "");
+        setAuthor(f.author || "");
+        setIsbn(f.isbn || "");
+        setCoverUrl(f.cover_url || "");
+        setStatus(f.status);
+        setRating(f.rating || 0);
+        setFavorite(!!f.favorite);
+        setDescription(f.description || "");
+        setPages(f.pages ? String(f.pages) : "");
+        setIntroPages(f.intro_pages != null ? String(f.intro_pages) : "0");
+        setStartPage(f.start_page != null ? String(f.start_page) : "1");
+        setEndPage(f.end_page != null ? String(f.end_page) : "");
+        setCurrentPage(f.current_page != null ? String(f.current_page) : "");
+        setStartDate(f.start_date || "");
+        setCompleteDate(f.complete_date || "");
+        setSource(f.source || "");
+        setVolume(f.volume || "");
+        setLcc(f.lcc || "");
+        setDdc(f.ddc || "");
+        setTopics(Array.isArray(f.topics) ? f.topics : []);
+        setAutoTopics(Array.isArray(f.auto_topics) ? f.auto_topics : []);
+        setItemType((f.item_type as "book" | "article") || "book");
+        setDoi(f.doi || "");
+        setJournal(f.journal || "");
+        setPubYear(f.publication_year != null ? String(f.publication_year) : "");
+        setUrl(f.url || "");
+      } catch (e) {
+        if (!cancel) setError(e instanceof Error ? e.message : "Failed to load book.");
+      } finally {
+        if (!cancel) setLoading(false);
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [book.id]);
+
+  const addTopic = () => {
+    const t = topicInput.trim();
+    if (t && !topics.includes(t)) {
+      setTopics([...topics, t]);
+      setTopicInput("");
+    }
+  };
+  const removeTopic = (t: string) => setTopics(topics.filter((x) => x !== t));
+  const removeAutoTopic = (t: string) =>
+    setAutoTopics(autoTopics.filter((x) => x !== t));
+  const promoteAutoTopic = (t: string) => {
+    if (!topics.includes(t)) setTopics([...topics, t]);
+    setAutoTopics(autoTopics.filter((x) => x !== t));
+  };
+
+  // -- Save: send everything through PUT /api/books/[id]
   const save = async () => {
     if (!title.trim() || !author.trim()) {
       setError("Title and author are required.");
@@ -751,20 +857,41 @@ export function EditBookModal({
     setSaving(true);
     setError("");
     try {
-      const now = new Date().toISOString().split("T")[0];
+      const today = new Date().toISOString().split("T")[0];
+      // Auto-stamp dates on status transitions when user didn't set them
+      const autoStart =
+        status === "reading" && !startDate ? today : startDate || undefined;
+      const autoComplete =
+        status === "read" && !completeDate ? today : completeDate || undefined;
+
       await api.books.update(book.id, {
         title: title.trim(),
         author: author.trim(),
-        pages: pages ? parseInt(pages) : undefined,
+        isbn: isbn.trim() || undefined,
         cover_url: coverUrl.trim() || undefined,
         status,
         rating: rating || undefined,
         favorite,
-        // Auto-stamp completion when transitioning to read
-        complete_date:
-          status === "read" && book.status !== "read" ? now : undefined,
-        start_date:
-          status === "reading" && !book.start_date ? now : undefined,
+        description: description.trim() || undefined,
+        pages: pages ? parseInt(pages) : undefined,
+        intro_pages: introPages ? parseInt(introPages) : 0,
+        start_page: startPage ? parseInt(startPage) : 1,
+        end_page: endPage ? parseInt(endPage) : undefined,
+        current_page: currentPage ? parseInt(currentPage) : undefined,
+        start_date: autoStart,
+        complete_date: autoComplete,
+        source: source.trim() || undefined,
+        volume: volume.trim() || undefined,
+        lcc: lcc.trim() || undefined,
+        ddc: ddc.trim() || undefined,
+        topics: topics.length > 0 ? topics : undefined,
+        auto_topics: autoTopics.length > 0 ? autoTopics : undefined,
+        item_type: itemType,
+        doi: itemType === "article" ? doi.trim() || undefined : undefined,
+        journal: itemType === "article" ? journal.trim() || undefined : undefined,
+        publication_year:
+          itemType === "article" && pubYear ? parseInt(pubYear) : undefined,
+        url: itemType === "article" ? url.trim() || undefined : undefined,
       });
       onSuccess();
       onClose();
@@ -772,6 +899,103 @@ export function EditBookModal({
       setError(e instanceof Error ? e.message : "Failed to save.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  // -- Re-fetch from Open Library / Google Books to fill empty fields
+  const refetchFromOpenLibrary = async () => {
+    setRefetching(true);
+    setRefetchMsg("");
+    setError("");
+    try {
+      const query = isbn.trim() || title.trim();
+      if (!query) {
+        setError("Need an ISBN or title to re-fetch.");
+        return;
+      }
+      const found = await searchBooks(query, 1);
+      if (found.length === 0) {
+        setRefetchMsg("No matches found.");
+        return;
+      }
+      const enriched = await enrichBook(found[0]);
+      const filled: string[] = [];
+      if (enriched.cover_url && !coverUrl) {
+        setCoverUrl(enriched.cover_url);
+        filled.push("cover");
+      }
+      if (enriched.pages && !pages) {
+        setPages(String(enriched.pages));
+        if (!endPage) setEndPage(String(enriched.pages));
+        filled.push("pages");
+      }
+      if (enriched.lcc && !lcc) {
+        setLcc(enriched.lcc);
+        filled.push("LCC");
+      }
+      if (enriched.ddc && !ddc) {
+        setDdc(enriched.ddc);
+        filled.push("DDC");
+      }
+      if (enriched.isbn && !isbn) {
+        setIsbn(enriched.isbn);
+        filled.push("ISBN");
+      }
+      if (enriched.description && !description) {
+        setDescription(enriched.description);
+        filled.push("description");
+      }
+      if (enriched.topics?.length && autoTopics.length === 0) {
+        setAutoTopics(enriched.topics);
+        filled.push("topics");
+      }
+      setRefetchMsg(
+        filled.length > 0 ? `Filled: ${filled.join(", ")}.` : "Everything already set."
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Re-fetch failed.");
+    } finally {
+      setRefetching(false);
+    }
+  };
+
+  // -- Duplicate: creates a near-copy with "(copy)" suffix in not_read state
+  const duplicate = async () => {
+    if (!confirm(`Duplicate "${title}"?`)) return;
+    setDuplicating(true);
+    setError("");
+    try {
+      await api.books.create({
+        title: `${title} (copy)`,
+        author,
+        isbn: isbn || undefined,
+        cover_url: coverUrl || undefined,
+        description: description || undefined,
+        pages: pages ? parseInt(pages) : undefined,
+        intro_pages: introPages ? parseInt(introPages) : 0,
+        start_page: startPage ? parseInt(startPage) : 1,
+        end_page: endPage ? parseInt(endPage) : undefined,
+        status: "not_read",
+        source: source || undefined,
+        volume: volume || undefined,
+        lcc: lcc || undefined,
+        ddc: ddc || undefined,
+        topics: topics.length > 0 ? topics : undefined,
+        auto_topics: autoTopics.length > 0 ? autoTopics : undefined,
+        item_type: itemType,
+        doi: itemType === "article" ? doi || undefined : undefined,
+        journal: itemType === "article" ? journal || undefined : undefined,
+        publication_year:
+          itemType === "article" && pubYear ? parseInt(pubYear) : undefined,
+        url: itemType === "article" ? url || undefined : undefined,
+        favorite: false,
+      });
+      onSuccess();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Duplicate failed.");
+    } finally {
+      setDuplicating(false);
     }
   };
 
@@ -788,55 +1012,318 @@ export function EditBookModal({
     }
   };
 
+  // Computed reading_pages from page details (for display)
+  const computedReadingPages = (() => {
+    const ep = parseInt(endPage) || 0;
+    const sp = parseInt(startPage) || 1;
+    const ip = parseInt(introPages) || 0;
+    return ep > 0 ? ep - sp + 1 + ip : null;
+  })();
+
   return (
-    <BentoModal title="Edit book" onClose={onClose} accent={bento.blue}>
+    <BentoModal title={itemType === "article" ? "Edit article" : "Edit book"} onClose={onClose} accent={bento.blue} size="lg">
       <ErrorBanner msg={error} />
 
-      <div className="space-y-3">
-        <Field label="Title *" value={title} onChange={setTitle} />
-        <Field label="Author *" value={author} onChange={setAuthor} />
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="Pages" value={pages} onChange={setPages} numeric />
-          <div>
-            <label className={labelCls} style={{ color: bento.inkSoft, ...display }}>
-              Rating
-            </label>
-            <StarPicker value={rating} onChange={setRating} />
+      {loading ? (
+        <div className="py-10 text-center text-sm" style={{ color: bento.inkSoft }}>
+          Loading full record...
+        </div>
+      ) : (
+        <>
+          {/* Action bar */}
+          <div className="flex gap-2 mb-5 flex-wrap">
+            <button
+              onClick={refetchFromOpenLibrary}
+              disabled={refetching || !!(itemType === "article")}
+              className="px-3 py-2 rounded-full text-xs font-semibold disabled:opacity-50 inline-flex items-center gap-1.5"
+              style={{
+                background: bento.lilac,
+                color: bento.ink,
+                ...display,
+              }}
+              title={itemType === "article" ? "Re-fetch is for books only" : "Fill empty fields from Open Library"}
+            >
+              {refetching ? "Fetching..." : "↻ Re-fetch metadata"}
+            </button>
+            <button
+              onClick={duplicate}
+              disabled={duplicating}
+              className="px-3 py-2 rounded-full text-xs font-semibold disabled:opacity-50"
+              style={{
+                background: bento.card,
+                color: bento.ink,
+                border: `1px solid ${bento.ink}10`,
+                ...display,
+              }}
+            >
+              {duplicating ? "..." : "⧉ Duplicate"}
+            </button>
+            <button
+              onClick={() => setItemType(itemType === "book" ? "article" : "book")}
+              className="px-3 py-2 rounded-full text-xs font-semibold"
+              style={{
+                background: bento.card,
+                color: bento.inkSoft,
+                border: `1px solid ${bento.ink}10`,
+                ...display,
+              }}
+            >
+              Type: {itemType === "article" ? "📄 Article" : "📚 Book"} (switch)
+            </button>
           </div>
-        </div>
-        <Field label="Cover URL" value={coverUrl} onChange={setCoverUrl} />
-        <StatusPicker value={status} onChange={setStatus} />
 
-        <label className="flex items-center gap-2 mt-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={favorite}
-            onChange={(e) => setFavorite(e.target.checked)}
-            className="w-4 h-4"
+          {refetchMsg && (
+            <div
+              className="mb-4 rounded-2xl px-3.5 py-2 text-sm"
+              style={{ background: bento.green + "22", color: bento.ink }}
+            >
+              {refetchMsg}
+            </div>
+          )}
+
+          {/* ---- Identity ---- */}
+          <SectionLabel>Identity</SectionLabel>
+          <div className="space-y-3 mb-5">
+            <Field label="Title *" value={title} onChange={setTitle} />
+            <Field label="Author *" value={author} onChange={setAuthor} />
+            {itemType === "book" && (
+              <Field label="ISBN" value={isbn} onChange={setIsbn} />
+            )}
+            <Field label="Cover URL" value={coverUrl} onChange={setCoverUrl} />
+            {coverUrl && (
+              <div className="flex items-center gap-3">
+                <img
+                  src={coverUrl}
+                  alt=""
+                  className="w-14 h-20 object-cover rounded-md shadow"
+                  onError={(e) => ((e.target as HTMLImageElement).style.display = "none")}
+                />
+                <span className="text-xs" style={{ color: bento.inkSoft }}>
+                  Cover preview
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* ---- Article-only ---- */}
+          {itemType === "article" && (
+            <>
+              <SectionLabel>Article metadata</SectionLabel>
+              <div className="space-y-3 mb-5">
+                <Field label="DOI" value={doi} onChange={setDoi} placeholder="10.1038/nature12373" />
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="Journal" value={journal} onChange={setJournal} />
+                  <Field label="Year" value={pubYear} onChange={setPubYear} numeric />
+                </div>
+                <Field label="URL" value={url} onChange={setUrl} />
+              </div>
+            </>
+          )}
+
+          {/* ---- Status / rating / dates ---- */}
+          <SectionLabel>Status &amp; rating</SectionLabel>
+          <div className="space-y-3 mb-5">
+            <StatusPicker value={status} onChange={setStatus} />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls} style={{ color: bento.inkSoft, ...display }}>
+                  Rating
+                </label>
+                <StarPicker value={rating} onChange={setRating} />
+              </div>
+              <label className="flex items-end gap-2 cursor-pointer pb-2">
+                <input
+                  type="checkbox"
+                  checked={favorite}
+                  onChange={(e) => setFavorite(e.target.checked)}
+                  className="w-5 h-5"
+                />
+                <span className="text-sm font-medium" style={display}>
+                  ⭐ Favorite
+                </span>
+              </label>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className={labelCls} style={{ color: bento.inkSoft, ...display }}>
+                  Started
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls} style={{ color: bento.inkSoft, ...display }}>
+                  Finished
+                </label>
+                <input
+                  type="date"
+                  value={completeDate}
+                  onChange={(e) => setCompleteDate(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* ---- Page details ---- */}
+          <SectionLabel>Page details</SectionLabel>
+          <div className="space-y-3 mb-5">
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Total pages" value={pages} onChange={setPages} numeric />
+              <Field label="Current page" value={currentPage} onChange={setCurrentPage} numeric />
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <Field label="Intro (roman)" value={introPages} onChange={setIntroPages} numeric placeholder="0" />
+              <Field label="Start page" value={startPage} onChange={setStartPage} numeric placeholder="1" />
+              <Field label="End page" value={endPage} onChange={setEndPage} numeric />
+            </div>
+            {computedReadingPages !== null && (
+              <p className="text-xs" style={{ color: bento.inkSoft }}>
+                Reading pages:{" "}
+                <span className="font-bold" style={{ ...display, color: bento.ink }}>
+                  {computedReadingPages}
+                </span>
+              </p>
+            )}
+          </div>
+
+          {/* ---- Acquisition & classification ---- */}
+          <SectionLabel>Acquisition &amp; classification</SectionLabel>
+          <div className="space-y-3 mb-5">
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Source" value={source} onChange={setSource} placeholder="Strand, Gift..." />
+              <Field label="Volume" value={volume} onChange={setVolume} placeholder="Vol. 1" />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="LCC" value={lcc} onChange={setLcc} placeholder="PR4034.P7" />
+              <Field label="DDC" value={ddc} onChange={setDdc} placeholder="823.7" />
+            </div>
+          </div>
+
+          {/* ---- Topics ---- */}
+          <SectionLabel>Topics</SectionLabel>
+          <div className="space-y-2 mb-5">
+            {topics.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {topics.map((t) => (
+                  <span
+                    key={t}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold"
+                    style={{ background: bento.pink, color: "#FFF", ...display }}
+                  >
+                    {t}
+                    <button
+                      onClick={() => removeTopic(t)}
+                      className="opacity-70 hover:opacity-100 ml-0.5"
+                      title="Remove"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={topicInput}
+                onChange={(e) => setTopicInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addTopic();
+                  }
+                }}
+                placeholder="Add a topic..."
+                className={inputCls}
+              />
+              <button
+                onClick={addTopic}
+                disabled={!topicInput.trim()}
+                className="px-3 py-2 rounded-2xl text-xs font-semibold disabled:opacity-50"
+                style={{ background: bento.ink, color: bento.bg, ...display }}
+              >
+                Add
+              </button>
+            </div>
+            {autoTopics.length > 0 && (
+              <div className="mt-2">
+                <p className="text-[10px] uppercase tracking-wider mb-1.5" style={{ color: bento.inkSoft, ...display }}>
+                  From Open Library — click to keep, × to drop
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {autoTopics.map((t) => (
+                    <span
+                      key={t}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs"
+                      style={{ background: bento.bg, color: bento.inkSoft, border: `1px solid ${bento.ink}10` }}
+                    >
+                      <button
+                        onClick={() => promoteAutoTopic(t)}
+                        className="hover:text-pink-600"
+                        title="Promote to topics"
+                        style={{ ...display, color: bento.ink }}
+                      >
+                        {t}
+                      </button>
+                      <button
+                        onClick={() => removeAutoTopic(t)}
+                        className="opacity-70 hover:opacity-100 ml-0.5"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ---- Notes ---- */}
+          <SectionLabel>Notes</SectionLabel>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+            placeholder="Description, summary, or personal notes..."
+            className={`${inputCls} mb-5`}
           />
-          <span className="text-sm font-medium" style={display}>
-            ⭐ Favorite
-          </span>
-        </label>
-      </div>
 
-      <div className="flex justify-between gap-2 pt-4">
-        <button
-          onClick={del}
-          disabled={deleting}
-          className="text-sm font-semibold"
-          style={{ color: bento.pink, ...display }}
-        >
-          {deleting ? "Deleting..." : "Delete"}
-        </button>
-        <div className="flex gap-2">
-          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
-          <PrimaryButton onClick={save} disabled={saving}>
-            {saving ? "Saving..." : "Save"}
-          </PrimaryButton>
-        </div>
-      </div>
+          {/* ---- Footer actions ---- */}
+          <div className="flex justify-between gap-2 pt-3 border-t" style={{ borderColor: bento.ink + "10" }}>
+            <button
+              onClick={del}
+              disabled={deleting}
+              className="text-sm font-semibold disabled:opacity-50"
+              style={{ color: bento.pink, ...display }}
+            >
+              {deleting ? "Deleting..." : "Delete"}
+            </button>
+            <div className="flex gap-2">
+              <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
+              <PrimaryButton onClick={save} disabled={saving}>
+                {saving ? "Saving..." : "Save"}
+              </PrimaryButton>
+            </div>
+          </div>
+        </>
+      )}
     </BentoModal>
+  );
+}
+
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <p
+      className="text-[10px] uppercase tracking-[0.2em] font-semibold mb-2 mt-2"
+      style={{ color: bento.inkSoft, ...display }}
+    >
+      {children}
+    </p>
   );
 }
 

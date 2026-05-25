@@ -76,7 +76,7 @@ export default function BentoDashboard() {
         {featured ? (
           <div
             className="col-span-12 md:col-span-6 md:row-span-4 rounded-3xl p-5 sm:p-6 relative overflow-hidden"
-            style={{ background: bento.ink, color: bento.bg, minHeight: "320px" }}
+            style={{ background: bento.ink, color: bento.bg, minHeight: "380px" }}
           >
             <div className="absolute -right-12 -bottom-12 w-64 h-64 rounded-full opacity-30" style={{ background: bento.pink, filter: "blur(40px)" }} />
             <div className="absolute -left-12 -top-12 w-48 h-48 rounded-full opacity-30" style={{ background: bento.yellow, filter: "blur(30px)" }} />
@@ -96,10 +96,10 @@ export default function BentoDashboard() {
                     src={featured.cover}
                     alt={featured.title}
                     className="rounded-xl shadow-2xl flex-shrink-0 object-cover"
-                    style={{ width: "112px", height: "168px", aspectRatio: "2 / 3" }}
+                    style={{ width: "160px", height: "240px", aspectRatio: "2 / 3" }}
                   />
                 ) : (
-                  <CoverFallback book={featured} style={{ width: "112px", height: "168px" }} />
+                  <CoverFallback book={featured} style={{ width: "160px", height: "240px" }} />
                 )}
                 <div className="flex-1 min-w-0 flex flex-col">
                   <p className="text-xl sm:text-2xl md:text-3xl font-bold leading-tight line-clamp-3" style={display}>
