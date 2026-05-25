@@ -14,7 +14,7 @@ export default function BentoDashboard() {
   const topics = Array.from(new Set(MOCK_BOOKS.flatMap((b) => b.topics)));
 
   return (
-    <BentoShell current="shelf">
+    <BentoShell current="home">
       {/* Hero greeting */}
       <div className="mb-6 md:mb-8 mt-2">
         <h1

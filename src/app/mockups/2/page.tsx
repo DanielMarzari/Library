@@ -4,271 +4,330 @@ import Link from "next/link";
 import { MOCK_BOOKS, MOCK_STATS } from "../data";
 
 // -----------------------------------------------------------------------------
-// Mockup 2 — "The Catalog"
-// Academic / card-catalog library feel. Sepia paper background, ink colors,
-// classification numbers, monospaced call-numbers, ruled rows. Every book is
-// visible on one page — designed to be the single scrollable index of the
-// entire collection. Drawing pins replaced with simple ruling and serif type.
+// Mockup 2 — "Field Notes"
+// Naturalist explorer's journal feel. Deep forest green + cream + ochre +
+// oxblood. Topographic line patterns, specimen cards, hand-drawn compass.
+// Each book is a "specimen" — observed, classified, annotated. Books are
+// grouped by region (the author's nationality), like a field expedition.
 // -----------------------------------------------------------------------------
 
 const palette = {
-  paper: "#F2E8D5",
-  paperDeep: "#E5D7B5",
-  ink: "#1F1A14",
-  inkSoft: "#5C4A33",
-  rule: "#9C7E5A",
-  ruleFaint: "#C5AB7F",
-  card: "#FFF7E5",
-  accent: "#7A2E1F", // oxblood
-  brass: "#B08020",
-  green: "#3F5B36",
+  paper: "#F1EAD8",
+  paperDeep: "#E5DBC1",
+  ink: "#1A1814",
+  inkSoft: "#5A4F3F",
+  forest: "#1F3A2C",
+  forestDeep: "#0F2418",
+  ochre: "#C2823C",
+  oxblood: "#8B3A2F",
+  rule: "#8B7A5C",
+  ruleFaint: "#C5B796",
+  card: "#FBF5E5",
 };
 
-const fontImport = `https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&family=Libre+Bodoni:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap`;
+const fontImport = `https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,700;0,9..144,900;1,9..144,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap`;
 
-const serifHead: React.CSSProperties = {
-  fontFamily: "'Libre Bodoni', 'Libre Caslon Text', serif",
-};
-const serifBody: React.CSSProperties = {
-  fontFamily: "'Libre Caslon Text', Georgia, serif",
-};
-const mono: React.CSSProperties = {
-  fontFamily: "'JetBrains Mono', monospace",
+const display: React.CSSProperties = { fontFamily: "'Fraunces', serif" };
+const bodyFont: React.CSSProperties = { fontFamily: "'Inter', sans-serif" };
+const mono: React.CSSProperties = { fontFamily: "'JetBrains Mono', monospace" };
+
+const NATIONALITIES: Record<string, { country: string; region: string; flag: string }> = {
+  "Fyodor Dostoevsky": { country: "Russia", region: "Eurasia", flag: "🇷🇺" },
+  "Umberto Eco": { country: "Italy", region: "Europe", flag: "🇮🇹" },
+  "Douglas Hofstadter": { country: "United States", region: "Americas", flag: "🇺🇸" },
+  "Vladimir Nabokov": { country: "Russia", region: "Eurasia", flag: "🇷🇺" },
+  "Italo Calvino": { country: "Italy", region: "Europe", flag: "🇮🇹" },
+  "Mikhail Bulgakov": { country: "Russia", region: "Eurasia", flag: "🇷🇺" },
+  "Toni Morrison": { country: "United States", region: "Americas", flag: "🇺🇸" },
+  "Thomas Mann": { country: "Germany", region: "Europe", flag: "🇩🇪" },
+  "Gabriel García Márquez": { country: "Colombia", region: "Americas", flag: "🇨🇴" },
+  "Nicholson Baker": { country: "United States", region: "Americas", flag: "🇺🇸" },
 };
 
-// Build a fake LCC call number for each book based on its index
-function callNum(i: number, b: typeof MOCK_BOOKS[number]): string {
-  const letters = ["PG", "PQ", "QA", "PS", "PN", "PT", "PR", "B"];
-  const letter = letters[i % letters.length];
-  const num = (3000 + i * 137) % 9999;
-  const surname = b.author.split(" ").pop() || "X";
-  const cutter = `.${surname[0].toUpperCase()}${(surname.charCodeAt(1) % 90) + 10}`;
-  return `${letter}${num}${cutter} ${b.year}`;
+// Fake field-note observations per book
+const FIELD_NOTES: Record<string, string> = {
+  "1": "Observed: heavy specimen, dense canopy of footnotes. Notable for ferocious dialogue.",
+  "2": "Found in monastic conditions. Specimen contains a labyrinth — measured 9 corridors.",
+  "3": "Largest specimen catalogued. Multi-layered, self-referential. Approach with patience.",
+  "4": "Compact specimen. Cross-references its own commentary. A mimicry expert.",
+  "5": "Observed only in fragments. Each fragment a complete city.",
+  "6": "Specimen of unknown geography. Frequently breaks the fourth wall.",
+  "7": "Specimen wails. Required two field readings to fully observe.",
+  "8": "Mimics itself recursively. Observed to interrupt the reader by name.",
+  "9": "Alpine habitat. Observed slow metabolism; recommended seasonal reading.",
+  "10": "Lush rainforest specimen. Magical realism in full bloom.",
+  "11": "Tiny specimen — entire ecosystem on a single escalator ride.",
+  "12": "Crystalline specimen. Each chapter a separate galaxy.",
+};
+
+const REGION_ORDER = ["Europe", "Eurasia", "Americas"];
+
+function groupByRegion() {
+  const map = new Map<string, typeof MOCK_BOOKS>();
+  MOCK_BOOKS.forEach((b) => {
+    const region = NATIONALITIES[b.author]?.region || "Unclassified";
+    const list = map.get(region) || [];
+    list.push(b);
+    map.set(region, list);
+  });
+  return REGION_ORDER
+    .filter((r) => map.has(r))
+    .map((r) => ({ region: r, books: map.get(r)! }));
 }
 
-export default function MockupCatalog() {
-  const sorted = [...MOCK_BOOKS].sort((a, b) => a.author.localeCompare(b.author));
+export default function MockupFieldNotes() {
+  const groups = groupByRegion();
+  const regionCount = groups.length;
+  const countries = new Set(MOCK_BOOKS.map((b) => NATIONALITIES[b.author]?.country).filter(Boolean));
 
   return (
     <>
       {/* eslint-disable-next-line @next/next/no-css-tags */}
       <link rel="stylesheet" href={fontImport} />
+
+      {/* Topographic SVG pattern as a faint background */}
       <div
         style={{
-          background: `repeating-linear-gradient(0deg, ${palette.paper} 0, ${palette.paper} 38px, ${palette.paperDeep}55 38px, ${palette.paperDeep}55 39px), ${palette.paper}`,
+          background: palette.paper,
           color: palette.ink,
           minHeight: "100vh",
-          ...serifBody,
+          backgroundImage: `url("data:image/svg+xml;utf8,${encodeURIComponent(topoSvg(palette.rule))}")`,
+          backgroundRepeat: "repeat",
+          ...bodyFont,
         }}
       >
-        <div className="max-w-7xl mx-auto px-6 sm:px-10 py-10">
+        <div className="max-w-7xl mx-auto px-5 sm:px-10 py-10">
           {/* Masthead */}
-          <header className="mb-10 pb-6 border-b-4" style={{ borderColor: palette.ink, borderBottomStyle: "double" }}>
-            <div className="flex items-start justify-between gap-6">
+          <header className="mb-8 sm:mb-12 pb-8 border-b" style={{ borderColor: palette.ink, borderBottomWidth: "3px", borderBottomStyle: "double" }}>
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-5">
               <div className="flex items-start gap-4">
-                <CrestSeal />
+                <CompassRose />
                 <div>
-                  <p className="text-[10px] uppercase tracking-[0.35em]" style={{ ...mono, color: palette.accent }}>
-                    Card Catalog · Vol. IV
+                  <p
+                    className="text-[10px] uppercase tracking-[0.4em]"
+                    style={{ ...mono, color: palette.oxblood }}
+                  >
+                    Reading Expedition · MMXXVI
                   </p>
                   <h1
-                    className="text-5xl sm:text-7xl leading-none tracking-tight mt-1"
-                    style={{ ...serifHead, fontWeight: 700, color: palette.ink }}
+                    className="leading-[0.9] tracking-tight mt-1"
+                    style={{
+                      ...display,
+                      fontWeight: 900,
+                      fontSize: "clamp(3.5rem, 9vw, 7rem)",
+                      color: palette.forest,
+                    }}
                   >
-                    Bibliotheca
+                    Field
+                    <br />
+                    <span style={{ fontStyle: "italic", fontWeight: 400 }}>Notes</span>
                   </h1>
-                  <p className="italic mt-1" style={{ color: palette.inkSoft }}>
-                    A complete index of the personal collection · est. MMXXVI
+                  <p
+                    className="italic mt-1 text-sm sm:text-base"
+                    style={{ color: palette.inkSoft, ...display }}
+                  >
+                    Vol. IV — Observations on the personal collection.
                   </p>
                 </div>
               </div>
-              <nav className="hidden md:flex flex-col gap-1 text-right text-sm" style={mono}>
-                <Link href="/mockups" className="hover:underline" style={{ color: palette.accent }}>
-                  ← all mockups
-                </Link>
-                <span style={{ color: palette.inkSoft }}>· Subject Index</span>
-                <span style={{ color: palette.inkSoft }}>· Author Index</span>
-                <span style={{ color: palette.inkSoft }}>· Reading Log</span>
-              </nav>
+              <Link
+                href="/mockups"
+                className="self-start px-3 py-1.5 text-[10px] uppercase tracking-[0.3em] border whitespace-nowrap"
+                style={{ ...mono, borderColor: palette.ink, color: palette.ink }}
+              >
+                ← all mockups
+              </Link>
             </div>
 
             {/* Stats strip */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-6 gap-y-2 mt-6 pt-4 border-t" style={{ borderColor: palette.rule }}>
-              <StatLine label="Holdings" value={String(MOCK_STATS.totalBooks)} accent={palette.ink} />
-              <StatLine label="Catalogued" value={String(MOCK_STATS.read)} accent={palette.green} sub="read" />
-              <StatLine label="Circulating" value={String(MOCK_STATS.reading)} accent={palette.accent} sub="reading" />
-              <StatLine label="Pages" value={MOCK_STATS.pagesRead.toLocaleString()} accent={palette.ink} sub="total" />
-              <StatLine label="Mean ★" value={MOCK_STATS.avgRating.toFixed(2)} accent={palette.brass} />
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-6 gap-y-3 mt-7 pt-5 border-t" style={{ borderColor: palette.rule }}>
+              <FieldStat label="Specimens" value={String(MOCK_STATS.totalBooks)} color={palette.forest} />
+              <FieldStat label="Observed" value={String(MOCK_STATS.read)} sub="read" color={palette.oxblood} />
+              <FieldStat label="Tracking" value={String(MOCK_STATS.reading)} sub="reading" color={palette.ochre} />
+              <FieldStat label="Regions" value={String(regionCount)} sub={`${countries.size} countries`} color={palette.forest} />
+              <FieldStat label="Pages" value={MOCK_STATS.pagesRead.toLocaleString()} color={palette.forest} />
             </div>
           </header>
 
-          {/* Filter / locator strip — feels like a finding aid */}
-          <div className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
-            <span className="text-[10px] uppercase tracking-[0.3em]" style={{ ...mono, color: palette.inkSoft }}>
-              Sort by
-            </span>
-            {["Author", "Title", "Call No.", "Date", "Rating"].map((s, i) => (
-              <a
-                key={s}
-                className="cursor-pointer hover:underline"
-                style={{
-                  color: i === 0 ? palette.accent : palette.ink,
-                  fontWeight: i === 0 ? 700 : 400,
-                  ...mono,
-                }}
+          {/* World band — visualised by region */}
+          <section className="mb-10">
+            <div className="flex items-baseline justify-between gap-3 mb-4">
+              <h2
+                className="text-2xl sm:text-3xl"
+                style={{ ...display, fontWeight: 700, color: palette.forest }}
               >
-                {s}{i === 0 && " ↓"}
-              </a>
-            ))}
-            <span className="ml-auto text-[10px] uppercase tracking-[0.3em]" style={{ ...mono, color: palette.inkSoft }}>
-              {sorted.length} entries · all visible
-            </span>
-          </div>
-
-          {/* THE CATALOG — table of all books */}
-          <div className="border-t-2 border-b-2" style={{ borderColor: palette.ink }}>
-            {/* Table header */}
-            <div
-              className="hidden md:grid grid-cols-[160px_60px_1fr_140px_80px_100px] gap-4 px-3 py-2.5 text-[10px] uppercase tracking-[0.25em]"
-              style={{ ...mono, color: palette.inkSoft, borderBottom: `1px solid ${palette.rule}` }}
-            >
-              <span>Call number</span>
-              <span></span>
-              <span>Author · Title · Subject</span>
-              <span>Published</span>
-              <span>Pages</span>
-              <span className="text-right">Status</span>
-            </div>
-
-            {sorted.map((b, i) => (
-              <CatalogRow key={b.id} b={b} i={i} />
-            ))}
-          </div>
-
-          {/* Bottom decorative band — a faux "checkout slip" */}
-          <section className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Index by subject */}
-            <div className="md:col-span-2">
-              <h3
-                className="text-2xl border-b-2 pb-2 mb-3"
-                style={{ ...serifHead, fontWeight: 700, borderColor: palette.ink }}
-              >
-                Subject Index
-              </h3>
-              <div className="columns-2 sm:columns-3 gap-6 text-sm" style={serifBody}>
-                {Array.from(new Set(MOCK_BOOKS.flatMap((b) => b.topics))).sort().map((t) => {
-                  const count = MOCK_BOOKS.filter((b) => b.topics.includes(t)).length;
-                  return (
-                    <p key={t} className="leading-relaxed break-inside-avoid">
-                      <span style={{ color: palette.accent }}>{t}</span>
-                      <span style={{ color: palette.inkSoft }}> · {count}</span>
-                    </p>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Checkout slip */}
-            <aside
-              className="p-5 relative"
-              style={{
-                background: palette.card,
-                border: `1px dashed ${palette.rule}`,
-                boxShadow: `4px 4px 0 ${palette.rule}55`,
-              }}
-            >
-              <p className="text-[10px] uppercase tracking-[0.3em] mb-2" style={{ ...mono, color: palette.accent }}>
-                Circulation Slip
-              </p>
-              <p className="text-lg" style={{ ...serifHead, fontWeight: 700 }}>
-                D. Marzari
-              </p>
-              <p className="text-xs italic mb-3" style={{ color: palette.inkSoft }}>
-                Card no. 0247 · since 2017
-              </p>
-
-              <table className="w-full text-xs" style={mono}>
-                <thead>
-                  <tr style={{ color: palette.inkSoft }}>
-                    <th className="text-left font-normal pb-1">Out</th>
-                    <th className="text-left font-normal pb-1">Returned</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[
-                    ["05.19.26", "—"],
-                    ["04.27.26", "05.12.26"],
-                    ["03.18.26", "04.21.26"],
-                    ["02.04.26", "03.10.26"],
-                  ].map(([o, r], idx) => (
-                    <tr key={idx} className="border-t" style={{ borderColor: palette.ruleFaint }}>
-                      <td className="py-1">{o}</td>
-                      <td className="py-1" style={{ color: r === "—" ? palette.accent : palette.ink }}>
-                        {r}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
+                Distribution by region
+              </h2>
               <p
-                className="text-[10px] italic mt-4 pt-3 border-t"
-                style={{ borderColor: palette.ruleFaint, color: palette.inkSoft }}
+                className="text-[10px] uppercase tracking-[0.3em]"
+                style={{ ...mono, color: palette.inkSoft }}
               >
-                &ldquo;Please return promptly so others may enjoy.&rdquo;
+                a partial atlas
               </p>
-            </aside>
+            </div>
+
+            <div
+              className="flex items-stretch overflow-hidden rounded-sm"
+              style={{ border: `1px solid ${palette.ink}` }}
+            >
+              {groups.map((g, i) => {
+                const pct = (g.books.length / MOCK_BOOKS.length) * 100;
+                const tone = [palette.forest, palette.ochre, palette.oxblood][i % 3];
+                return (
+                  <div
+                    key={g.region}
+                    className="px-3 py-3 flex flex-col justify-center"
+                    style={{
+                      background: tone,
+                      color: palette.paper,
+                      width: `${pct}%`,
+                      minWidth: "100px",
+                    }}
+                  >
+                    <p
+                      className="text-[10px] uppercase tracking-[0.3em] opacity-80"
+                      style={mono}
+                    >
+                      {g.region}
+                    </p>
+                    <p
+                      className="text-2xl sm:text-3xl leading-none mt-0.5"
+                      style={{ ...display, fontWeight: 700 }}
+                    >
+                      {g.books.length}
+                      <span
+                        className="text-xs ml-1.5 opacity-80"
+                        style={{ ...mono, fontWeight: 400 }}
+                      >
+                        · {pct.toFixed(0)}%
+                      </span>
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* Specimen plates — grouped by region */}
+          {groups.map((g) => (
+            <section key={g.region} className="mb-12">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="h-px flex-1" style={{ background: palette.ink }} />
+                <h2
+                  className="text-xl sm:text-2xl px-3"
+                  style={{
+                    ...display,
+                    fontWeight: 700,
+                    color: palette.forest,
+                    fontStyle: "italic",
+                  }}
+                >
+                  {g.region}
+                </h2>
+                <div className="h-px flex-1" style={{ background: palette.ink }} />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {g.books.map((b, i) => (
+                  <SpecimenCard
+                    key={b.id}
+                    book={b}
+                    plateNo={i + 1}
+                    nat={NATIONALITIES[b.author]}
+                    note={FIELD_NOTES[b.id]}
+                  />
+                ))}
+              </div>
+            </section>
+          ))}
+
+          {/* Field journal entry */}
+          <section
+            className="mt-14 p-6 sm:p-8 relative"
+            style={{
+              background: palette.forest,
+              color: palette.paper,
+              boxShadow: `6px 6px 0 ${palette.ink}`,
+            }}
+          >
+            <p
+              className="text-[10px] uppercase tracking-[0.4em] mb-3 opacity-80"
+              style={{ ...mono, color: palette.ochre }}
+            >
+              Expedition Notes · End of season
+            </p>
+            <p
+              className="text-xl sm:text-2xl leading-relaxed"
+              style={{ ...display, fontStyle: "italic" }}
+            >
+              &ldquo;{MOCK_STATS.read} specimens fully observed; {MOCK_STATS.reading} still under
+              study. Strongest specimens this season hail from the Americas. Recommend
+              extending the Eurasian survey next year — promising leads in the
+              Russian thicket.&rdquo;
+            </p>
+            <p
+              className="text-xs mt-4 tracking-[0.3em]"
+              style={{ ...mono, opacity: 0.7 }}
+            >
+              — D.M., FIELD JOURNAL, ENTRY 247
+            </p>
           </section>
 
           {/* Colophon */}
-          <footer className="mt-12 pt-6 border-t-2 text-center" style={{ borderColor: palette.ink, borderTopStyle: "double" }}>
-            <p style={{ ...serifHead, fontStyle: "italic", color: palette.inkSoft }}>
-              — Mockup 2 · The Catalog —
+          <footer
+            className="mt-12 pt-6 text-center"
+            style={{ borderTop: `3px double ${palette.ink}` }}
+          >
+            <p
+              className="italic"
+              style={{ ...display, color: palette.inkSoft }}
+            >
+              — Mockup 2 · Field Notes —
             </p>
-            <p className="text-[10px] uppercase tracking-[0.3em] mt-2" style={{ ...mono, color: palette.inkSoft }}>
-              Set in Libre Bodoni · Libre Caslon Text · JetBrains Mono
+            <p
+              className="text-[10px] uppercase tracking-[0.3em] mt-2"
+              style={{ ...mono, color: palette.inkSoft }}
+            >
+              Set in Fraunces · Inter · JetBrains Mono
             </p>
           </footer>
         </div>
-
-        {/* Back button (mobile) */}
-        <Link
-          href="/mockups"
-          className="md:hidden fixed top-3 right-3 px-3 py-1.5 text-[10px] uppercase tracking-[0.25em] border"
-          style={{
-            borderColor: palette.ink,
-            color: palette.ink,
-            background: palette.paper,
-            ...mono,
-          }}
-        >
-          ← mockups
-        </Link>
       </div>
     </>
   );
 }
 
-function StatLine({
+// ---- Components -------------------------------------------------------------
+
+function FieldStat({
   label,
   value,
-  accent,
   sub,
+  color,
 }: {
   label: string;
   value: string;
-  accent: string;
   sub?: string;
+  color: string;
 }) {
   return (
     <div>
-      <p className="text-[10px] uppercase tracking-[0.3em]" style={{ ...mono, color: "#5C4A33" }}>
+      <p
+        className="text-[10px] uppercase tracking-[0.3em]"
+        style={{ ...mono, color: palette.inkSoft }}
+      >
         {label}
       </p>
-      <p className="text-2xl mt-0.5" style={{ ...serifHead, color: accent, fontWeight: 700 }}>
+      <p
+        className="text-2xl sm:text-3xl leading-none mt-1"
+        style={{ ...display, fontWeight: 700, color }}
+      >
         {value}
         {sub && (
-          <span className="text-xs ml-1.5 italic" style={{ ...serifBody, color: "#5C4A33", fontWeight: 400 }}>
+          <span
+            className="text-xs ml-1.5 italic"
+            style={{ ...display, fontWeight: 400, color: palette.inkSoft }}
+          >
             {sub}
           </span>
         )}
@@ -277,125 +336,180 @@ function StatLine({
   );
 }
 
-function CatalogRow({
-  b,
-  i,
+function SpecimenCard({
+  book,
+  plateNo,
+  nat,
+  note,
 }: {
-  b: typeof MOCK_BOOKS[number];
-  i: number;
+  book: typeof MOCK_BOOKS[number];
+  plateNo: number;
+  nat?: { country: string; region: string; flag: string };
+  note?: string;
 }) {
-  const cn = callNum(i, b);
-  const status =
-    b.status === "read" ? { label: "ON SHELF", color: "#3F5B36" } :
-    b.status === "reading" ? { label: "OUT", color: "#7A2E1F" } :
-    { label: "QUEUED", color: "#5C4A33" };
+  const statusBadge =
+    book.status === "read"
+      ? { label: "FULLY OBSERVED", color: "#1F3A2C" }
+      : book.status === "reading"
+      ? { label: "UNDER STUDY", color: "#C2823C" }
+      : { label: "AWAITING SURVEY", color: "#8B3A2F" };
 
   return (
     <article
-      className="grid grid-cols-[80px_1fr] md:grid-cols-[160px_60px_1fr_140px_80px_100px] gap-4 px-3 py-4 items-start hover:bg-black/[0.025]"
-      style={{ borderBottom: "1px solid #C5AB7F" }}
+      className="relative p-4 flex gap-4"
+      style={{
+        background: "#FBF5E5",
+        border: `1px solid ${palette.ink}`,
+        boxShadow: `3px 3px 0 ${palette.ink}30`,
+      }}
     >
-      {/* Call number */}
-      <div className="md:order-1">
-        <p className="text-[11px] font-semibold leading-tight" style={mono}>
-          {cn}
-        </p>
-        <p className="text-[10px] mt-0.5 hidden md:block" style={{ ...mono, color: "#5C4A33" }}>
-          shelf {3 + (i % 8)}
-        </p>
+      {/* Plate number — like the corner of a museum card */}
+      <div
+        className="absolute -top-2 -left-2 px-2 py-0.5 text-[10px] font-bold tracking-wider"
+        style={{ ...mono, background: palette.ink, color: palette.paper }}
+      >
+        PL.{String(plateNo).padStart(2, "0")}
       </div>
 
-      {/* Cover (hidden on mobile to save space) */}
-      <div className="hidden md:flex md:order-2 justify-center">
+      {/* Cover */}
+      <div className="flex-shrink-0">
         <img
-          src={b.cover}
-          alt={b.title}
-          className="w-12 aspect-[2/3] object-cover"
-          style={{ filter: "sepia(0.25) saturate(0.7)" }}
+          src={book.cover}
+          alt={book.title}
+          className="w-20 sm:w-24 aspect-[2/3] object-cover"
+          style={{
+            filter: "sepia(0.2) saturate(0.85)",
+            boxShadow: `2px 2px 0 ${palette.rule}`,
+          }}
         />
+        {/* Faux pin / annotation */}
+        <p
+          className="text-[9px] mt-1.5 text-center"
+          style={{ ...mono, color: palette.inkSoft }}
+        >
+          {book.year}
+          {nat && ` · ${nat.flag}`}
+        </p>
       </div>
 
-      {/* Title + meta */}
-      <div className="md:order-3 min-w-0">
+      {/* Specimen details */}
+      <div className="min-w-0 flex-1">
         <p
-          className="text-base sm:text-lg leading-tight"
-          style={{ ...serifHead, fontWeight: 700 }}
+          className="text-[10px] uppercase tracking-[0.25em] mb-0.5"
+          style={{ ...mono, color: palette.oxblood }}
         >
-          {b.author}.{" "}
-          <span style={{ fontStyle: "italic", fontWeight: 400, ...serifBody }}>
-            {b.title}.
-          </span>
+          Genus · {book.topics[0] || "Lit."}
         </p>
-        <div className="text-xs mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5" style={{ color: "#5C4A33" }}>
-          {b.topics.map((t) => (
-            <span key={t}>· {t}</span>
-          ))}
-          {b.source && <span className="italic">acq. {b.source}</span>}
-        </div>
-        {b.rating && (
-          <p className="text-sm mt-1" style={{ color: "#B08020" }}>
-            {"★".repeat(b.rating)}
-            <span style={{ color: "#C5AB7F" }}>{"★".repeat(5 - b.rating)}</span>
-            <span className="ml-2 text-xs italic" style={{ ...serifBody, color: "#5C4A33" }}>
-              — reader&apos;s rating
-            </span>
+        <h3
+          className="leading-tight"
+          style={{ ...display, fontWeight: 700, fontSize: "1.05rem", color: palette.ink }}
+        >
+          {book.title}
+        </h3>
+        <p
+          className="italic text-sm mt-0.5"
+          style={{ ...display, color: palette.inkSoft }}
+        >
+          {book.author}
+        </p>
+
+        {/* Specimen data */}
+        <dl
+          className="grid grid-cols-2 gap-x-2 gap-y-0.5 mt-2.5 text-[11px]"
+          style={mono}
+        >
+          <Datum label="loc." value={nat?.country || "—"} />
+          <Datum label="size" value={`${book.pages}pp`} />
+          {book.source && <Datum label="acq." value={book.source} />}
+          {book.rating && (
+            <Datum
+              label="rate"
+              value={"★".repeat(book.rating)}
+              color={palette.ochre}
+            />
+          )}
+        </dl>
+
+        {/* Note */}
+        {note && (
+          <p
+            className="text-[11px] leading-snug mt-2.5 pl-2 border-l-2 italic"
+            style={{ borderColor: palette.ochre, color: palette.inkSoft, ...display }}
+          >
+            {note}
           </p>
         )}
-      </div>
 
-      {/* Published */}
-      <div className="hidden md:block md:order-4" style={{ color: "#5C4A33" }}>
-        <p className="text-sm" style={serifBody}>
-          {b.year}
-        </p>
-        <p className="text-[10px]" style={mono}>
-          {b.year < 1950 ? "antiquarian" : "modern"}
-        </p>
-      </div>
-
-      {/* Pages */}
-      <div className="hidden md:block md:order-5 text-sm tabular-nums" style={{ ...mono, color: "#5C4A33" }}>
-        {b.pages} pp
-      </div>
-
-      {/* Status */}
-      <div className="hidden md:flex md:order-6 justify-end items-start">
-        <span
-          className="text-[10px] tracking-[0.25em] px-2 py-1 border"
-          style={{ ...mono, color: status.color, borderColor: status.color }}
-        >
-          {status.label}
-        </span>
-      </div>
-
-      {/* Mobile mini status row */}
-      <div className="md:hidden col-span-2 -mt-2 flex items-center justify-between text-[10px]" style={mono}>
-        <span style={{ color: "#5C4A33" }}>
-          {b.year} · {b.pages} pp
-        </span>
-        <span
-          className="px-1.5 py-0.5 border"
-          style={{ color: status.color, borderColor: status.color }}
-        >
-          {status.label}
-        </span>
+        {/* Status stamp */}
+        <div className="mt-2.5">
+          <span
+            className="text-[9px] tracking-[0.25em] px-1.5 py-0.5 border"
+            style={{
+              ...mono,
+              color: statusBadge.color,
+              borderColor: statusBadge.color,
+            }}
+          >
+            {statusBadge.label}
+          </span>
+        </div>
       </div>
     </article>
   );
 }
 
-function CrestSeal() {
+function Datum({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string;
+  color?: string;
+}) {
   return (
-    <svg width="60" height="60" viewBox="0 0 60 60" fill="none" aria-hidden>
-      <circle cx="30" cy="30" r="28" stroke="#1F1A14" strokeWidth="1.5" />
-      <circle cx="30" cy="30" r="22" stroke="#7A2E1F" strokeWidth="1" />
-      <path d="M30 12 L38 30 L30 24 L22 30 Z" fill="#7A2E1F" />
-      <text x="30" y="44" textAnchor="middle" fontSize="6" fill="#1F1A14" fontFamily="serif" fontStyle="italic">
-        lectio
-      </text>
-      <text x="30" y="51" textAnchor="middle" fontSize="6" fill="#1F1A14" fontFamily="serif" fontStyle="italic">
-        privata
-      </text>
+    <>
+      <dt style={{ color: palette.inkSoft }}>{label}</dt>
+      <dd style={{ color: color || palette.ink, textAlign: "right" }}>{value}</dd>
+    </>
+  );
+}
+
+function CompassRose() {
+  return (
+    <svg width="68" height="68" viewBox="0 0 80 80" fill="none" aria-hidden>
+      <circle cx="40" cy="40" r="36" stroke="#1A1814" strokeWidth="1.5" fill="none" />
+      <circle cx="40" cy="40" r="28" stroke="#8B7A5C" strokeWidth="0.8" fill="none" />
+      {/* Main points */}
+      <path d="M40 6 L43 38 L40 40 L37 38 Z" fill="#8B3A2F" />
+      <path d="M40 74 L43 42 L40 40 L37 42 Z" fill="#1A1814" />
+      <path d="M6 40 L38 37 L40 40 L38 43 Z" fill="#1A1814" />
+      <path d="M74 40 L42 37 L40 40 L42 43 Z" fill="#1A1814" />
+      {/* Secondary points */}
+      <path d="M16 16 L37 39 L40 40 L39 37 Z" fill="#C2823C" opacity="0.7" />
+      <path d="M64 16 L41 39 L40 40 L43 37 Z" fill="#C2823C" opacity="0.7" />
+      <path d="M16 64 L37 41 L40 40 L39 43 Z" fill="#C2823C" opacity="0.7" />
+      <path d="M64 64 L41 41 L40 40 L43 43 Z" fill="#C2823C" opacity="0.7" />
+      {/* Center */}
+      <circle cx="40" cy="40" r="3" fill="#1A1814" />
+      <text x="40" y="11" fontSize="6" textAnchor="middle" fill="#1A1814" fontFamily="serif">N</text>
+      <text x="40" y="78" fontSize="6" textAnchor="middle" fill="#1A1814" fontFamily="serif">S</text>
+      <text x="4" y="42" fontSize="6" textAnchor="middle" fill="#1A1814" fontFamily="serif">W</text>
+      <text x="76" y="42" fontSize="6" textAnchor="middle" fill="#1A1814" fontFamily="serif">E</text>
     </svg>
   );
+}
+
+// Faint topographic line pattern — repeats as a background tile.
+function topoSvg(color: string): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300">
+    <g fill="none" stroke="${color}" stroke-width="0.6" opacity="0.18">
+      <path d="M0 80 Q60 40 120 80 T240 80 T360 80" />
+      <path d="M0 130 Q60 90 120 130 T240 130 T360 130" />
+      <path d="M0 180 Q60 140 120 180 T240 180 T360 180" />
+      <path d="M0 230 Q60 190 120 230 T240 230 T360 230" />
+      <path d="M0 30 Q60 0 120 30 T240 30 T360 30" />
+      <path d="M0 280 Q60 240 120 280 T240 280 T360 280" />
+    </g>
+  </svg>`;
 }

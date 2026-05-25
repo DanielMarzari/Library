@@ -22,17 +22,19 @@ export const display: CSSProperties = { fontFamily: "'Space Grotesk', sans-serif
 export const body: CSSProperties = { fontFamily: "'Inter', sans-serif" };
 
 const TABS = [
-  { label: "Shelf", href: "/mockups/1", icon: HomeIcon },
-  { label: "Reading", href: "/mockups/1/list", icon: ListIcon },
-  { label: "Authors", href: "/mockups/1/authors", icon: PeopleIcon },
-  { label: "Detail", href: "/mockups/1/book", icon: BookIcon },
-];
+  { label: "Home", href: "/mockups/1", icon: HomeIcon, key: "home" },
+  { label: "Shelf", href: "/mockups/1/shelf", icon: ShelfIcon, key: "shelf" },
+  { label: "Reading", href: "/mockups/1/list", icon: ListIcon, key: "list" },
+  { label: "Authors", href: "/mockups/1/authors", icon: PeopleIcon, key: "authors" },
+] as const;
+
+export type BentoTab = "home" | "shelf" | "list" | "authors" | "book";
 
 export function BentoShell({
   current,
   children,
 }: {
-  current: "shelf" | "list" | "authors" | "book";
+  current: BentoTab;
   children: ReactNode;
 }) {
   return (
@@ -67,11 +69,7 @@ export function BentoShell({
             style={{ background: bento.card, border: `1px solid ${bento.ink}10` }}
           >
             {TABS.map((t) => {
-              const active =
-                (current === "shelf" && t.label === "Shelf") ||
-                (current === "list" && t.label === "Reading") ||
-                (current === "authors" && t.label === "Authors") ||
-                (current === "book" && t.label === "Detail");
+              const active = current === t.key;
               return (
                 <Link
                   key={t.label}
@@ -116,11 +114,7 @@ export function BentoShell({
             style={{ background: bento.card, border: `1px solid ${bento.ink}10` }}
           >
             {TABS.map((t) => {
-              const active =
-                (current === "shelf" && t.label === "Shelf") ||
-                (current === "list" && t.label === "Reading") ||
-                (current === "authors" && t.label === "Authors") ||
-                (current === "book" && t.label === "Detail");
+              const active = current === t.key;
               const Icon = t.icon;
               return (
                 <Link
@@ -178,6 +172,19 @@ function PeopleIcon() {
       <path d="M2.5 20c.6-3.4 3.4-5.4 6.5-5.4S15 16.6 15.5 20" />
       <circle cx="17" cy="9.5" r="2.6" />
       <path d="M15 14.5c2.2 0 4.6 1.2 5.5 4" />
+    </svg>
+  );
+}
+
+function ShelfIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="3" width="3" height="14" />
+      <rect x="9" y="5" width="3" height="12" />
+      <rect x="14" y="3" width="3" height="14" />
+      <rect x="19" y="6" width="2" height="11" />
+      <line x1="3" y1="18" x2="22" y2="18" />
+      <line x1="3" y1="20" x2="22" y2="20" />
     </svg>
   );
 }

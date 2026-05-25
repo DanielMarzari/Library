@@ -59,18 +59,24 @@ export default function MockupReel() {
               <p className="text-2xl tracking-[0.08em]" style={display}>REEL</p>
             </div>
             <nav className="hidden md:flex items-center gap-7 text-sm" style={mono}>
-              {["DIARY", "SHELF", "LISTS", "PROFILE"].map((l, i) => (
-                <a
-                  key={l}
-                  className="hover:opacity-100 transition-opacity"
-                  style={{
-                    color: i === 0 ? palette.hot : palette.inkSoft,
-                    opacity: i === 0 ? 1 : 0.8,
-                  }}
-                >
-                  {l}
-                </a>
-              ))}
+              <Link
+                href="/mockups/3/diary"
+                style={{ color: palette.inkSoft, opacity: 0.8 }}
+                className="hover:opacity-100 transition-opacity"
+              >
+                DIARY
+              </Link>
+              <a style={{ color: palette.hot, opacity: 1 }}>SHELF</a>
+              <Link
+                href="/mockups/3/book"
+                style={{ color: palette.inkSoft, opacity: 0.8 }}
+                className="hover:opacity-100 transition-opacity"
+              >
+                BOOK
+              </Link>
+              <span style={{ color: palette.inkFaint }}>·</span>
+              <a style={{ color: palette.inkSoft, opacity: 0.8 }}>LISTS</a>
+              <a style={{ color: palette.inkSoft, opacity: 0.8 }}>PROFILE</a>
             </nav>
             <Link
               href="/mockups"
@@ -247,9 +253,18 @@ export default function MockupReel() {
 
           {/* Diary feed */}
           <section className="mb-16">
-            <h2 className="text-3xl sm:text-5xl mb-6" style={display}>
-              READING DIARY
-            </h2>
+            <div className="flex items-end justify-between gap-3 mb-6">
+              <h2 className="text-3xl sm:text-5xl" style={display}>
+                READING DIARY
+              </h2>
+              <Link
+                href="/mockups/3/diary"
+                className="text-xs tracking-[0.3em] hover:opacity-100"
+                style={{ ...mono, color: palette.hot }}
+              >
+                FULL DIARY →
+              </Link>
+            </div>
 
             <div className="space-y-px" style={{ background: palette.surfaceHi }}>
               {[
