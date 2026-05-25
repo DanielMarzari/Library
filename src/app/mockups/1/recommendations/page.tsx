@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
+import { api } from "@/lib/api-client";
 import { BentoShell, bento, display } from "../theme";
 import { useRecommendations, type LibraryRecommendation } from "../useLibraryData";
+import { AddRecommendationModal } from "../modals";
 
 // Source classifier (heuristic) — maps free-text "recommended_by" to a chip.
 function classify(by?: string): { kind: string; color: string; icon: string } {
@@ -20,7 +23,39 @@ function safeCover(url?: string) {
 }
 
 export default function BentoRecommendations() {
-  const { recs, loading } = useRecommendations();
+  const { recs, loading, refetch } = useRecommendations();
+  const [showAdd, setShowAdd] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const addToLibrary = async (r: LibraryRecommendation) => {
+    if (busyId) return;
+    setBusyId(r.id);
+    try {
+      await api.books.create({
+        title: r.title,
+        author: r.author || "Unknown Author",
+        isbn: r.isbn || undefined,
+        cover_url: r.cover_url || undefined,
+        source: r.recommended_by ? `rec from ${r.recommended_by}` : "recommendation",
+        status: "not_read",
+      });
+      await api.recommendations.delete(r.id);
+      refetch();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const dismissRec = async (r: LibraryRecommendation) => {
+    if (!confirm(`Dismiss "${r.title}"?`)) return;
+    setBusyId(r.id);
+    try {
+      await api.recommendations.delete(r.id);
+      refetch();
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   // Sort by created_at desc
   const sorted = [...recs].sort(
@@ -95,7 +130,14 @@ export default function BentoRecommendations() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-8">
             {featured.map((r) => (
-              <RecCard key={r.id} r={r} featured />
+              <RecCard
+              key={r.id}
+              r={r}
+              featured
+              busy={busyId === r.id}
+              onAddToLibrary={() => addToLibrary(r)}
+              onDismiss={() => dismissRec(r)}
+            />
             ))}
           </div>
         </>
@@ -109,7 +151,13 @@ export default function BentoRecommendations() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {rest.map((r) => (
-              <RecCard key={r.id} r={r} />
+              <RecCard
+              key={r.id}
+              r={r}
+              busy={busyId === r.id}
+              onAddToLibrary={() => addToLibrary(r)}
+              onDismiss={() => dismissRec(r)}
+            />
             ))}
           </div>
         </>
@@ -129,17 +177,37 @@ export default function BentoRecommendations() {
           </p>
         </div>
         <button
+          onClick={() => setShowAdd(true)}
           className="px-4 py-2 rounded-full text-xs font-semibold text-white"
           style={{ background: bento.pink, ...display }}
         >
           Add rec
         </button>
       </div>
+
+      {showAdd && (
+        <AddRecommendationModal
+          onClose={() => setShowAdd(false)}
+          onSuccess={() => refetch()}
+        />
+      )}
     </BentoShell>
   );
 }
 
-function RecCard({ r, featured }: { r: LibraryRecommendation; featured?: boolean }) {
+function RecCard({
+  r,
+  featured,
+  busy,
+  onAddToLibrary,
+  onDismiss,
+}: {
+  r: LibraryRecommendation;
+  featured?: boolean;
+  busy?: boolean;
+  onAddToLibrary?: () => void;
+  onDismiss?: () => void;
+}) {
   const meta = classify(r.recommended_by);
   const cover = safeCover(r.cover_url);
   return (
@@ -207,13 +275,17 @@ function RecCard({ r, featured }: { r: LibraryRecommendation; featured?: boolean
 
         <div className="flex gap-2 mt-3">
           <button
-            className="px-3 py-1.5 rounded-full text-xs font-semibold flex-1"
+            onClick={onAddToLibrary}
+            disabled={busy}
+            className="px-3 py-1.5 rounded-full text-xs font-semibold flex-1 disabled:opacity-50"
             style={{ background: bento.pink, color: "#FFF", ...display }}
           >
-            + Reading list
+            {busy ? "..." : "+ Add to library"}
           </button>
           <button
-            className="px-3 py-1.5 rounded-full text-xs font-semibold"
+            onClick={onDismiss}
+            disabled={busy}
+            className="px-3 py-1.5 rounded-full text-xs font-semibold disabled:opacity-50"
             style={{
               background: bento.bg,
               color: bento.inkSoft,
@@ -221,7 +293,7 @@ function RecCard({ r, featured }: { r: LibraryRecommendation; featured?: boolean
               ...display,
             }}
           >
-            Already own
+            Dismiss
           </button>
         </div>
       </div>

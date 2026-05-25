@@ -1,14 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
+import { api } from "@/lib/api-client";
 import { BentoShell, bento, display } from "../theme";
 import {
   useBooks,
   useStats,
   useReadingGoals,
   useLearningGoals,
+  booksFinishedInYear,
   type LibraryLearningGoal,
 } from "../useLibraryData";
+import { SetReadingGoalModal, AddLearningGoalModal } from "../modals";
 import type { MockBook } from "../../data";
 
 const HUES = [bento.pink, bento.green, bento.yellow, bento.lilac, bento.blue, bento.orange];
@@ -16,27 +20,58 @@ const HUES = [bento.pink, bento.green, bento.yellow, bento.lilac, bento.blue, be
 export default function BentoGoals() {
   const { books } = useBooks();
   const stats = useStats(books);
-  const { goals: readingGoals } = useReadingGoals();
-  const { goals: learningGoals } = useLearningGoals();
+  const { goals: readingGoals, refetch: refetchReading } = useReadingGoals();
+  const { goals: learningGoals, refetch: refetchLearning } = useLearningGoals();
+
+  const [showYearGoal, setShowYearGoal] = useState(false);
+  const [showLearningGoal, setShowLearningGoal] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const currentYear = new Date().getFullYear();
-  const target = readingGoals.find((g) => g.year === currentYear)?.target || 24;
-  const yearPct = Math.min(100, (stats.read / target) * 100);
+  const existingYearGoal = readingGoals.find((g) => g.year === currentYear);
+  const target = existingYearGoal?.target || 12;
+  const readThisYear = booksFinishedInYear(books, currentYear).length;
+  const yearPct = Math.min(100, (readThisYear / target) * 100);
+
+  const deleteLearning = async (id: string) => {
+    if (!confirm("Delete this learning goal? (Books stay in library.)")) return;
+    setBusyId(id);
+    try {
+      await api.learningGoals.delete(id);
+      refetchLearning();
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
     <BentoShell current="goals">
-      <div className="mt-2 mb-6">
-        <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: bento.inkSoft, ...display }}>
-          Goals
-        </p>
-        <h1 className="text-3xl sm:text-5xl font-bold leading-tight tracking-tight" style={display}>
-          {stats.read}/{target} so far{" "}
-          {stats.read >= target ? (
-            <span style={{ color: bento.green }}>— goal met!</span>
-          ) : (
-            <span style={{ color: bento.pink }}>— keep going.</span>
-          )}
-        </h1>
+      <div className="mt-2 mb-6 flex items-end justify-between gap-3">
+        <div>
+          <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: bento.inkSoft, ...display }}>
+            Goals · {currentYear}
+          </p>
+          <h1 className="text-3xl sm:text-5xl font-bold leading-tight tracking-tight" style={display}>
+            {readThisYear}/{target} so far{" "}
+            {readThisYear >= target ? (
+              <span style={{ color: bento.green }}>— goal met!</span>
+            ) : (
+              <span style={{ color: bento.pink }}>— keep going.</span>
+            )}
+          </h1>
+        </div>
+        <button
+          onClick={() => setShowYearGoal(true)}
+          className="px-4 py-2.5 rounded-full text-xs sm:text-sm font-semibold whitespace-nowrap"
+          style={{
+            background: bento.card,
+            border: `1px solid ${bento.ink}10`,
+            color: bento.ink,
+            ...display,
+          }}
+        >
+          Edit goal
+        </button>
       </div>
 
       <div
@@ -50,11 +85,11 @@ export default function BentoGoals() {
             Reading Goal · {currentYear}
           </p>
           <p className="text-5xl sm:text-7xl font-bold leading-none mb-1" style={display}>
-            {stats.read}
+            {readThisYear}
             <span style={{ color: bento.yellow, fontSize: "0.5em" }}> / {target}</span>
           </p>
           <p className="text-sm opacity-80 mt-2">
-            {yearPct.toFixed(0)}% of the way · {Math.max(0, target - stats.read)} to go
+            {yearPct.toFixed(0)}% of the way · {Math.max(0, target - readThisYear)} to go
           </p>
           <div className="h-3 rounded-full overflow-hidden mt-5" style={{ background: "rgba(255,255,255,0.15)" }}>
             <div
@@ -82,6 +117,7 @@ export default function BentoGoals() {
               </span>
             </h2>
             <button
+              onClick={() => setShowLearningGoal(true)}
               className="text-xs font-semibold px-3 py-1.5 rounded-full text-white"
               style={{ background: bento.pink, ...display }}
             >
@@ -91,7 +127,14 @@ export default function BentoGoals() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
             {learningGoals.map((g, i) => (
-              <GoalCard key={g.id} g={g} hue={g.color || HUES[i % HUES.length]} books={books} />
+              <GoalCard
+                key={g.id}
+                g={g}
+                hue={g.color || HUES[i % HUES.length]}
+                books={books}
+                busy={busyId === g.id}
+                onDelete={() => deleteLearning(g.id)}
+              />
             ))}
           </div>
         </>
@@ -102,10 +145,32 @@ export default function BentoGoals() {
           className="rounded-3xl p-8 text-center"
           style={{ background: bento.card, border: `1px dashed ${bento.ink}20`, color: bento.inkSoft }}
         >
-          <p className="text-sm italic">
-            No learning goals yet. Create one to track a multi-book project (e.g. &ldquo;all of Calvino&rdquo;).
+          <p className="text-sm italic mb-3">
+            No learning goals yet. Track a multi-book project (e.g. &ldquo;all of Calvino&rdquo;).
           </p>
+          <button
+            onClick={() => setShowLearningGoal(true)}
+            className="px-4 py-2 rounded-full text-xs font-semibold text-white"
+            style={{ background: bento.pink, ...display }}
+          >
+            + New learning goal
+          </button>
         </div>
+      )}
+
+      {showYearGoal && (
+        <SetReadingGoalModal
+          year={currentYear}
+          current={existingYearGoal ? { id: existingYearGoal.id, target: existingYearGoal.target } : undefined}
+          onClose={() => setShowYearGoal(false)}
+          onSuccess={() => refetchReading()}
+        />
+      )}
+      {showLearningGoal && (
+        <AddLearningGoalModal
+          onClose={() => setShowLearningGoal(false)}
+          onSuccess={() => refetchLearning()}
+        />
       )}
     </BentoShell>
   );
@@ -115,10 +180,14 @@ function GoalCard({
   g,
   hue,
   books,
+  busy,
+  onDelete,
 }: {
   g: LibraryLearningGoal;
   hue: string;
   books: MockBook[];
+  busy?: boolean;
+  onDelete?: () => void;
 }) {
   // Naively match books to a goal by topic substring of the goal name —
   // good enough for a preview. The real /api/learning-goal-books join would
@@ -182,13 +251,25 @@ function GoalCard({
         </div>
       )}
 
-      <Link
-        href="/mockups/1/list"
-        className="block mt-4 text-xs font-semibold"
-        style={{ color: hue, ...display }}
-      >
-        Manage books →
-      </Link>
+      <div className="flex items-center justify-between mt-4">
+        <Link
+          href="/mockups/1/list"
+          className="text-xs font-semibold"
+          style={{ color: hue, ...display }}
+        >
+          Manage books →
+        </Link>
+        {onDelete && (
+          <button
+            onClick={onDelete}
+            disabled={busy}
+            className="text-xs font-semibold disabled:opacity-50"
+            style={{ color: bento.inkSoft, ...display }}
+          >
+            Delete
+          </button>
+        )}
+      </div>
     </article>
   );
 }

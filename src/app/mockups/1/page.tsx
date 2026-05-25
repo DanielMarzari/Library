@@ -1,18 +1,21 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { BentoShell, bento, display } from "./theme";
-import { useBooks, useStats, useReadingGoals } from "./useLibraryData";
+import { useBooks, useStats, useReadingGoals, booksFinishedInYear } from "./useLibraryData";
+import { AddBookModal, LogProgressModal } from "./modals";
 import type { MockBook } from "../data";
 
-// Mockup 1 — Bento Pop · Dashboard (mobile-first)
-// Reads from the real /api/* routes when a session is present; falls back to
-// the static mock data otherwise.
+// Mockup 1 — Bento Pop · Dashboard
 
 export default function BentoDashboard() {
-  const { books, loading, usingMock } = useBooks();
+  const { books, loading, usingMock, refetch } = useBooks();
   const stats = useStats(books);
-  const { goals } = useReadingGoals();
+  const { goals, refetch: refetchGoals } = useReadingGoals();
+
+  const [showAdd, setShowAdd] = useState(false);
+  const [showLog, setShowLog] = useState<MockBook | null>(null);
 
   const reading = books.filter((b) => b.status === "reading");
   const featured = reading[0];
@@ -20,13 +23,14 @@ export default function BentoDashboard() {
   const queued = books.filter((b) => b.status === "not_read");
   const topics = Array.from(new Set(books.flatMap((b) => b.topics))).slice(0, 16);
 
+  // Year-aware reading goal: count books finished THIS year, not all-time
   const currentYear = new Date().getFullYear();
-  const target = goals.find((g) => g.year === currentYear)?.target || 24;
-  const goalPct = Math.min(100, (stats.read / target) * 100);
+  const target = goals.find((g) => g.year === currentYear)?.target || 12;
+  const readThisYear = booksFinishedInYear(books, currentYear).length;
+  const goalPct = Math.min(100, (readThisYear / target) * 100);
 
   return (
     <BentoShell current="home">
-      {/* Loading hint — only on first paint, replaced by real data on hydrate */}
       {loading && (
         <div
           className="mb-3 mt-2 text-xs px-3 py-1.5 rounded-full inline-flex items-center gap-2"
@@ -63,62 +67,112 @@ export default function BentoDashboard() {
           >
             {stats.pagesRead.toLocaleString()} pages
           </span>{" "}
-          <span style={{ color: bento.inkSoft }}>this year.</span>
+          <span style={{ color: bento.inkSoft }}>across {stats.read} books.</span>
         </h1>
       </div>
 
       <div className="grid grid-cols-12 gap-3 sm:gap-4 md:auto-rows-[140px]">
         {/* Currently reading hero */}
-        {featured && (
-          <Link
-            href={`/mockups/1/book?id=${encodeURIComponent(featured.id)}`}
-            className="col-span-12 md:col-span-6 md:row-span-4 rounded-3xl p-5 sm:p-6 relative overflow-hidden block"
-            style={{ background: bento.ink, color: bento.bg, minHeight: "260px" }}
+        {featured ? (
+          <div
+            className="col-span-12 md:col-span-6 md:row-span-4 rounded-3xl p-5 sm:p-6 relative overflow-hidden"
+            style={{ background: bento.ink, color: bento.bg, minHeight: "320px" }}
           >
             <div className="absolute -right-12 -bottom-12 w-64 h-64 rounded-full opacity-30" style={{ background: bento.pink, filter: "blur(40px)" }} />
             <div className="absolute -left-12 -top-12 w-48 h-48 rounded-full opacity-30" style={{ background: bento.yellow, filter: "blur(30px)" }} />
-            <div className="relative h-full flex gap-4 sm:gap-5">
-              {featured.cover ? (
-                <img
-                  src={featured.cover}
-                  alt={featured.title}
-                  className="w-24 sm:w-32 aspect-[2/3] object-cover rounded-xl shadow-2xl flex-shrink-0"
-                />
-              ) : (
-                <CoverFallback book={featured} className="w-24 sm:w-32" />
-              )}
-              <div className="flex-1 flex flex-col min-w-0">
-                <p className="text-[10px] sm:text-xs uppercase tracking-wider opacity-60 mb-1.5" style={display}>
-                  Now reading
-                </p>
-                <p className="text-xl sm:text-2xl md:text-3xl font-bold leading-tight" style={display}>
-                  {featured.title}
-                </p>
-                <p className="opacity-70 mt-1 text-sm sm:text-base">{featured.author}</p>
-                {featured.progress !== undefined && (
-                  <div className="mt-auto pt-3">
-                    <div className="flex justify-between text-xs sm:text-sm mb-2">
-                      <span>
-                        Page {Math.round((featured.pages * featured.progress) / 100)} of {featured.pages}
-                      </span>
-                      <span className="font-bold" style={{ color: bento.yellow }}>
-                        {featured.progress}%
-                      </span>
-                    </div>
-                    <div className="h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.15)" }}>
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${featured.progress}%`,
-                          background: `linear-gradient(90deg, ${bento.yellow}, ${bento.pink})`,
-                        }}
-                      />
-                    </div>
-                  </div>
+
+            <div className="relative h-full flex flex-col">
+              <p className="text-[10px] sm:text-xs uppercase tracking-wider opacity-60 mb-3" style={display}>
+                Now reading
+              </p>
+
+              {/* Side-by-side layout — cover keeps its 2:3 aspect; explicit width prevents squishing */}
+              <Link
+                href={`/mockups/1/book?id=${encodeURIComponent(featured.id)}`}
+                className="flex gap-4 sm:gap-5 flex-1 min-h-0"
+              >
+                {featured.cover ? (
+                  <img
+                    src={featured.cover}
+                    alt={featured.title}
+                    className="rounded-xl shadow-2xl flex-shrink-0 object-cover"
+                    style={{ width: "112px", height: "168px", aspectRatio: "2 / 3" }}
+                  />
+                ) : (
+                  <CoverFallback book={featured} style={{ width: "112px", height: "168px" }} />
                 )}
+                <div className="flex-1 min-w-0 flex flex-col">
+                  <p className="text-xl sm:text-2xl md:text-3xl font-bold leading-tight line-clamp-3" style={display}>
+                    {featured.title}
+                  </p>
+                  <p className="opacity-70 mt-1 text-sm sm:text-base line-clamp-1">{featured.author}</p>
+
+                  {featured.progress !== undefined && (
+                    <div className="mt-auto pt-3">
+                      <div className="flex justify-between text-xs sm:text-sm mb-2">
+                        <span>
+                          Page {Math.round((featured.pages * featured.progress) / 100)} of {featured.pages}
+                        </span>
+                        <span className="font-bold" style={{ color: bento.yellow }}>
+                          {featured.progress}%
+                        </span>
+                      </div>
+                      <div className="h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.15)" }}>
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${featured.progress}%`,
+                            background: `linear-gradient(90deg, ${bento.yellow}, ${bento.pink})`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Link>
+
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={() => setShowLog(featured)}
+                  className="flex-1 px-3 py-2 rounded-full text-xs font-semibold"
+                  style={{ background: bento.yellow, color: bento.ink, ...display }}
+                >
+                  ▶ Log progress
+                </button>
+                <Link
+                  href={`/mockups/1/book?id=${encodeURIComponent(featured.id)}`}
+                  className="px-3 py-2 rounded-full text-xs font-semibold"
+                  style={{ background: "rgba(255,255,255,0.15)", color: "#FFF", ...display }}
+                >
+                  Open
+                </Link>
               </div>
             </div>
-          </Link>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowAdd(true)}
+            className="col-span-12 md:col-span-6 md:row-span-4 rounded-3xl p-5 sm:p-6 flex flex-col items-center justify-center text-center"
+            style={{
+              background: bento.card,
+              border: `2px dashed ${bento.ink}20`,
+              minHeight: "260px",
+            }}
+          >
+            <p className="text-4xl mb-3">📖</p>
+            <p className="text-lg font-bold" style={display}>
+              Nothing in progress
+            </p>
+            <p className="text-sm mt-1" style={{ color: bento.inkSoft }}>
+              Start reading a book and it&apos;ll show up here.
+            </p>
+            <span
+              className="mt-4 px-4 py-2 rounded-full text-xs font-semibold text-white"
+              style={{ background: bento.pink, ...display }}
+            >
+              + Add a book
+            </span>
+          </button>
         )}
 
         {/* Stats — 3 tiles */}
@@ -133,16 +187,16 @@ export default function BentoDashboard() {
           style={{ background: bento.card, border: `1px solid ${bento.ink}10`, minHeight: "130px" }}
         >
           <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: bento.inkSoft, ...display }}>
-            Goal &apos;{String(currentYear).slice(2)}
+            Goal · {currentYear}
           </p>
           <p className="text-2xl sm:text-3xl font-bold mt-1" style={display}>
-            {stats.read}/{target}
+            {readThisYear}/{target}
           </p>
           <div className="h-2 rounded-full overflow-hidden mt-2" style={{ background: bento.ink + "10" }}>
             <div className="h-full rounded-full" style={{ width: `${goalPct}%`, background: bento.pink }} />
           </div>
           <p className="text-xs mt-2" style={{ color: bento.inkSoft }}>
-            {goalPct.toFixed(0)}% there · {target - stats.read} to go
+            {goalPct.toFixed(0)}% · {Math.max(0, target - readThisYear)} to go
           </p>
         </Link>
 
@@ -155,26 +209,32 @@ export default function BentoDashboard() {
           <p className="text-[10px] uppercase tracking-wider font-semibold mb-3" style={{ color: bento.inkSoft, ...display }}>
             Up next
           </p>
-          <div className="flex">
-            {queued.slice(0, 4).map((b, i) => (
-              <CoverThumb
-                key={b.id}
-                book={b}
-                size="w-10 sm:w-12"
-                style={{
-                  transform: `rotate(${(i - 1.5) * 4}deg)`,
-                  marginLeft: i === 0 ? 0 : "-12px",
-                  zIndex: 4 - i,
-                }}
-              />
-            ))}
-          </div>
+          {queued.length === 0 ? (
+            <p className="text-sm italic" style={{ color: bento.inkSoft }}>
+              Queue is empty.
+            </p>
+          ) : (
+            <div className="flex">
+              {queued.slice(0, 4).map((b, i) => (
+                <CoverThumb
+                  key={b.id}
+                  book={b}
+                  size="w-10 sm:w-12"
+                  style={{
+                    transform: `rotate(${(i - 1.5) * 4}deg)`,
+                    marginLeft: i === 0 ? 0 : "-12px",
+                    zIndex: 4 - i,
+                  }}
+                />
+              ))}
+            </div>
+          )}
           <p className="text-xs mt-3" style={{ color: bento.inkSoft }}>
             {queued.length} on the queue
           </p>
         </Link>
 
-        {/* Recently read — wide row */}
+        {/* Recently read */}
         <div
           className="col-span-12 md:row-span-3 rounded-3xl p-5 sm:p-6"
           style={{ background: bento.card, border: `1px solid ${bento.ink}10` }}
@@ -187,44 +247,50 @@ export default function BentoDashboard() {
               See all →
             </Link>
           </div>
-          <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-8 gap-2.5 sm:gap-3">
-            {recent.map((b) => (
-              <Link
-                href={`/mockups/1/book?id=${encodeURIComponent(b.id)}`}
-                key={b.id}
-                className="group block"
-              >
-                <div className="relative">
-                  {b.cover ? (
-                    <img
-                      src={b.cover}
-                      alt={b.title}
-                      className="w-full aspect-[2/3] object-cover rounded-xl shadow-lg group-hover:scale-105 transition-transform"
-                    />
-                  ) : (
-                    <CoverFallback book={b} className="w-full" />
-                  )}
-                  {b.rating === 5 && (
-                    <div
-                      className="absolute -top-1.5 -right-1.5 w-6 h-6 sm:w-7 sm:h-7 rounded-full grid place-items-center text-xs font-bold shadow"
-                      style={{ background: bento.yellow }}
-                    >
-                      ★
-                    </div>
-                  )}
-                </div>
-                <p className="text-[11px] sm:text-xs font-semibold mt-2 line-clamp-1" style={display}>
-                  {b.title}
-                </p>
-                <p className="text-[10px]" style={{ color: bento.inkSoft }}>
-                  {b.author}
-                </p>
-              </Link>
-            ))}
-          </div>
+          {recent.length === 0 ? (
+            <p className="text-sm italic" style={{ color: bento.inkSoft }}>
+              Nothing finished yet. Mark a book read to populate this.
+            </p>
+          ) : (
+            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-8 gap-2.5 sm:gap-3">
+              {recent.map((b) => (
+                <Link
+                  href={`/mockups/1/book?id=${encodeURIComponent(b.id)}`}
+                  key={b.id}
+                  className="group block"
+                >
+                  <div className="relative">
+                    {b.cover ? (
+                      <img
+                        src={b.cover}
+                        alt={b.title}
+                        className="w-full aspect-[2/3] object-cover rounded-xl shadow-lg group-hover:scale-105 transition-transform"
+                      />
+                    ) : (
+                      <CoverFallback book={b} className="w-full" />
+                    )}
+                    {b.rating === 5 && (
+                      <div
+                        className="absolute -top-1.5 -right-1.5 w-6 h-6 sm:w-7 sm:h-7 rounded-full grid place-items-center text-xs font-bold shadow"
+                        style={{ background: bento.yellow }}
+                      >
+                        ★
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[11px] sm:text-xs font-semibold mt-2 line-clamp-1" style={display}>
+                    {b.title}
+                  </p>
+                  <p className="text-[10px]" style={{ color: bento.inkSoft }}>
+                    {b.author}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Interests / tag cloud */}
+        {/* Interests */}
         <div
           className="col-span-12 md:col-span-6 md:row-span-2 rounded-3xl p-5 sm:p-6"
           style={{ background: bento.green, color: bento.ink }}
@@ -253,44 +319,74 @@ export default function BentoDashboard() {
           </div>
         </div>
 
-        {/* Streak */}
-        <div
-          className="col-span-6 md:col-span-3 md:row-span-2 rounded-3xl p-4 sm:p-5 flex flex-col justify-between"
+        {/* Add book */}
+        <button
+          onClick={() => setShowAdd(true)}
+          className="col-span-6 md:col-span-3 md:row-span-2 rounded-3xl p-4 sm:p-5 flex flex-col justify-between text-left"
           style={{ background: bento.pink, color: "#FFF", minHeight: "130px" }}
         >
           <p className="text-[10px] uppercase tracking-wider font-semibold" style={display}>
-            Streak
+            Quick add
           </p>
           <div>
             <p className="text-4xl sm:text-5xl font-bold leading-none" style={display}>
-              {Math.max(0, stats.reading * 4)}
+              +
             </p>
-            <p className="text-xs sm:text-sm opacity-90 mt-1">days reading 🔥</p>
+            <p className="text-xs sm:text-sm opacity-90 mt-2">
+              Search, scan ISBN, or DOI
+            </p>
           </div>
-        </div>
+        </button>
 
-        {/* Surprise me */}
+        {/* Random pick / surprise */}
         <Link
           href="/mockups/1/recommendations"
           className="col-span-6 md:col-span-3 md:row-span-2 rounded-3xl p-4 sm:p-5 flex flex-col justify-between"
           style={{ background: bento.lilac, color: bento.ink, minHeight: "130px" }}
         >
           <p className="text-[10px] uppercase tracking-wider font-semibold" style={display}>
-            Surprise me
+            Recommendations
           </p>
           <div>
             <p className="text-base sm:text-lg font-bold leading-tight" style={display}>
-              Pick one from your queue
+              See what people are recommending
             </p>
-            <button
-              className="mt-2.5 px-3 py-1.5 rounded-full text-xs font-semibold"
+            <span
+              className="inline-block mt-2.5 px-3 py-1.5 rounded-full text-xs font-semibold"
               style={{ background: bento.ink, color: bento.bg }}
             >
-              Roll →
-            </button>
+              View →
+            </span>
           </div>
         </Link>
       </div>
+
+      {/* Floating FAB on mobile */}
+      <button
+        onClick={() => setShowAdd(true)}
+        className="md:hidden fixed bottom-24 right-5 w-14 h-14 rounded-full shadow-xl grid place-items-center text-2xl font-bold z-30"
+        style={{ background: bento.pink, color: "#FFF", boxShadow: `0 10px 30px -5px ${bento.pink}aa`, ...display }}
+        aria-label="Add book"
+      >
+        +
+      </button>
+
+      {showAdd && (
+        <AddBookModal
+          onClose={() => setShowAdd(false)}
+          onSuccess={() => {
+            refetch();
+            refetchGoals();
+          }}
+        />
+      )}
+      {showLog && (
+        <LogProgressModal
+          book={showLog}
+          onClose={() => setShowLog(null)}
+          onSuccess={() => refetch()}
+        />
+      )}
     </BentoShell>
   );
 }
@@ -338,13 +434,22 @@ function StatTile({
   );
 }
 
-function CoverFallback({ book, className }: { book: MockBook; className?: string }) {
+function CoverFallback({
+  book,
+  className,
+  style,
+}: {
+  book: MockBook;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
   return (
     <div
-      className={`aspect-[2/3] flex flex-col items-center justify-center p-2 text-center rounded-xl ${className || ""}`}
+      className={`flex flex-col items-center justify-center p-2 text-center rounded-xl ${className || "aspect-[2/3]"} flex-shrink-0`}
       style={{
         background: `linear-gradient(135deg, ${bento.lilac}, ${bento.pink})`,
         color: "#FFF",
+        ...style,
       }}
     >
       <span className="text-[10px] font-bold leading-tight line-clamp-3" style={display}>

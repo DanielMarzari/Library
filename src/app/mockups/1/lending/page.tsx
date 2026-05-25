@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
+import { api } from "@/lib/api-client";
 import { BentoShell, bento, display } from "../theme";
 import { useBooks, useLending, type LibraryLending } from "../useLibraryData";
+import { LendBookModal } from "../modals";
 import type { MockBook } from "../../data";
 
 const HUES = [bento.pink, bento.green, bento.yellow, bento.lilac, bento.blue, bento.orange];
@@ -29,7 +32,9 @@ function daysBetween(a: string, b?: string | null): number {
 
 export default function BentoLending() {
   const { books } = useBooks();
-  const { lending, loading } = useLending();
+  const { lending, loading, refetch } = useLending();
+  const [showLend, setShowLend] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const byId = new Map(books.map((b) => [b.id, b]));
 
   const active = lending.filter((l) => !l.returned_date);
@@ -38,6 +43,30 @@ export default function BentoLending() {
   const overdue = active.filter(
     (l) => l.due_date && new Date(l.due_date).getTime() < Date.now()
   );
+
+  const markReturned = async (l: LibraryLending) => {
+    if (busyId) return;
+    setBusyId(l.id);
+    try {
+      await api.lending.update(l.id, {
+        returned_date: new Date().toISOString().split("T")[0],
+      });
+      refetch();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const deleteLoan = async (l: LibraryLending) => {
+    if (!confirm("Delete this lending record?")) return;
+    setBusyId(l.id);
+    try {
+      await api.lending.delete(l.id);
+      refetch();
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
     <BentoShell current="lending">
@@ -57,6 +86,7 @@ export default function BentoLending() {
           </h1>
         </div>
         <button
+          onClick={() => setShowLend(true)}
           className="px-4 py-2.5 rounded-full text-xs sm:text-sm font-semibold text-white whitespace-nowrap"
           style={{ background: bento.pink, ...display }}
         >
@@ -95,7 +125,16 @@ export default function BentoLending() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-8">
             {active.map((l, i) => (
-              <LoanCard key={l.id} l={l} book={byId.get(l.book_id)} hue={HUES[i % HUES.length]} active />
+              <LoanCard
+                key={l.id}
+                l={l}
+                book={byId.get(l.book_id)}
+                hue={HUES[i % HUES.length]}
+                active
+                busy={busyId === l.id}
+                onReturn={() => markReturned(l)}
+                onDelete={() => deleteLoan(l)}
+              />
             ))}
           </div>
         </>
@@ -122,10 +161,25 @@ export default function BentoLending() {
           className="rounded-3xl p-8 text-center mt-4"
           style={{ background: bento.card, border: `1px dashed ${bento.ink}20`, color: bento.inkSoft }}
         >
-          <p className="text-sm italic">
-            No lending records yet. Hit &ldquo;Lend a book&rdquo; to add one.
+          <p className="text-sm italic mb-3">
+            No lending records yet.
           </p>
+          <button
+            onClick={() => setShowLend(true)}
+            className="px-4 py-2 rounded-full text-xs font-semibold text-white"
+            style={{ background: bento.pink, ...display }}
+          >
+            + Lend a book
+          </button>
         </div>
+      )}
+
+      {showLend && (
+        <LendBookModal
+          books={books}
+          onClose={() => setShowLend(false)}
+          onSuccess={() => refetch()}
+        />
       )}
     </BentoShell>
   );
@@ -136,11 +190,17 @@ function LoanCard({
   book,
   hue,
   active,
+  busy,
+  onReturn,
+  onDelete,
 }: {
   l: LibraryLending;
   book?: MockBook;
   hue: string;
   active?: boolean;
+  busy?: boolean;
+  onReturn?: () => void;
+  onDelete?: () => void;
 }) {
   const overdue = !!(l.due_date && new Date(l.due_date).getTime() < Date.now());
   const days = daysBetween(l.lent_date);
@@ -224,21 +284,25 @@ function LoanCard({
         {active && (
           <div className="flex gap-2">
             <button
-              className="px-3 py-1.5 rounded-full text-xs font-semibold flex-1"
+              onClick={onReturn}
+              disabled={busy}
+              className="px-3 py-1.5 rounded-full text-xs font-semibold flex-1 disabled:opacity-50"
               style={{ background: bento.green, color: bento.ink, ...display }}
             >
-              ✓ Returned
+              {busy ? "..." : "✓ Returned"}
             </button>
             <button
-              className="px-3 py-1.5 rounded-full text-xs font-semibold"
+              onClick={onDelete}
+              disabled={busy}
+              className="px-3 py-1.5 rounded-full text-xs font-semibold disabled:opacity-50"
               style={{
                 background: bento.bg,
-                color: bento.inkSoft,
-                border: `1px solid ${bento.ink}10`,
+                color: bento.pink,
+                border: `1px solid ${bento.pink}33`,
                 ...display,
               }}
             >
-              Edit
+              Delete
             </button>
           </div>
         )}

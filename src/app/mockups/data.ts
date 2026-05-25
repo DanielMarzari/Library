@@ -17,6 +17,9 @@ export interface MockBook {
   cover_url?: string;
   has_cover_blob?: boolean;
   current_page?: number;
+  complete_date?: string;
+  start_date?: string;
+  favorite?: boolean;
 }
 
 export const MOCK_BOOKS: MockBook[] = [
