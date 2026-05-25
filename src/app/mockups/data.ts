@@ -13,6 +13,10 @@ export interface MockBook {
   topics: string[];
   source?: string;
   progress?: number; // 0-100, for reading status
+  // Extra real-data fields surfaced when available (auth/borrowers wire-up).
+  cover_url?: string;
+  has_cover_blob?: boolean;
+  current_page?: number;
 }
 
 export const MOCK_BOOKS: MockBook[] = [

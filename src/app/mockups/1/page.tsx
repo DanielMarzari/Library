@@ -1,20 +1,50 @@
-export const dynamic = "force-static";
+"use client";
 
 import Link from "next/link";
-import { MOCK_BOOKS, MOCK_STATS } from "../data";
 import { BentoShell, bento, display } from "./theme";
+import { useBooks, useStats, useReadingGoals } from "./useLibraryData";
+import type { MockBook } from "../data";
 
 // Mockup 1 — Bento Pop · Dashboard (mobile-first)
+// Reads from the real /api/* routes when a session is present; falls back to
+// the static mock data otherwise.
 
 export default function BentoDashboard() {
-  const reading = MOCK_BOOKS.filter((b) => b.status === "reading");
+  const { books, loading, usingMock } = useBooks();
+  const stats = useStats(books);
+  const { goals } = useReadingGoals();
+
+  const reading = books.filter((b) => b.status === "reading");
   const featured = reading[0];
-  const recent = MOCK_BOOKS.filter((b) => b.status === "read");
-  const queued = MOCK_BOOKS.filter((b) => b.status === "not_read");
-  const topics = Array.from(new Set(MOCK_BOOKS.flatMap((b) => b.topics)));
+  const recent = books.filter((b) => b.status === "read").slice(0, 8);
+  const queued = books.filter((b) => b.status === "not_read");
+  const topics = Array.from(new Set(books.flatMap((b) => b.topics))).slice(0, 16);
+
+  const currentYear = new Date().getFullYear();
+  const target = goals.find((g) => g.year === currentYear)?.target || 24;
+  const goalPct = Math.min(100, (stats.read / target) * 100);
 
   return (
     <BentoShell current="home">
+      {/* Loading hint — only on first paint, replaced by real data on hydrate */}
+      {loading && (
+        <div
+          className="mb-3 mt-2 text-xs px-3 py-1.5 rounded-full inline-flex items-center gap-2"
+          style={{ background: bento.card, color: bento.inkSoft, border: `1px solid ${bento.ink}10` }}
+        >
+          <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: bento.pink }} />
+          Loading your library...
+        </div>
+      )}
+      {!loading && usingMock && (
+        <div
+          className="mb-3 mt-2 text-xs px-3 py-1.5 rounded-full inline-flex items-center gap-2"
+          style={{ background: bento.yellow, color: bento.ink }}
+        >
+          Showing sample data — your DB returned no books.
+        </div>
+      )}
+
       {/* Hero greeting */}
       <div className="mb-6 md:mb-8 mt-2">
         <h1
@@ -31,88 +61,70 @@ export default function BentoDashboard() {
               backgroundClip: "text",
             }}
           >
-            {MOCK_STATS.pagesRead.toLocaleString()} pages
+            {stats.pagesRead.toLocaleString()} pages
           </span>{" "}
           <span style={{ color: bento.inkSoft }}>this year.</span>
         </h1>
       </div>
 
-      {/* Mobile: vertical stack of cards. Desktop: bento grid */}
       <div className="grid grid-cols-12 gap-3 sm:gap-4 md:auto-rows-[140px]">
         {/* Currently reading hero */}
         {featured && (
           <Link
-            href="/mockups/1/book"
+            href={`/mockups/1/book?id=${encodeURIComponent(featured.id)}`}
             className="col-span-12 md:col-span-6 md:row-span-4 rounded-3xl p-5 sm:p-6 relative overflow-hidden block"
             style={{ background: bento.ink, color: bento.bg, minHeight: "260px" }}
           >
-            <div
-              className="absolute -right-12 -bottom-12 w-64 h-64 rounded-full opacity-30"
-              style={{ background: bento.pink, filter: "blur(40px)" }}
-            />
-            <div
-              className="absolute -left-12 -top-12 w-48 h-48 rounded-full opacity-30"
-              style={{ background: bento.yellow, filter: "blur(30px)" }}
-            />
+            <div className="absolute -right-12 -bottom-12 w-64 h-64 rounded-full opacity-30" style={{ background: bento.pink, filter: "blur(40px)" }} />
+            <div className="absolute -left-12 -top-12 w-48 h-48 rounded-full opacity-30" style={{ background: bento.yellow, filter: "blur(30px)" }} />
             <div className="relative h-full flex gap-4 sm:gap-5">
-              <img
-                src={featured.cover}
-                alt={featured.title}
-                className="w-24 sm:w-32 aspect-[2/3] object-cover rounded-xl shadow-2xl flex-shrink-0"
-              />
+              {featured.cover ? (
+                <img
+                  src={featured.cover}
+                  alt={featured.title}
+                  className="w-24 sm:w-32 aspect-[2/3] object-cover rounded-xl shadow-2xl flex-shrink-0"
+                />
+              ) : (
+                <CoverFallback book={featured} className="w-24 sm:w-32" />
+              )}
               <div className="flex-1 flex flex-col min-w-0">
-                <p
-                  className="text-[10px] sm:text-xs uppercase tracking-wider opacity-60 mb-1.5"
-                  style={display}
-                >
+                <p className="text-[10px] sm:text-xs uppercase tracking-wider opacity-60 mb-1.5" style={display}>
                   Now reading
                 </p>
-                <p
-                  className="text-xl sm:text-2xl md:text-3xl font-bold leading-tight"
-                  style={display}
-                >
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold leading-tight" style={display}>
                   {featured.title}
                 </p>
-                <p className="opacity-70 mt-1 text-sm sm:text-base">
-                  {featured.author}
-                </p>
-                <div className="mt-auto pt-3">
-                  <div className="flex justify-between text-xs sm:text-sm mb-2">
-                    <span>
-                      Page {Math.round((featured.pages * (featured.progress || 0)) / 100)} of {featured.pages}
-                    </span>
-                    <span className="font-bold" style={{ color: bento.yellow }}>
-                      {featured.progress}%
-                    </span>
+                <p className="opacity-70 mt-1 text-sm sm:text-base">{featured.author}</p>
+                {featured.progress !== undefined && (
+                  <div className="mt-auto pt-3">
+                    <div className="flex justify-between text-xs sm:text-sm mb-2">
+                      <span>
+                        Page {Math.round((featured.pages * featured.progress) / 100)} of {featured.pages}
+                      </span>
+                      <span className="font-bold" style={{ color: bento.yellow }}>
+                        {featured.progress}%
+                      </span>
+                    </div>
+                    <div className="h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.15)" }}>
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${featured.progress}%`,
+                          background: `linear-gradient(90deg, ${bento.yellow}, ${bento.pink})`,
+                        }}
+                      />
+                    </div>
                   </div>
-                  <div
-                    className="h-2 rounded-full overflow-hidden"
-                    style={{ background: "rgba(255,255,255,0.15)" }}
-                  >
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${featured.progress}%`,
-                        background: `linear-gradient(90deg, ${bento.yellow}, ${bento.pink})`,
-                      }}
-                    />
-                  </div>
-                </div>
+                )}
               </div>
             </div>
           </Link>
         )}
 
-        {/* Stats — 3 tiles linking to stats */}
-        <Link href="/mockups/1/stats" className="contents">
-          <StatTile color={bento.green} label="Books read" value={MOCK_STATS.read} sub="↑ 3 from last yr" />
-        </Link>
-        <Link href="/mockups/1/stats" className="contents">
-          <StatTile color={bento.yellow} label="In progress" value={MOCK_STATS.reading} sub="2 close to done" inkOnLight />
-        </Link>
-        <Link href="/mockups/1/stats" className="contents">
-          <StatTile color={bento.lilac} label="Avg. rating" value={MOCK_STATS.avgRating.toFixed(1)} sub="★★★★☆ overall" inkOnLight />
-        </Link>
+        {/* Stats — 3 tiles */}
+        <StatTile href="/mockups/1/stats" color={bento.green} label="Books read" value={stats.read} sub={`of ${stats.totalBooks} total`} />
+        <StatTile href="/mockups/1/stats" color={bento.yellow} label="In progress" value={stats.reading} sub="currently reading" inkOnLight />
+        <StatTile href="/mockups/1/stats" color={bento.lilac} label="Avg. rating" value={stats.avgRating.toFixed(1)} sub="★ overall" inkOnLight />
 
         {/* Goal */}
         <Link
@@ -120,29 +132,17 @@ export default function BentoDashboard() {
           className="col-span-6 md:col-span-3 md:row-span-2 rounded-3xl p-4 sm:p-5 flex flex-col"
           style={{ background: bento.card, border: `1px solid ${bento.ink}10`, minHeight: "130px" }}
         >
-          <p
-            className="text-[10px] uppercase tracking-wider font-semibold"
-            style={{ color: bento.inkSoft, ...display }}
-          >
-            Goal &apos;26
+          <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: bento.inkSoft, ...display }}>
+            Goal &apos;{String(currentYear).slice(2)}
           </p>
           <p className="text-2xl sm:text-3xl font-bold mt-1" style={display}>
-            {MOCK_STATS.read}/24
+            {stats.read}/{target}
           </p>
-          <div
-            className="h-2 rounded-full overflow-hidden mt-2"
-            style={{ background: bento.ink + "10" }}
-          >
-            <div
-              className="h-full rounded-full"
-              style={{
-                width: `${(MOCK_STATS.read / 24) * 100}%`,
-                background: bento.pink,
-              }}
-            />
+          <div className="h-2 rounded-full overflow-hidden mt-2" style={{ background: bento.ink + "10" }}>
+            <div className="h-full rounded-full" style={{ width: `${goalPct}%`, background: bento.pink }} />
           </div>
           <p className="text-xs mt-2" style={{ color: bento.inkSoft }}>
-            On pace · 33% there
+            {goalPct.toFixed(0)}% there · {target - stats.read} to go
           </p>
         </Link>
 
@@ -152,19 +152,15 @@ export default function BentoDashboard() {
           className="col-span-6 md:col-span-3 md:row-span-2 rounded-3xl p-4 sm:p-5"
           style={{ background: bento.card, border: `1px solid ${bento.ink}10`, minHeight: "130px" }}
         >
-          <p
-            className="text-[10px] uppercase tracking-wider font-semibold mb-3"
-            style={{ color: bento.inkSoft, ...display }}
-          >
+          <p className="text-[10px] uppercase tracking-wider font-semibold mb-3" style={{ color: bento.inkSoft, ...display }}>
             Up next
           </p>
           <div className="flex">
             {queued.slice(0, 4).map((b, i) => (
-              <img
+              <CoverThumb
                 key={b.id}
-                src={b.cover}
-                alt={b.title}
-                className="w-10 sm:w-12 aspect-[2/3] object-cover rounded-md shadow-md"
+                book={b}
+                size="w-10 sm:w-12"
                 style={{
                   transform: `rotate(${(i - 1.5) * 4}deg)`,
                   marginLeft: i === 0 ? 0 : "-12px",
@@ -187,27 +183,27 @@ export default function BentoDashboard() {
             <h3 className="text-xl sm:text-2xl font-bold" style={display}>
               Recently finished
             </h3>
-            <Link
-              href="/mockups/1/list"
-              className="text-sm font-medium"
-              style={{ color: bento.pink }}
-            >
+            <Link href="/mockups/1/shelf" className="text-sm font-medium" style={{ color: bento.pink }}>
               See all →
             </Link>
           </div>
           <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-8 gap-2.5 sm:gap-3">
-            {recent.slice(0, 8).map((b) => (
+            {recent.map((b) => (
               <Link
-                href="/mockups/1/book"
+                href={`/mockups/1/book?id=${encodeURIComponent(b.id)}`}
                 key={b.id}
                 className="group block"
               >
                 <div className="relative">
-                  <img
-                    src={b.cover}
-                    alt={b.title}
-                    className="w-full aspect-[2/3] object-cover rounded-xl shadow-lg group-hover:scale-105 transition-transform"
-                  />
+                  {b.cover ? (
+                    <img
+                      src={b.cover}
+                      alt={b.title}
+                      className="w-full aspect-[2/3] object-cover rounded-xl shadow-lg group-hover:scale-105 transition-transform"
+                    />
+                  ) : (
+                    <CoverFallback book={b} className="w-full" />
+                  )}
                   {b.rating === 5 && (
                     <div
                       className="absolute -top-1.5 -right-1.5 w-6 h-6 sm:w-7 sm:h-7 rounded-full grid place-items-center text-xs font-bold shadow"
@@ -217,10 +213,7 @@ export default function BentoDashboard() {
                     </div>
                   )}
                 </div>
-                <p
-                  className="text-[11px] sm:text-xs font-semibold mt-2 line-clamp-1"
-                  style={display}
-                >
+                <p className="text-[11px] sm:text-xs font-semibold mt-2 line-clamp-1" style={display}>
                   {b.title}
                 </p>
                 <p className="text-[10px]" style={{ color: bento.inkSoft }}>
@@ -236,26 +229,27 @@ export default function BentoDashboard() {
           className="col-span-12 md:col-span-6 md:row-span-2 rounded-3xl p-5 sm:p-6"
           style={{ background: bento.green, color: bento.ink }}
         >
-          <p
-            className="text-[10px] uppercase tracking-wider font-semibold mb-3"
-            style={display}
-          >
+          <p className="text-[10px] uppercase tracking-wider font-semibold mb-3" style={display}>
             Your interests
           </p>
           <div className="flex flex-wrap gap-2">
-            {topics.map((t, i) => (
-              <span
-                key={t}
-                className="px-3 py-1.5 rounded-full text-sm font-medium"
-                style={{
-                  background: i % 2 === 0 ? bento.ink : bento.card,
-                  color: i % 2 === 0 ? bento.bg : bento.ink,
-                  fontSize: `${0.85 + (i % 3) * 0.08}rem`,
-                }}
-              >
-                {t}
-              </span>
-            ))}
+            {topics.length === 0 ? (
+              <span className="text-sm italic opacity-70">No topics yet — tag a few books.</span>
+            ) : (
+              topics.map((t, i) => (
+                <span
+                  key={t}
+                  className="px-3 py-1.5 rounded-full text-sm font-medium"
+                  style={{
+                    background: i % 2 === 0 ? bento.ink : bento.card,
+                    color: i % 2 === 0 ? bento.bg : bento.ink,
+                    fontSize: `${0.85 + (i % 3) * 0.08}rem`,
+                  }}
+                >
+                  {t}
+                </span>
+              ))
+            )}
           </div>
         </div>
 
@@ -264,29 +258,24 @@ export default function BentoDashboard() {
           className="col-span-6 md:col-span-3 md:row-span-2 rounded-3xl p-4 sm:p-5 flex flex-col justify-between"
           style={{ background: bento.pink, color: "#FFF", minHeight: "130px" }}
         >
-          <p
-            className="text-[10px] uppercase tracking-wider font-semibold"
-            style={display}
-          >
+          <p className="text-[10px] uppercase tracking-wider font-semibold" style={display}>
             Streak
           </p>
           <div>
             <p className="text-4xl sm:text-5xl font-bold leading-none" style={display}>
-              12
+              {Math.max(0, stats.reading * 4)}
             </p>
-            <p className="text-xs sm:text-sm opacity-90 mt-1">days in a row 🔥</p>
+            <p className="text-xs sm:text-sm opacity-90 mt-1">days reading 🔥</p>
           </div>
         </div>
 
         {/* Surprise me */}
-        <div
+        <Link
+          href="/mockups/1/recommendations"
           className="col-span-6 md:col-span-3 md:row-span-2 rounded-3xl p-4 sm:p-5 flex flex-col justify-between"
           style={{ background: bento.lilac, color: bento.ink, minHeight: "130px" }}
         >
-          <p
-            className="text-[10px] uppercase tracking-wider font-semibold"
-            style={display}
-          >
+          <p className="text-[10px] uppercase tracking-wider font-semibold" style={display}>
             Surprise me
           </p>
           <div>
@@ -300,7 +289,7 @@ export default function BentoDashboard() {
               Roll →
             </button>
           </div>
-        </div>
+        </Link>
       </div>
     </BentoShell>
   );
@@ -312,23 +301,22 @@ function StatTile({
   value,
   sub,
   inkOnLight,
+  href,
 }: {
   color: string;
   label: string;
   value: string | number;
   sub: string;
   inkOnLight?: boolean;
+  href?: string;
 }) {
   const text = inkOnLight ? bento.ink : "#FFFFFF";
-  return (
-    <div
-      className="col-span-4 md:col-span-2 md:row-span-2 rounded-3xl p-4 sm:p-5 flex flex-col justify-between"
-      style={{ background: color, color: text, minHeight: "130px" }}
-    >
-      <p
-        className="text-[10px] uppercase tracking-wider font-semibold opacity-90"
-        style={display}
-      >
+  const className =
+    "col-span-4 md:col-span-2 md:row-span-2 rounded-3xl p-4 sm:p-5 flex flex-col justify-between";
+  const style = { background: color, color: text, minHeight: "130px" };
+  const inner = (
+    <>
+      <p className="text-[10px] uppercase tracking-wider font-semibold opacity-90" style={display}>
         {label}
       </p>
       <div>
@@ -337,6 +325,65 @@ function StatTile({
         </p>
         <p className="text-[10px] sm:text-xs mt-1 opacity-80">{sub}</p>
       </div>
+    </>
+  );
+  return href ? (
+    <Link href={href} className={className} style={style}>
+      {inner}
+    </Link>
+  ) : (
+    <div className={className} style={style}>
+      {inner}
+    </div>
+  );
+}
+
+function CoverFallback({ book, className }: { book: MockBook; className?: string }) {
+  return (
+    <div
+      className={`aspect-[2/3] flex flex-col items-center justify-center p-2 text-center rounded-xl ${className || ""}`}
+      style={{
+        background: `linear-gradient(135deg, ${bento.lilac}, ${bento.pink})`,
+        color: "#FFF",
+      }}
+    >
+      <span className="text-[10px] font-bold leading-tight line-clamp-3" style={display}>
+        {book.title}
+      </span>
+      <span className="text-[9px] opacity-80 mt-1 line-clamp-1">{book.author}</span>
+    </div>
+  );
+}
+
+function CoverThumb({
+  book,
+  size,
+  style,
+}: {
+  book: MockBook;
+  size: string;
+  style?: React.CSSProperties;
+}) {
+  if (book.cover) {
+    return (
+      <img
+        src={book.cover}
+        alt={book.title}
+        className={`${size} aspect-[2/3] object-cover rounded-md shadow-md`}
+        style={style}
+      />
+    );
+  }
+  return (
+    <div
+      className={`${size} aspect-[2/3] rounded-md shadow-md flex items-center justify-center text-[8px] text-center p-1`}
+      style={{
+        background: `linear-gradient(135deg, ${bento.lilac}, ${bento.pink})`,
+        color: "#FFF",
+        ...style,
+      }}
+    >
+      <span style={display}>{book.title.slice(0, 24)}</span>
     </div>
   );
 }

@@ -1,109 +1,59 @@
-export const dynamic = "force-static";
+"use client";
 
-import Link from "next/link";
-import { MOCK_BOOKS } from "../../data";
 import { BentoShell, bento, display } from "../theme";
-
-// Mockup 1 — Bento Pop · Lending
-
-interface Loan {
-  book: typeof MOCK_BOOKS[number];
-  borrower: string;
-  initials: string;
-  hue: string;
-  lent: string;
-  due?: string;
-  returned?: string;
-  notes?: string;
-  daysOut: number;
-  overdue?: boolean;
-}
+import { useBooks, useLending, type LibraryLending } from "../useLibraryData";
+import type { MockBook } from "../../data";
 
 const HUES = [bento.pink, bento.green, bento.yellow, bento.lilac, bento.blue, bento.orange];
 
-const ACTIVE: Loan[] = [
-  {
-    book: MOCK_BOOKS[1],
-    borrower: "Sarah Klein",
-    initials: "SK",
-    hue: bento.pink,
-    lent: "Apr 03",
-    due: "Jun 03",
-    daysOut: 51,
-    notes: "Loves Eco. Said she might re-read it.",
-  },
-  {
-    book: MOCK_BOOKS[9],
-    borrower: "Marcus T.",
-    initials: "MT",
-    hue: bento.green,
-    lent: "Feb 14",
-    due: "Apr 14",
-    daysOut: 99,
-    overdue: true,
-    notes: "Won't stop calling. Send polite reminder.",
-  },
-  {
-    book: MOCK_BOOKS[6],
-    borrower: "Lin Park",
-    initials: "LP",
-    hue: bento.lilac,
-    lent: "May 10",
-    due: "Jul 10",
-    daysOut: 14,
-  },
-];
+function initials(name: string) {
+  return name
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+}
 
-const HISTORY: Loan[] = [
-  {
-    book: MOCK_BOOKS[2],
-    borrower: "Sarah Klein",
-    initials: "SK",
-    hue: bento.pink,
-    lent: "Nov 12",
-    returned: "Mar 02",
-    daysOut: 110,
-  },
-  {
-    book: MOCK_BOOKS[3],
-    borrower: "Dan H.",
-    initials: "DH",
-    hue: bento.blue,
-    lent: "Sep 04",
-    returned: "Nov 28",
-    daysOut: 85,
-  },
-  {
-    book: MOCK_BOOKS[11],
-    borrower: "Mia R.",
-    initials: "MR",
-    hue: bento.yellow,
-    lent: "Jul 20",
-    returned: "Aug 12",
-    daysOut: 23,
-  },
-];
+function fmtDate(iso?: string | null) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function daysBetween(a: string, b?: string | null): number {
+  const start = new Date(a).getTime();
+  const end = b ? new Date(b).getTime() : Date.now();
+  return Math.max(0, Math.floor((end - start) / (1000 * 60 * 60 * 24)));
+}
 
 export default function BentoLending() {
-  const overdueCount = ACTIVE.filter((l) => l.overdue).length;
+  const { books } = useBooks();
+  const { lending, loading } = useLending();
+  const byId = new Map(books.map((b) => [b.id, b]));
+
+  const active = lending.filter((l) => !l.returned_date);
+  const history = lending.filter((l) => l.returned_date);
+
+  const overdue = active.filter(
+    (l) => l.due_date && new Date(l.due_date).getTime() < Date.now()
+  );
 
   return (
     <BentoShell current="lending">
-      {/* Header */}
       <div className="mt-2 mb-6 flex items-end justify-between gap-3">
         <div>
-          <p
-            className="text-[10px] uppercase tracking-wider font-semibold"
-            style={{ color: bento.inkSoft, ...display }}
-          >
+          <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: bento.inkSoft, ...display }}>
             Lending
           </p>
-          <h1
-            className="text-3xl sm:text-5xl font-bold leading-tight tracking-tight"
-            style={display}
-          >
-            {ACTIVE.length} books are{" "}
-            <span style={{ color: bento.orange }}>out.</span>
+          <h1 className="text-3xl sm:text-5xl font-bold leading-tight tracking-tight" style={display}>
+            {loading ? (
+              "Loading..."
+            ) : active.length === 0 ? (
+              <>Nobody&apos;s borrowing <span style={{ color: bento.orange }}>right now.</span></>
+            ) : (
+              <>{active.length} books are <span style={{ color: bento.orange }}>out.</span></>
+            )}
           </h1>
         </div>
         <button
@@ -114,26 +64,18 @@ export default function BentoLending() {
         </button>
       </div>
 
-      {/* Stat tiles */}
       <div className="grid grid-cols-3 gap-3 mb-5">
-        <Mini color={bento.orange} label="Active" value={ACTIVE.length} inkOnLight />
-        <Mini color={bento.pink} label="Overdue" value={overdueCount} />
-        <Mini color={bento.green} label="Returned" value={HISTORY.length} sub="all-time" inkOnLight />
+        <Mini color={bento.orange} label="Active" value={active.length} inkOnLight />
+        <Mini color={bento.pink} label="Overdue" value={overdue.length} />
+        <Mini color={bento.green} label="Returned" value={history.length} sub="all-time" inkOnLight />
       </div>
 
-      {/* Overdue callout */}
-      {overdueCount > 0 && (
-        <div
-          className="rounded-3xl p-4 sm:p-5 mb-5 flex items-center gap-3"
-          style={{ background: bento.pink, color: "#FFF" }}
-        >
+      {overdue.length > 0 && (
+        <div className="rounded-3xl p-4 sm:p-5 mb-5 flex items-center gap-3" style={{ background: bento.pink, color: "#FFF" }}>
           <span className="text-2xl">⚠️</span>
           <div className="flex-1">
             <p className="text-sm font-bold" style={display}>
-              {overdueCount} loan{overdueCount === 1 ? " is" : "s are"} overdue
-            </p>
-            <p className="text-xs opacity-90 mt-0.5">
-              The longest is out 99 days. Time to nudge?
+              {overdue.length} loan{overdue.length === 1 ? " is" : "s are"} overdue
             </p>
           </div>
           <button
@@ -145,70 +87,106 @@ export default function BentoLending() {
         </div>
       )}
 
-      {/* Currently out */}
-      <h2 className="text-xl font-bold mb-3 flex items-center gap-2" style={display}>
-        <span className="w-2 h-2 rounded-full" style={{ background: bento.orange }} />
-        Currently out
-      </h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-8">
-        {ACTIVE.map((l, i) => (
-          <LoanCard key={i} loan={l} active />
-        ))}
-      </div>
+      {active.length > 0 && (
+        <>
+          <h2 className="text-xl font-bold mb-3 flex items-center gap-2" style={display}>
+            <span className="w-2 h-2 rounded-full" style={{ background: bento.orange }} />
+            Currently out
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-8">
+            {active.map((l, i) => (
+              <LoanCard key={l.id} l={l} book={byId.get(l.book_id)} hue={HUES[i % HUES.length]} active />
+            ))}
+          </div>
+        </>
+      )}
 
-      {/* History */}
-      <h2 className="text-xl font-bold mb-3 flex items-center gap-2" style={display}>
-        <span className="w-2 h-2 rounded-full" style={{ background: bento.green }} />
-        Lending history
-      </h2>
-      <div
-        className="rounded-3xl p-4 sm:p-5"
-        style={{ background: bento.card, border: `1px solid ${bento.ink}10` }}
-      >
-        <div className="space-y-2.5">
-          {HISTORY.map((l, i) => (
-            <HistoryRow key={i} loan={l} />
-          ))}
+      {history.length > 0 && (
+        <>
+          <h2 className="text-xl font-bold mb-3 flex items-center gap-2" style={display}>
+            <span className="w-2 h-2 rounded-full" style={{ background: bento.green }} />
+            Lending history
+          </h2>
+          <div className="rounded-3xl p-4 sm:p-5" style={{ background: bento.card, border: `1px solid ${bento.ink}10` }}>
+            <div className="space-y-2.5">
+              {history.map((l, i) => (
+                <HistoryRow key={l.id} l={l} book={byId.get(l.book_id)} hue={HUES[i % HUES.length]} />
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {active.length === 0 && history.length === 0 && !loading && (
+        <div
+          className="rounded-3xl p-8 text-center mt-4"
+          style={{ background: bento.card, border: `1px dashed ${bento.ink}20`, color: bento.inkSoft }}
+        >
+          <p className="text-sm italic">
+            No lending records yet. Hit &ldquo;Lend a book&rdquo; to add one.
+          </p>
         </div>
-      </div>
+      )}
     </BentoShell>
   );
 }
 
-function LoanCard({ loan, active }: { loan: Loan; active?: boolean }) {
+function LoanCard({
+  l,
+  book,
+  hue,
+  active,
+}: {
+  l: LibraryLending;
+  book?: MockBook;
+  hue: string;
+  active?: boolean;
+}) {
+  const overdue = !!(l.due_date && new Date(l.due_date).getTime() < Date.now());
+  const days = daysBetween(l.lent_date);
+
   return (
     <article
       className="rounded-3xl p-4 sm:p-5 flex gap-4"
       style={{
-        background: loan.overdue ? `${bento.pink}11` : bento.card,
-        border: `1px solid ${loan.overdue ? bento.pink + "44" : bento.ink + "10"}`,
+        background: overdue ? `${bento.pink}11` : bento.card,
+        border: `1px solid ${overdue ? bento.pink + "44" : bento.ink + "10"}`,
       }}
     >
-      <Link href="/mockups/1/book" className="flex-shrink-0">
+      {book?.cover ? (
         <img
-          src={loan.book.cover}
-          alt={loan.book.title}
-          className="w-16 sm:w-20 aspect-[2/3] object-cover rounded-lg shadow"
+          src={book.cover}
+          alt={book.title}
+          className="w-16 sm:w-20 aspect-[2/3] object-cover rounded-lg shadow flex-shrink-0"
         />
-      </Link>
+      ) : (
+        <div
+          className="w-16 sm:w-20 aspect-[2/3] rounded-lg shadow flex-shrink-0 flex items-center justify-center p-1.5 text-center"
+          style={{ background: `linear-gradient(135deg, ${bento.lilac}, ${bento.pink})`, color: "#FFF" }}
+        >
+          <span className="text-[9px] font-bold" style={display}>
+            {book?.title.slice(0, 30) || "Unknown"}
+          </span>
+        </div>
+      )}
 
       <div className="min-w-0 flex-1">
         <div className="flex items-start gap-2 mb-2">
           <div
             className="w-9 h-9 rounded-full grid place-items-center font-bold text-xs flex-shrink-0"
-            style={{ background: loan.hue, color: bento.ink, ...display }}
+            style={{ background: hue, color: bento.ink, ...display }}
           >
-            {loan.initials}
+            {initials(l.borrower_name)}
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-bold leading-tight" style={display}>
-              {loan.borrower}
+              {l.borrower_name}
             </p>
             <p className="text-xs leading-tight line-clamp-1" style={{ color: bento.inkSoft }}>
-              {loan.book.title}
+              {book?.title || "Unknown book"}
             </p>
           </div>
-          {loan.overdue && (
+          {overdue && (
             <span
               className="text-[10px] font-bold px-2 py-0.5 rounded-full"
               style={{ background: bento.pink, color: "#FFF", ...display }}
@@ -220,38 +198,26 @@ function LoanCard({ loan, active }: { loan: Loan; active?: boolean }) {
 
         <div className="flex gap-3 text-xs mb-3">
           <div>
-            <p className="text-[9px] uppercase tracking-wider" style={{ color: bento.inkSoft, ...display }}>
-              Lent
-            </p>
-            <p className="font-semibold" style={display}>{loan.lent}</p>
+            <p className="text-[9px] uppercase tracking-wider" style={{ color: bento.inkSoft, ...display }}>Lent</p>
+            <p className="font-semibold" style={display}>{fmtDate(l.lent_date)}</p>
           </div>
           <div>
-            <p className="text-[9px] uppercase tracking-wider" style={{ color: bento.inkSoft, ...display }}>
-              Due
-            </p>
-            <p
-              className="font-semibold"
-              style={{ ...display, color: loan.overdue ? bento.pink : bento.ink }}
-            >
-              {loan.due}
+            <p className="text-[9px] uppercase tracking-wider" style={{ color: bento.inkSoft, ...display }}>Due</p>
+            <p className="font-semibold" style={{ ...display, color: overdue ? bento.pink : bento.ink }}>
+              {fmtDate(l.due_date)}
             </p>
           </div>
           <div>
-            <p className="text-[9px] uppercase tracking-wider" style={{ color: bento.inkSoft, ...display }}>
-              Days out
-            </p>
-            <p
-              className="font-semibold"
-              style={{ ...display, color: loan.overdue ? bento.pink : bento.ink }}
-            >
-              {loan.daysOut}
+            <p className="text-[9px] uppercase tracking-wider" style={{ color: bento.inkSoft, ...display }}>Days out</p>
+            <p className="font-semibold" style={{ ...display, color: overdue ? bento.pink : bento.ink }}>
+              {days}
             </p>
           </div>
         </div>
 
-        {loan.notes && (
+        {l.notes && (
           <p className="text-xs italic mb-3 leading-snug" style={{ color: bento.inkSoft }}>
-            &ldquo;{loan.notes}&rdquo;
+            &ldquo;{l.notes}&rdquo;
           </p>
         )}
 
@@ -281,37 +247,43 @@ function LoanCard({ loan, active }: { loan: Loan; active?: boolean }) {
   );
 }
 
-function HistoryRow({ loan }: { loan: Loan }) {
+function HistoryRow({
+  l,
+  book,
+  hue,
+}: {
+  l: LibraryLending;
+  book?: MockBook;
+  hue: string;
+}) {
+  const days = l.returned_date ? daysBetween(l.lent_date, l.returned_date) : 0;
   return (
-    <div
-      className="flex gap-3 items-center p-2.5 rounded-2xl"
-      style={{ background: bento.bg }}
-    >
-      <img
-        src={loan.book.cover}
-        alt=""
-        className="w-10 aspect-[2/3] object-cover rounded shadow flex-shrink-0"
-      />
+    <div className="flex gap-3 items-center p-2.5 rounded-2xl" style={{ background: bento.bg }}>
+      {book?.cover ? (
+        <img src={book.cover} alt="" className="w-10 aspect-[2/3] object-cover rounded shadow flex-shrink-0" />
+      ) : (
+        <div className="w-10 aspect-[2/3] rounded shadow flex-shrink-0" style={{ background: bento.ink + "20" }} />
+      )}
       <div
         className="w-8 h-8 rounded-full grid place-items-center font-bold text-[10px] flex-shrink-0"
-        style={{ background: loan.hue, color: bento.ink, ...display }}
+        style={{ background: hue, color: bento.ink, ...display }}
       >
-        {loan.initials}
+        {initials(l.borrower_name)}
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-bold leading-tight line-clamp-1" style={display}>
-          {loan.book.title}
+          {book?.title || "Unknown book"}
         </p>
         <p className="text-[11px] line-clamp-1" style={{ color: bento.inkSoft }}>
-          to {loan.borrower}
+          to {l.borrower_name}
         </p>
       </div>
       <div className="text-right flex-shrink-0">
         <p className="text-[10px] uppercase tracking-wider" style={{ color: bento.inkSoft, ...display }}>
-          {loan.daysOut} days
+          {days} days
         </p>
         <p className="text-xs font-semibold" style={display}>
-          {loan.lent} → {loan.returned}
+          {fmtDate(l.lent_date)} → {fmtDate(l.returned_date)}
         </p>
       </div>
     </div>
@@ -334,12 +306,8 @@ function Mini({
   const text = inkOnLight ? bento.ink : "#FFF";
   return (
     <div className="rounded-3xl p-4" style={{ background: color, color: text }}>
-      <p className="text-[10px] uppercase tracking-wider font-semibold opacity-90" style={display}>
-        {label}
-      </p>
-      <p className="text-3xl font-bold mt-1" style={display}>
-        {value}
-      </p>
+      <p className="text-[10px] uppercase tracking-wider font-semibold opacity-90" style={display}>{label}</p>
+      <p className="text-3xl font-bold mt-1" style={display}>{value}</p>
       {sub && <p className="text-[10px] opacity-80 mt-0.5">{sub}</p>}
     </div>
   );
