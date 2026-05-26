@@ -1538,6 +1538,13 @@ export function LendBookModal({
 }
 
 // ---- 5) ADD RECOMMENDATION -------------------------------------------------
+//
+// Supports BOOKS and ARTICLES. Lookup is optional — if Open Library / Crossref
+// can't find it, the user can fill in fields by hand and save anyway. The
+// modal never blocks you when an outside source has nothing to say.
+
+type RecType = "book" | "article";
+type LookupState = "idle" | "searching" | "found" | "not_found";
 
 export function AddRecommendationModal({
   onClose,
@@ -1546,33 +1553,117 @@ export function AddRecommendationModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
+  const [recType, setRecType] = useState<RecType>("book");
+
+  // Shared fields
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
   const [recommendedBy, setRecommendedBy] = useState("");
   const [topic, setTopic] = useState("");
   const [notes, setNotes] = useState("");
   const [coverUrl, setCoverUrl] = useState("");
+
+  // Book-specific
+  const [isbn, setIsbn] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Article-specific
+  const [doi, setDoi] = useState("");
+  const [journal, setJournal] = useState("");
+  const [url, setUrl] = useState("");
+  const [pubYear, setPubYear] = useState("");
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [lookupState, setLookupState] = useState<LookupState>("idle");
+  const [lookupMsg, setLookupMsg] = useState("");
 
   const titleRef = useRef<HTMLInputElement>(null);
 
-  // Quick lookup helper — if title looks substantial, search Open Library and fill missing fields
-  const quickFill = async () => {
-    if (!title.trim()) return;
-    setSaving(true);
-    const found = await searchBooks(title.trim(), 1);
-    setSaving(false);
-    if (found.length > 0) {
-      const r = found[0];
-      if (!author) setAuthor(r.author);
-      if (!coverUrl && r.cover_url) setCoverUrl(r.cover_url);
+  // -- Book lookup (Open Library / Google Books)
+  const lookupBook = async () => {
+    const q = (searchQuery || isbn || title).trim();
+    if (!q) {
+      setLookupState("not_found");
+      setLookupMsg("Enter a title, author, or ISBN to search.");
+      return;
     }
+    setLookupState("searching");
+    setLookupMsg("");
+    try {
+      const found = await searchBooks(q, 1);
+      if (found.length === 0) {
+        setLookupState("not_found");
+        setLookupMsg(`No match in Open Library / Google Books for "${q}". Fill in by hand and save anyway.`);
+        return;
+      }
+      const r = found[0];
+      // Only fill empty fields — never clobber user input
+      if (!title.trim()) setTitle(r.title);
+      if (!author.trim()) setAuthor(r.author);
+      if (!isbn.trim() && r.isbn) setIsbn(r.isbn);
+      if (!coverUrl.trim() && r.cover_url) setCoverUrl(r.cover_url);
+      setLookupState("found");
+      setLookupMsg(`Found: "${r.title}" by ${r.author}.`);
+    } catch (e) {
+      setLookupState("not_found");
+      setLookupMsg(
+        `Lookup failed${e instanceof Error ? ` (${e.message})` : ""}. Fill in by hand if you'd like.`
+      );
+    }
+  };
+
+  // -- DOI lookup (Crossref)
+  const lookupArticle = async () => {
+    const d = doi.trim();
+    if (!d) {
+      setLookupState("not_found");
+      setLookupMsg("Enter a DOI to search Crossref.");
+      return;
+    }
+    if (!looksLikeDoi(d)) {
+      setLookupState("not_found");
+      setLookupMsg(`"${d}" doesn't look like a DOI. Expected format: 10.xxxx/...`);
+      return;
+    }
+    setLookupState("searching");
+    setLookupMsg("");
+    try {
+      const found = await lookupDoi(d);
+      if (!found) {
+        setLookupState("not_found");
+        setLookupMsg(`Crossref had no record for "${d}". Fill in by hand and save anyway.`);
+        return;
+      }
+      if (!title.trim()) setTitle(found.title);
+      if (!author.trim()) setAuthor(found.author);
+      if (!journal.trim() && found.journal) setJournal(found.journal);
+      if (!pubYear.trim() && found.publication_year) setPubYear(String(found.publication_year));
+      if (!url.trim() && found.url) setUrl(found.url);
+      setLookupState("found");
+      setLookupMsg(`Found: "${found.title}" in ${found.journal || "(no journal)"}.`);
+    } catch (e) {
+      setLookupState("not_found");
+      setLookupMsg(
+        `Crossref lookup failed${e instanceof Error ? ` (${e.message})` : ""}. Fill in by hand if you'd like.`
+      );
+    }
+  };
+
+  const reset = () => {
+    setLookupState("idle");
+    setLookupMsg("");
+    setError("");
+  };
+
+  const switchType = (t: RecType) => {
+    setRecType(t);
+    reset();
   };
 
   const save = async () => {
     if (!title.trim()) {
-      setError("Title is required.");
+      setError("Title is required — everything else is optional.");
       titleRef.current?.focus();
       return;
     }
@@ -1586,6 +1677,13 @@ export function AddRecommendationModal({
         topic: topic.trim() || undefined,
         notes: notes.trim() || undefined,
         cover_url: coverUrl.trim() || undefined,
+        // Item-type-specific persistence
+        item_type: recType,
+        isbn: recType === "book" ? isbn.trim() || undefined : undefined,
+        doi: recType === "article" ? doi.trim() || undefined : undefined,
+        journal: recType === "article" ? journal.trim() || undefined : undefined,
+        url: recType === "article" ? url.trim() || undefined : undefined,
+        year: pubYear ? parseInt(pubYear) : undefined,
       });
       onSuccess();
       onClose();
@@ -1600,28 +1698,152 @@ export function AddRecommendationModal({
     <BentoModal title="Add recommendation" onClose={onClose} accent={bento.lilac}>
       <ErrorBanner msg={error} />
 
+      {/* Type toggle */}
+      <div className="flex gap-1 p-1 rounded-full mb-4" style={{ background: bento.card, border: `1px solid ${bento.ink}10` }}>
+        {[
+          { key: "book", label: "📚 Book" },
+          { key: "article", label: "📄 Article" },
+        ].map((t) => {
+          const active = recType === t.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => switchType(t.key as RecType)}
+              className="flex-1 px-3 py-2 rounded-full text-sm font-semibold transition-colors"
+              style={{
+                background: active ? bento.ink : "transparent",
+                color: active ? bento.bg : bento.inkSoft,
+                ...display,
+              }}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Lookup — optional, dismissible */}
+      {recType === "book" ? (
+        <div className="rounded-2xl p-3 mb-4" style={{ background: bento.card, border: `1px solid ${bento.ink}10` }}>
+          <p className="text-[10px] uppercase tracking-wider font-semibold mb-2" style={{ color: bento.inkSoft, ...display }}>
+            Optional: look it up
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && lookupBook()}
+              placeholder="Title, author, or ISBN"
+              className={inputCls}
+            />
+            <SecondaryButton onClick={lookupBook}>
+              {lookupState === "searching" ? "..." : "Find"}
+            </SecondaryButton>
+          </div>
+          <p className="text-[11px] mt-2" style={{ color: bento.inkSoft }}>
+            Searches Open Library + Google Books. If nothing is found, just fill in the form yourself.
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-2xl p-3 mb-4" style={{ background: bento.card, border: `1px solid ${bento.ink}10` }}>
+          <p className="text-[10px] uppercase tracking-wider font-semibold mb-2" style={{ color: bento.inkSoft, ...display }}>
+            Optional: look it up by DOI
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={doi}
+              onChange={(e) => setDoi(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && lookupArticle()}
+              placeholder="10.1038/nature12373"
+              className={inputCls}
+            />
+            <SecondaryButton onClick={lookupArticle}>
+              {lookupState === "searching" ? "..." : "Find"}
+            </SecondaryButton>
+          </div>
+          <p className="text-[11px] mt-2" style={{ color: bento.inkSoft }}>
+            Searches Crossref. No DOI or no match? No problem — just fill in the form yourself.
+          </p>
+        </div>
+      )}
+
+      {/* Lookup result feedback */}
+      {lookupMsg && (
+        <div
+          className="rounded-2xl px-3 py-2 text-sm mb-4 flex items-start gap-2"
+          style={{
+            background:
+              lookupState === "found"
+                ? bento.green + "22"
+                : lookupState === "not_found"
+                ? bento.yellow + "33"
+                : bento.card,
+            color: bento.ink,
+          }}
+        >
+          <span>{lookupState === "found" ? "✓" : "ℹ️"}</span>
+          <p className="flex-1">{lookupMsg}</p>
+          <button
+            onClick={reset}
+            className="text-xs opacity-60 hover:opacity-100"
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* ---- Common fields ---- */}
       <div className="space-y-3">
         <div>
           <label className={labelCls} style={{ color: bento.inkSoft, ...display }}>
             Title *
           </label>
-          <div className="flex gap-2">
-            <input
-              ref={titleRef}
-              autoFocus
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="The Idiot"
-              className={inputCls}
-            />
-            <SecondaryButton onClick={quickFill}>Lookup</SecondaryButton>
-          </div>
+          <input
+            ref={titleRef}
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder={recType === "article" ? "On the Electrodynamics of Moving Bodies" : "The Idiot"}
+            className={inputCls}
+          />
         </div>
-        <Field label="Author" value={author} onChange={setAuthor} />
-        <Field label="Recommended by" value={recommendedBy} onChange={setRecommendedBy} placeholder="Sarah K., Ezra Klein Show, ..." />
+        <Field
+          label={recType === "article" ? "Author(s)" : "Author"}
+          value={author}
+          onChange={setAuthor}
+          placeholder={recType === "article" ? "Einstein, A." : "Elif Batuman"}
+        />
+
+        {/* Type-specific fields */}
+        {recType === "book" && (
+          <>
+            <Field label="ISBN" value={isbn} onChange={setIsbn} placeholder="optional" />
+            <Field label="Cover URL" value={coverUrl} onChange={setCoverUrl} placeholder="https://..." />
+          </>
+        )}
+        {recType === "article" && (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Journal" value={journal} onChange={setJournal} placeholder="Annalen der Physik" />
+              <Field label="Year" value={pubYear} onChange={setPubYear} numeric placeholder="1905" />
+            </div>
+            <Field label="DOI" value={doi} onChange={setDoi} placeholder="10.xxxx/..." />
+            <Field label="URL" value={url} onChange={setUrl} placeholder="https://doi.org/..." />
+          </>
+        )}
+
+        <Field
+          label="Recommended by"
+          value={recommendedBy}
+          onChange={setRecommendedBy}
+          placeholder="Sarah K., Ezra Klein Show, Substack, ..."
+        />
         <Field label="Topic" value={topic} onChange={setTopic} placeholder="Coming of age" />
-        <Field label="Cover URL" value={coverUrl} onChange={setCoverUrl} />
+
         <div>
           <label className={labelCls} style={{ color: bento.inkSoft, ...display }}>
             Why?

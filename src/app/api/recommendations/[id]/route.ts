@@ -29,7 +29,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const values: any[] = [];
 
     // All valid recommendation columns
-    const fields = ['title', 'author', 'isbn', 'cover_url', 'recommended_by', 'notes', 'topic', 'interest', 'year', 'lowest_price', 'thriftbooks_price', 'source_book_id'];
+    const fields = [
+      'title', 'author', 'isbn', 'cover_url',
+      'recommended_by', 'notes', 'topic', 'interest', 'year',
+      'lowest_price', 'thriftbooks_price', 'source_book_id',
+      'item_type', 'doi', 'journal', 'url',
+    ];
     for (const field of fields) {
       if (body[field] !== undefined) {
         updates.push(`${field} = ?`);

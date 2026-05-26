@@ -31,6 +31,11 @@ export interface LibraryRecommendation {
   interest?: string;
   year?: number;
   created_at: string;
+  // Article support — populated when item_type === 'article'
+  item_type?: "book" | "article";
+  doi?: string;
+  journal?: string;
+  url?: string;
 }
 
 export interface LibraryLending {

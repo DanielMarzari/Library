@@ -167,4 +167,11 @@ function ensureAllTables(db: Database.Database) {
   addColumnSafe('books', 'journal', 'TEXT');
   addColumnSafe('books', 'publication_year', 'INTEGER');
   addColumnSafe('books', 'url', 'TEXT');
+
+  // Article support on recommendations — same shape as books so they map 1:1
+  // when promoting a rec → library.
+  addColumnSafe('recommendations', 'item_type', "TEXT NOT NULL DEFAULT 'book'");
+  addColumnSafe('recommendations', 'doi', 'TEXT');
+  addColumnSafe('recommendations', 'journal', 'TEXT');
+  addColumnSafe('recommendations', 'url', 'TEXT');
 }

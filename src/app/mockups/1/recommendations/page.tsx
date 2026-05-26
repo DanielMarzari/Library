@@ -31,13 +31,19 @@ export default function BentoRecommendations() {
     if (busyId) return;
     setBusyId(r.id);
     try {
+      const isArticle = r.item_type === "article";
       await api.books.create({
         title: r.title,
         author: r.author || "Unknown Author",
-        isbn: r.isbn || undefined,
+        isbn: !isArticle ? r.isbn || undefined : undefined,
         cover_url: r.cover_url || undefined,
         source: r.recommended_by ? `rec from ${r.recommended_by}` : "recommendation",
         status: "not_read",
+        item_type: isArticle ? "article" : "book",
+        doi: isArticle ? r.doi || undefined : undefined,
+        journal: isArticle ? r.journal || undefined : undefined,
+        url: isArticle ? r.url || undefined : undefined,
+        publication_year: isArticle && r.year ? r.year : undefined,
       });
       await api.recommendations.delete(r.id);
       refetch();
@@ -234,17 +240,36 @@ function RecCard({
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2 mb-1">
           <p className="text-base sm:text-lg font-bold leading-tight" style={display}>{r.title}</p>
-          {featured && (
-            <span
-              className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-              style={{ background: bento.pink, color: "#FFF", ...display }}
-            >
-              ♥ NEW
-            </span>
-          )}
+          <div className="flex gap-1 flex-shrink-0">
+            {r.item_type === "article" && (
+              <span
+                className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                style={{ background: bento.blue, color: "#FFF", ...display }}
+              >
+                📄 Article
+              </span>
+            )}
+            {featured && (
+              <span
+                className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                style={{ background: bento.pink, color: "#FFF", ...display }}
+              >
+                ♥ NEW
+              </span>
+            )}
+          </div>
         </div>
         {r.author && (
           <p className="text-sm" style={{ color: bento.inkSoft }}>{r.author}</p>
+        )}
+        {r.item_type === "article" && (r.journal || r.year || r.doi) && (
+          <p className="text-[11px] mt-1" style={{ color: bento.inkSoft }}>
+            {r.journal && <span>{r.journal}</span>}
+            {r.journal && r.year && <span> · </span>}
+            {r.year && <span>{r.year}</span>}
+            {(r.journal || r.year) && r.doi && <span> · </span>}
+            {r.doi && <span className="font-mono">{r.doi}</span>}
+          </p>
         )}
 
         {r.recommended_by && (
@@ -280,7 +305,7 @@ function RecCard({
             className="px-3 py-1.5 rounded-full text-xs font-semibold flex-1 disabled:opacity-50"
             style={{ background: bento.pink, color: "#FFF", ...display }}
           >
-            {busy ? "..." : "+ Add to library"}
+            {busy ? "..." : r.item_type === "article" ? "+ Add article" : "+ Add to library"}
           </button>
           <button
             onClick={onDismiss}

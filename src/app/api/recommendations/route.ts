@@ -21,34 +21,42 @@ export async function POST(request: NextRequest) {
       title, author, isbn, cover_url,
       recommended_by, notes, topic, interest, year,
       source_book_id,
+      // Article fields (item_type === 'article' uses these)
+      item_type, doi, journal, url,
       // Accept old field names for backward compat
       description, source,
     } = body;
 
-    const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    if (!title || !String(title).trim()) {
+      return NextResponse.json({ error: 'title is required' }, { status: 400 });
+    }
+
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
     const now = new Date().toISOString();
 
-    // Map old field names: description was used for author, source for recommended_by
     const actualAuthor = author || description || null;
     const actualRecommendedBy = recommended_by || source || null;
+    const resolvedItemType = item_type === 'article' ? 'article' : 'book';
 
     const stmt = db.prepare(`
-      INSERT INTO recommendations (id, title, author, isbn, cover_url, recommended_by, notes, topic, interest, year, source_book_id, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO recommendations (
+        id, title, author, isbn, cover_url, recommended_by, notes, topic,
+        interest, year, source_book_id,
+        item_type, doi, journal, url,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
-      id, title, actualAuthor, isbn || null, cover_url || null,
+      id, title.trim(), actualAuthor, isbn || null, cover_url || null,
       actualRecommendedBy, notes || null, topic || null, interest || null, year || null,
-      source_book_id || null, now
+      source_book_id || null,
+      resolvedItemType, doi || null, journal || null, url || null,
+      now
     );
 
-    return NextResponse.json({
-      id, title, author: actualAuthor, isbn: isbn || null, cover_url: cover_url || null,
-      recommended_by: actualRecommendedBy, notes: notes || null, topic: topic || null,
-      interest: interest || null, year: year || null, source_book_id: source_book_id || null,
-      created_at: now,
-    });
+    const row = db.prepare('SELECT * FROM recommendations WHERE id = ?').get(id);
+    return NextResponse.json(row);
   } catch (error) {
     console.error('POST /api/recommendations error:', error);
     return NextResponse.json({ error: 'Failed to create recommendation', details: String(error) }, { status: 500 });
