@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { api } from "@/lib/api-client";
-import { searchBooks, enrichBook, BookSearchResult } from "@/lib/bookLookup";
+import { searchBooks, enrichBook, lookupDoi, looksLikeDoi, BookSearchResult } from "@/lib/bookLookup";
 import Link from "next/link";
 import { safeCoverUrl } from "@/lib/coverUrl";
 
@@ -23,7 +23,14 @@ interface Recommendation {
   thriftbooks_price?: number | null;
   source_book_id?: string | null;
   created_at: string;
+  // Article support
+  item_type?: "book" | "article";
+  doi?: string;
+  journal?: string;
+  url?: string;
 }
+
+type AddMode = "book" | "article";
 
 type SortMode = "recent" | "abe_asc" | "abe_desc" | "thrift_asc" | "thrift_desc" | "alpha";
 
@@ -64,6 +71,21 @@ export default function RecommendationsPage() {
   const [excludeSource, setExcludeSource] = useState<string | null>(null);
   const [searchFilter, setSearchFilter] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
+
+  // -- Add-flow extensions: article support + manual fallback when nothing
+  // can be found in Open Library / Crossref. The user can always save by
+  // hand from this form even with no search hit.
+  const [addMode, setAddMode] = useState<AddMode>("book");
+  const [manualTitle, setManualTitle] = useState("");
+  const [manualAuthor, setManualAuthor] = useState("");
+  const [manualIsbn, setManualIsbn] = useState("");
+  const [manualCoverUrl, setManualCoverUrl] = useState("");
+  const [articleDoi, setArticleDoi] = useState("");
+  const [articleJournal, setArticleJournal] = useState("");
+  const [articleYear, setArticleYear] = useState("");
+  const [articleUrl, setArticleUrl] = useState("");
+  const [doiLooking, setDoiLooking] = useState(false);
+  const [lookupHint, setLookupHint] = useState<{ kind: "info" | "warn" | "ok"; msg: string } | null>(null);
   const [page, setPage] = useState(1);
   const [sortMode, setSortMode] = useState<SortMode>("recent");
   const [fetchingPrices, setFetchingPrices] = useState(false);
@@ -243,42 +265,139 @@ export default function RecommendationsPage() {
     }
   }, []);
 
-  // Add recommendation
+  // Reset all add-form state after a save (or when cancelling)
+  const resetAddForm = () => {
+    setSearchQuery("");
+    setRecommendedBy("");
+    setNotes("");
+    setSourceBookId(null);
+    setSourceBookTitle("");
+    setSourceBookQuery("");
+    setSelectedResult(null);
+    setSearchResults([]);
+    setShowSearchResults(false);
+    setAddMode("book");
+    setManualTitle("");
+    setManualAuthor("");
+    setManualIsbn("");
+    setManualCoverUrl("");
+    setArticleDoi("");
+    setArticleJournal("");
+    setArticleYear("");
+    setArticleUrl("");
+    setLookupHint(null);
+  };
+
+  // Add recommendation. Accepts:
+  //  - a search result (legacy book flow)
+  //  - manual book fields (no search hit)
+  //  - manual article fields with optional DOI
   const handleAddRecommendation = async (book: BookSearchResult | null = null) => {
     const bookToAdd = book || selectedResult;
-    if (!bookToAdd || !bookToAdd.title.trim()) {
-      alert("Please select or search for a book");
-      return;
-    }
     setAddingLoading(true);
     try {
-      const enrichedBook = await enrichBook(bookToAdd);
-      const data = await api.recommendations.create({
-        title: enrichedBook.title,
-        author: enrichedBook.author || null,
-        isbn: enrichedBook.isbn || null,
-        cover_url: enrichedBook.cover_url || null,
-        recommended_by: recommendedBy.trim() || null,
-        notes: notes.trim() || null,
-        source_book_id: sourceBookId || null,
-      } as any);
+      let payload: Record<string, unknown>;
+
+      if (addMode === "article") {
+        // Article path — title required, everything else optional.
+        const title = manualTitle.trim();
+        if (!title) {
+          alert("Article needs at least a title.");
+          setAddingLoading(false);
+          return;
+        }
+        payload = {
+          title,
+          author: manualAuthor.trim() || null,
+          cover_url: manualCoverUrl.trim() || null,
+          recommended_by: recommendedBy.trim() || null,
+          notes: notes.trim() || null,
+          source_book_id: sourceBookId || null,
+          item_type: "article",
+          doi: articleDoi.trim() || null,
+          journal: articleJournal.trim() || null,
+          url: articleUrl.trim() || null,
+          year: articleYear ? parseInt(articleYear) || null : null,
+        };
+      } else if (bookToAdd) {
+        // Book path with a chosen Open Library / Google Books result.
+        const enrichedBook = await enrichBook(bookToAdd);
+        payload = {
+          title: enrichedBook.title,
+          author: enrichedBook.author || null,
+          isbn: enrichedBook.isbn || null,
+          cover_url: enrichedBook.cover_url || null,
+          recommended_by: recommendedBy.trim() || null,
+          notes: notes.trim() || null,
+          source_book_id: sourceBookId || null,
+          item_type: "book",
+        };
+      } else {
+        // Manual book path (no search match).
+        const title = manualTitle.trim();
+        if (!title) {
+          alert("At least a title is required.");
+          setAddingLoading(false);
+          return;
+        }
+        payload = {
+          title,
+          author: manualAuthor.trim() || null,
+          isbn: manualIsbn.trim() || null,
+          cover_url: manualCoverUrl.trim() || null,
+          recommended_by: recommendedBy.trim() || null,
+          notes: notes.trim() || null,
+          source_book_id: sourceBookId || null,
+          item_type: "book",
+        };
+      }
+
+      const data = await api.recommendations.create(payload as any);
 
       setRecommendations((prev) => [data as Recommendation, ...prev]);
       setAllRecs((prev) => [data as Recommendation, ...prev]);
-      setSearchQuery("");
-      setRecommendedBy("");
-      setNotes("");
-      setSourceBookId(null);
-      setSourceBookTitle("");
-      setSourceBookQuery("");
-      setSelectedResult(null);
-      setSearchResults([]);
-      setShowSearchResults(false);
+      resetAddForm();
       setShowAddForm(false);
     } catch (error) {
       console.error("Error adding recommendation:", error);
+      alert("Failed to save. Check the console for details.");
     } finally {
       setAddingLoading(false);
+    }
+  };
+
+  // -- DOI lookup helper for article mode (Crossref).
+  const handleDoiLookup = async () => {
+    const raw = articleDoi.trim();
+    if (!raw) {
+      setLookupHint({ kind: "warn", msg: "Enter a DOI to lookup, or fill in by hand." });
+      return;
+    }
+    if (!looksLikeDoi(raw)) {
+      setLookupHint({ kind: "warn", msg: `"${raw}" doesn't look like a DOI (10.xxxx/...). Fill in by hand if you'd like.` });
+      return;
+    }
+    setDoiLooking(true);
+    setLookupHint(null);
+    try {
+      const found = await lookupDoi(raw);
+      if (!found) {
+        setLookupHint({ kind: "warn", msg: `Crossref has no record for ${raw}. Fill in by hand and save anyway.` });
+        return;
+      }
+      if (!manualTitle.trim()) setManualTitle(found.title);
+      if (!manualAuthor.trim()) setManualAuthor(found.author);
+      if (!articleJournal.trim() && found.journal) setArticleJournal(found.journal);
+      if (!articleYear.trim() && found.publication_year) setArticleYear(String(found.publication_year));
+      if (!articleUrl.trim() && found.url) setArticleUrl(found.url);
+      setLookupHint({ kind: "ok", msg: `Found: "${found.title}"${found.journal ? ` in ${found.journal}` : ""}.` });
+    } catch (e) {
+      setLookupHint({
+        kind: "warn",
+        msg: `Crossref lookup failed${e instanceof Error ? ` (${e.message})` : ""}. Fill in by hand if you'd like.`,
+      });
+    } finally {
+      setDoiLooking(false);
     }
   };
 
@@ -534,50 +653,191 @@ export default function RecommendationsPage() {
           <div className="bg-surface border border-border-custom rounded-xl p-4 mb-5 animate-in slide-in-from-top-2">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-foreground">Add a Recommendation</h2>
-              <button onClick={() => setShowAddForm(false)} className="text-muted hover:text-foreground text-sm">✕</button>
+              <button onClick={() => { setShowAddForm(false); resetAddForm(); }} className="text-muted hover:text-foreground text-sm">✕</button>
             </div>
+
+            {/* Book / Article toggle */}
+            <div className="flex gap-1 p-1 bg-surface-2 rounded-lg mb-3">
+              {([
+                { key: "book", label: "📚 Book" },
+                { key: "article", label: "📄 Article" },
+              ] as { key: AddMode; label: string }[]).map((t) => {
+                const active = addMode === t.key;
+                return (
+                  <button
+                    key={t.key}
+                    onClick={() => { setAddMode(t.key); setLookupHint(null); }}
+                    className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                      active
+                        ? "bg-emerald-600 text-white"
+                        : "text-muted hover:text-foreground"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+
             <div className="space-y-3">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search by title or ISBN..."
-                  value={searchQuery}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  className="w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted focus:outline-none focus:ring-1 focus:ring-emerald-600"
-                />
-                {showSearchResults && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-surface-2 border border-border-custom rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
-                    {searching ? (
-                      <div className="p-3 text-center text-muted text-sm">Searching...</div>
-                    ) : searchResults.length > 0 ? (
-                      searchResults.map((result, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => { setSelectedResult(result); setShowSearchResults(false); }}
-                          className="w-full text-left px-3 py-2 hover:bg-border-custom border-b border-border-custom last:border-0 transition-colors"
-                        >
-                          <div className="font-medium text-foreground text-sm">{result.title}</div>
-                          <div className="text-xs text-muted">{result.author || "Unknown"}</div>
-                        </button>
-                      ))
-                    ) : (
-                      <div className="p-3 text-center text-muted text-sm">No results</div>
+              {addMode === "book" && (
+                <>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search by title or ISBN (optional)..."
+                      value={searchQuery}
+                      onChange={(e) => handleSearch(e.target.value)}
+                      className="w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                    />
+                    {showSearchResults && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-surface-2 border border-border-custom rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
+                        {searching ? (
+                          <div className="p-3 text-center text-muted text-sm">Searching...</div>
+                        ) : searchResults.length > 0 ? (
+                          searchResults.map((result, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => { setSelectedResult(result); setShowSearchResults(false); }}
+                              className="w-full text-left px-3 py-2 hover:bg-border-custom border-b border-border-custom last:border-0 transition-colors"
+                            >
+                              <div className="font-medium text-foreground text-sm">{result.title}</div>
+                              <div className="text-xs text-muted">{result.author || "Unknown"}</div>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="p-3 text-center text-muted text-sm">
+                            No results — fill in by hand below.
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
-              </div>
-              {selectedResult && (
-                <div className="flex items-center gap-3 bg-surface-2 rounded-lg p-2.5">
-                  {selectedResult.cover_url && (
-                    <img src={safeCoverUrl(selectedResult.cover_url)} alt="" className="w-10 h-14 object-cover rounded" />
+                  {selectedResult ? (
+                    <div className="flex items-center gap-3 bg-surface-2 rounded-lg p-2.5">
+                      {selectedResult.cover_url && (
+                        <img src={safeCoverUrl(selectedResult.cover_url)} alt="" className="w-10 h-14 object-cover rounded" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-foreground text-sm truncate">{selectedResult.title}</p>
+                        <p className="text-xs text-muted">{selectedResult.author}</p>
+                      </div>
+                      <button onClick={() => setSelectedResult(null)} className="text-muted hover:text-foreground text-xs">✕</button>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-[10px] uppercase tracking-wider text-muted font-medium pt-1">
+                        Or enter by hand (skip the search)
+                      </p>
+                      <input
+                        type="text"
+                        placeholder="Title *"
+                        value={manualTitle}
+                        onChange={(e) => setManualTitle(e.target.value)}
+                        className="w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                      />
+                      <div className="grid grid-cols-2 gap-3">
+                        <input
+                          type="text"
+                          placeholder="Author"
+                          value={manualAuthor}
+                          onChange={(e) => setManualAuthor(e.target.value)}
+                          className="bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                        />
+                        <input
+                          type="text"
+                          placeholder="ISBN"
+                          value={manualIsbn}
+                          onChange={(e) => setManualIsbn(e.target.value)}
+                          className="bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                        />
+                      </div>
+                      <input
+                        type="url"
+                        placeholder="Cover image URL"
+                        value={manualCoverUrl}
+                        onChange={(e) => setManualCoverUrl(e.target.value)}
+                        className="w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                      />
+                    </>
                   )}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-foreground text-sm truncate">{selectedResult.title}</p>
-                    <p className="text-xs text-muted">{selectedResult.author}</p>
-                  </div>
-                  <button onClick={() => setSelectedResult(null)} className="text-muted hover:text-foreground text-xs">✕</button>
-                </div>
+                </>
               )}
+
+              {addMode === "article" && (
+                <>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="DOI (optional) — e.g. 10.1038/nature12373"
+                      value={articleDoi}
+                      onChange={(e) => setArticleDoi(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleDoiLookup()}
+                      className="flex-1 bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleDoiLookup}
+                      disabled={doiLooking}
+                      className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 px-3 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+                    >
+                      {doiLooking ? "..." : "Lookup"}
+                    </button>
+                  </div>
+                  {lookupHint && (
+                    <div
+                      className={`rounded-lg px-3 py-2 text-xs ${
+                        lookupHint.kind === "ok"
+                          ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/30"
+                          : lookupHint.kind === "warn"
+                          ? "bg-amber-500/10 text-amber-300 border border-amber-500/30"
+                          : "bg-surface-2 text-muted"
+                      }`}
+                    >
+                      {lookupHint.msg}
+                    </div>
+                  )}
+                  <input
+                    type="text"
+                    placeholder="Title *"
+                    value={manualTitle}
+                    onChange={(e) => setManualTitle(e.target.value)}
+                    className="w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Author(s)"
+                    value={manualAuthor}
+                    onChange={(e) => setManualAuthor(e.target.value)}
+                    className="w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="text"
+                      placeholder="Journal"
+                      value={articleJournal}
+                      onChange={(e) => setArticleJournal(e.target.value)}
+                      className="bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                    />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="Year"
+                      value={articleYear}
+                      onChange={(e) => setArticleYear(e.target.value)}
+                      className="bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                    />
+                  </div>
+                  <input
+                    type="url"
+                    placeholder="URL"
+                    value={articleUrl}
+                    onChange={(e) => setArticleUrl(e.target.value)}
+                    className="w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                  />
+                </>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <input type="text" placeholder="Recommended by..." value={recommendedBy} onChange={(e) => setRecommendedBy(e.target.value)}
                   className="bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted focus:outline-none focus:ring-1 focus:ring-emerald-600" />
@@ -635,10 +895,14 @@ export default function RecommendationsPage() {
               </div>
               <button
                 onClick={() => handleAddRecommendation()}
-                disabled={!selectedResult || addingLoading}
+                disabled={
+                  addingLoading ||
+                  // Need at least a title from one of: selected result, manual title
+                  !(selectedResult?.title.trim() || manualTitle.trim())
+                }
                 className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-border-custom disabled:text-muted text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
               >
-                {addingLoading ? "Adding..." : "+ Add Recommendation"}
+                {addingLoading ? "Adding..." : addMode === "article" ? "+ Add Article" : "+ Add Recommendation"}
               </button>
             </div>
           </div>
@@ -930,16 +1194,30 @@ export default function RecommendationsPage() {
                       <img src={safeCoverUrl(rec.cover_url)} alt="" className="w-8 h-11 object-cover rounded flex-shrink-0" />
                     ) : (
                       <div className="w-8 h-11 bg-surface-2 rounded flex-shrink-0 flex items-center justify-center">
-                        <span className="text-[10px] text-muted">📖</span>
+                        <span className="text-[10px] text-muted">
+                          {rec.item_type === "article" ? "📄" : "📖"}
+                        </span>
                       </div>
                     )}
 
                     {/* Title & Author */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{rec.title}</p>
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {rec.item_type === "article" && (
+                          <span className="px-1.5 py-0.5 bg-blue-500/10 text-blue-400 rounded text-[9px] font-medium mr-1.5">
+                            Article
+                          </span>
+                        )}
+                        {rec.title}
+                      </p>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                         {rec.author && (
                           <span className="text-xs text-muted truncate">{rec.author}</span>
+                        )}
+                        {rec.item_type === "article" && (rec.journal || rec.year || rec.doi) && (
+                          <span className="text-[10px] text-muted/80 truncate">
+                            {[rec.journal, rec.year, rec.doi].filter(Boolean).join(" · ")}
+                          </span>
                         )}
                         {getRecTags(rec).map((tag, i) => (
                           <span
