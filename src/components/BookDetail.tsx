@@ -425,7 +425,20 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { if (saveTimeoutRef.current) { clearTimeout(saveTimeoutRef.current); doSave(); } onUpdated(); }} />
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={() => {
+          // If an autosave is queued, flush it first so the edit isn't lost.
+          if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+            doSave();
+          }
+          // doSave already calls onUpdated() on success — we still need an
+          // explicit close because onUpdated no longer dismisses the panel
+          // (kept open during autosaves on purpose).
+          onClose();
+        }}
+      />
 
       {/* Confetti */}
       {showConfetti && <ConfettiOverlay />}
