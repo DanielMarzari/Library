@@ -1,10 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { BentoShell, bento, display } from "../theme";
 import { useBooks } from "../useLibraryData";
-import { AddBookModal } from "../modals";
+import { AddBookModal, EditBookModal } from "../modals";
 import type { MockBook } from "../../data";
 
 type Filter = "all" | "reading" | "not_read" | "read" | "favorites";
@@ -13,6 +12,7 @@ export default function BentoShelf() {
   const { books, loading, refetch } = useBooks();
   const [filter, setFilter] = useState<Filter>("all");
   const [showAdd, setShowAdd] = useState(false);
+  const [editing, setEditing] = useState<MockBook | null>(null);
 
   const filtered = books.filter((b) => {
     if (filter === "all") return true;
@@ -121,7 +121,7 @@ export default function BentoShelf() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-5">
               {s.books.map((b) => (
-                <CoverCard key={b.id} b={b} />
+                <CoverCard key={b.id} b={b} onClick={() => setEditing(b)} />
               ))}
             </div>
           </section>
@@ -140,13 +140,24 @@ export default function BentoShelf() {
       {showAdd && (
         <AddBookModal onClose={() => setShowAdd(false)} onSuccess={() => refetch()} />
       )}
+      {editing && (
+        <EditBookModal
+          book={editing}
+          onClose={() => setEditing(null)}
+          onSuccess={() => refetch()}
+          onDelete={() => {
+            setEditing(null);
+            refetch();
+          }}
+        />
+      )}
     </BentoShell>
   );
 }
 
-function CoverCard({ b }: { b: MockBook }) {
+function CoverCard({ b, onClick }: { b: MockBook; onClick: () => void }) {
   return (
-    <Link href={`/mockups/1/book?id=${encodeURIComponent(b.id)}`} className="group block">
+    <button onClick={onClick} className="group block text-left w-full">
       <div className="relative">
         {b.cover ? (
           <img
@@ -198,6 +209,6 @@ function CoverCard({ b }: { b: MockBook }) {
       <p className="text-xs mt-0.5" style={{ color: bento.inkSoft }}>
         {b.author}
       </p>
-    </Link>
+    </button>
   );
 }

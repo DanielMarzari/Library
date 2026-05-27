@@ -1,15 +1,17 @@
 "use client";
 
-import Link from "next/link";
+import { useState } from "react";
 import { BentoShell, bento, display } from "../theme";
 import { useBooks } from "../useLibraryData";
+import { EditBookModal } from "../modals";
 import type { MockBook } from "../../data";
 
 export default function BentoList() {
-  const { books } = useBooks();
+  const { books, refetch } = useBooks();
   const reading = books.filter((b) => b.status === "reading");
   const queued = books.filter((b) => b.status === "not_read");
   const finished = books.filter((b) => b.status === "read").slice(0, 24);
+  const [editing, setEditing] = useState<MockBook | null>(null);
 
   return (
     <BentoShell current="list">
@@ -35,7 +37,7 @@ export default function BentoList() {
 
       <Section title="Currently reading" accent={bento.yellow}>
         {reading.map((b) => (
-          <ListRow key={b.id} b={b} status="reading" />
+          <ListRow key={b.id} b={b} status="reading" onClick={() => setEditing(b)} />
         ))}
         {reading.length === 0 && (
           <EmptyHint label="Nothing in progress yet — start one from the shelf." />
@@ -44,7 +46,7 @@ export default function BentoList() {
 
       <Section title="Up next" accent={bento.lilac}>
         {queued.map((b) => (
-          <ListRow key={b.id} b={b} status="queued" />
+          <ListRow key={b.id} b={b} status="queued" onClick={() => setEditing(b)} />
         ))}
         {queued.length === 0 && (
           <EmptyHint label="Queue is empty — add some recs to your reading list." />
@@ -62,10 +64,10 @@ export default function BentoList() {
         <div className="rounded-3xl p-4 sm:p-5" style={{ background: bento.card, border: `1px solid ${bento.ink}10` }}>
           <div className="grid grid-cols-4 sm:grid-cols-6 gap-2.5">
             {finished.map((b) => (
-              <Link
-                href={`/mockups/1/book?id=${encodeURIComponent(b.id)}`}
+              <button
+                onClick={() => setEditing(b)}
                 key={b.id}
-                className="group block"
+                className="group block text-left"
               >
                 <div className="relative">
                   {b.cover ? (
@@ -89,11 +91,23 @@ export default function BentoList() {
                 <p className="text-[10px] font-semibold mt-1.5 line-clamp-1" style={display}>
                   {b.title}
                 </p>
-              </Link>
+              </button>
             ))}
           </div>
         </div>
       </div>
+
+      {editing && (
+        <EditBookModal
+          book={editing}
+          onClose={() => setEditing(null)}
+          onSuccess={() => refetch()}
+          onDelete={() => {
+            setEditing(null);
+            refetch();
+          }}
+        />
+      )}
     </BentoShell>
   );
 }
@@ -121,11 +135,19 @@ function EmptyHint({ label }: { label: string }) {
   );
 }
 
-function ListRow({ b, status }: { b: MockBook; status: "reading" | "queued" }) {
+function ListRow({
+  b,
+  status,
+  onClick,
+}: {
+  b: MockBook;
+  status: "reading" | "queued";
+  onClick: () => void;
+}) {
   return (
-    <Link
-      href={`/mockups/1/book?id=${encodeURIComponent(b.id)}`}
-      className="flex gap-3 p-3 rounded-2xl items-center group"
+    <button
+      onClick={onClick}
+      className="flex gap-3 p-3 rounded-2xl items-center group w-full text-left"
       style={{ background: bento.card, border: `1px solid ${bento.ink}10` }}
     >
       {b.cover ? (
@@ -178,7 +200,7 @@ function ListRow({ b, status }: { b: MockBook; status: "reading" | "queued" }) {
       <span className="text-lg opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: bento.inkSoft }}>
         →
       </span>
-    </Link>
+    </button>
   );
 }
 

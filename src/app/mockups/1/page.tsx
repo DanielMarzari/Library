@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { BentoShell, bento, display } from "./theme";
 import { useBooks, useStats, useReadingGoals, booksFinishedInYear } from "./useLibraryData";
-import { AddBookModal, LogProgressModal } from "./modals";
+import { AddBookModal, EditBookModal, LogProgressModal } from "./modals";
 import type { MockBook } from "../data";
 
 // Mockup 1 — Bento Pop · Dashboard
@@ -16,6 +16,9 @@ export default function BentoDashboard() {
 
   const [showAdd, setShowAdd] = useState(false);
   const [showLog, setShowLog] = useState<MockBook | null>(null);
+  // Editing a book stays as an overlay on this page — closing returns here,
+  // not to a separate detail route.
+  const [editing, setEditing] = useState<MockBook | null>(null);
 
   const reading = books.filter((b) => b.status === "reading");
   const featured = reading[0];
@@ -87,9 +90,9 @@ export default function BentoDashboard() {
               </p>
 
               {/* Side-by-side layout — cover keeps its 2:3 aspect; explicit width prevents squishing */}
-              <Link
-                href={`/mockups/1/book?id=${encodeURIComponent(featured.id)}`}
-                className="flex gap-4 sm:gap-5 flex-1 min-h-0"
+              <button
+                onClick={() => setEditing(featured)}
+                className="flex gap-4 sm:gap-5 flex-1 min-h-0 text-left"
               >
                 {featured.cover ? (
                   <img
@@ -129,7 +132,7 @@ export default function BentoDashboard() {
                     </div>
                   )}
                 </div>
-              </Link>
+              </button>
 
               <div className="flex gap-2 mt-4">
                 <button
@@ -143,6 +146,7 @@ export default function BentoDashboard() {
                   href={`/mockups/1/book?id=${encodeURIComponent(featured.id)}`}
                   className="px-3 py-2 rounded-full text-xs font-semibold"
                   style={{ background: "rgba(255,255,255,0.15)", color: "#FFF", ...display }}
+                  title="View full detail with reading log"
                 >
                   Open
                 </Link>
@@ -254,10 +258,10 @@ export default function BentoDashboard() {
           ) : (
             <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-8 gap-2.5 sm:gap-3">
               {recent.map((b) => (
-                <Link
-                  href={`/mockups/1/book?id=${encodeURIComponent(b.id)}`}
+                <button
+                  onClick={() => setEditing(b)}
                   key={b.id}
-                  className="group block"
+                  className="group block text-left"
                 >
                   <div className="relative">
                     {b.cover ? (
@@ -284,7 +288,7 @@ export default function BentoDashboard() {
                   <p className="text-[10px]" style={{ color: bento.inkSoft }}>
                     {b.author}
                   </p>
-                </Link>
+                </button>
               ))}
             </div>
           )}
@@ -385,6 +389,17 @@ export default function BentoDashboard() {
           book={showLog}
           onClose={() => setShowLog(null)}
           onSuccess={() => refetch()}
+        />
+      )}
+      {editing && (
+        <EditBookModal
+          book={editing}
+          onClose={() => setEditing(null)}
+          onSuccess={() => refetch()}
+          onDelete={() => {
+            setEditing(null);
+            refetch();
+          }}
         />
       )}
     </BentoShell>
