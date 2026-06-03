@@ -11,7 +11,7 @@ import { AddBookSheet } from "@/components/AddBookSheet";
 import Link from "next/link";
 
 type FilterStatus = "all" | "not_read" | "reading" | "read" | "exclude_read" | "favorites" | "on_reading_list";
-type SortMode = "recent" | "alpha" | "rating" | "lcc" | "ddc" | "pages_asc" | "pages_desc";
+type SortMode = "recent" | "last" | "alpha" | "rating" | "lcc" | "ddc" | "pages_asc" | "pages_desc";
 type HeaderTab = "filter" | "sort";
 type GridSize = "xs" | "small" | "medium" | "large" | "xl";
 
@@ -182,6 +182,17 @@ export default function Home() {
     }
 
     switch (sortMode) {
+      case "last":
+        // Most recently touched anything: book row edits, status changes, and
+        // page-log autosaves all bump updated_at via PUT /api/books/[id],
+        // so this surfaces the book you (or autosave) touched most recently.
+        // Fallback to created_at for any row without an updated_at.
+        sorted.sort((a, b) => {
+          const aKey = a.updated_at || a.created_at || "0";
+          const bKey = b.updated_at || b.created_at || "0";
+          return bKey.localeCompare(aKey);
+        });
+        break;
       case "alpha":
         sorted.sort((a, b) => a.title.localeCompare(b.title));
         break;
@@ -346,6 +357,7 @@ export default function Home() {
 
   const sortButtons: { label: string; value: SortMode }[] = [
     { label: "Recent", value: "recent" },
+    { label: "Last", value: "last" },
     { label: "A-Z", value: "alpha" },
     { label: "Rating", value: "rating" },
     { label: "Shortest", value: "pages_asc" },
