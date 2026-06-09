@@ -70,6 +70,22 @@ const MOCKUPS: Mockup[] = [
       { label: "Diary", href: "/mockups/3/diary" },
     ],
   },
+  {
+    id: "4",
+    name: "LibraryCat",
+    tagline: "Classic OPAC · TinyCat-style search",
+    description:
+      "A library catalog with faceted search the way LibraryThing / TinyCat does it. Cream paper background, oxblood accents, serif headings, blue catalog links. Left sidebar facets (tags, authors, LCC subject, status) with counts. Dense result rows with cover, title, tags, rating, call number, and a status badge. Book detail page shows a proper bibliographic table.",
+    palette: ["#F4ECDA", "#2A2722", "#1652A1", "#8B3A2F", "#B08020", "#3F5B36"],
+    font: "Bitter + Inter + JetBrains Mono",
+    vibe: "Scholarly · Dense · Searchable",
+    bg: "linear-gradient(135deg, #F4ECDA 0%, #E8DEC4 100%)",
+    text: "#2A2722",
+    sublinks: [
+      { label: "Catalog", href: "/mockups/4" },
+      { label: "Book", href: "/mockups/4/book" },
+    ],
+  },
 ];
 
 export default function MockupsIndex() {
