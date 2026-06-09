@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { LibcatShell, libcat, serif, sans, mono } from "../theme";
-import { coverFor, lccSubject, useCatalog, type CatalogBook } from "../useCatalog";
+import { LibcatShell, libcat, heading, sans } from "../theme";
+import { coverFor, useCatalog, type CatalogBook } from "../useCatalog";
 
 export default function LibcatBookPage() {
   return (
@@ -16,10 +16,8 @@ export default function LibcatBookPage() {
 
 function Loading() {
   return (
-    <LibcatShell showSearch={false}>
-      <p className="text-sm py-8" style={{ color: libcat.inkSoft }}>
-        Loading record...
-      </p>
+    <LibcatShell>
+      <p style={{ padding: 30, color: libcat.textMuted }}>Loading record…</p>
     </LibcatShell>
   );
 }
@@ -32,239 +30,324 @@ function LibcatBookDetail() {
 
   if (loading || !book) {
     return (
-      <LibcatShell showSearch={false}>
-        <p className="text-sm py-8" style={{ color: libcat.inkSoft }}>
-          Loading record...
-        </p>
+      <LibcatShell>
+        <p style={{ padding: 30, color: libcat.textMuted }}>Loading record…</p>
       </LibcatShell>
     );
   }
 
   return (
-    <LibcatShell showSearch={false}>
-      {/* Breadcrumbs */}
-      <nav className="text-xs mt-2 mb-4" style={{ color: libcat.inkSoft }}>
-        <Link href="/mockups/4" style={{ color: libcat.link }}>
-          Catalog
-        </Link>
-        <span className="mx-1">›</span>
-        <span>{book.title.length > 40 ? book.title.slice(0, 40) + "…" : book.title}</span>
-      </nav>
-
-      {/* ---- Header (cover + title block) ---- */}
-      <header
-        className="grid grid-cols-1 sm:grid-cols-[180px_1fr] gap-6 pb-5 mb-5"
-        style={{ borderBottom: `2px solid ${libcat.border}` }}
+    <LibcatShell>
+      {/* Breadcrumbs — Bootstrap 3 style: light gray bg, › separators */}
+      <ol
+        className="breadcrumb"
+        style={{
+          background: libcat.breadcrumbBg,
+          padding: "8px 15px",
+          borderRadius: 4,
+          marginBottom: 20,
+          listStyle: "none",
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 6,
+          fontSize: 13,
+        }}
       >
-        {/* Cover */}
-        <div>
-          <Cover book={book} />
-        </div>
+        <li>
+          <Link href="/mockups/4" style={{ color: libcat.link }}>
+            Catalog
+          </Link>
+        </li>
+        <li style={{ color: libcat.textMuted }}>
+          ›{" "}
+          <span style={{ color: libcat.text }}>
+            {book.title.length > 60 ? book.title.slice(0, 60) + "…" : book.title}
+          </span>
+        </li>
+      </ol>
 
-        <div>
-          {book.item_type === "article" && (
-            <span
-              className="inline-block mb-2 px-2 py-0.5 text-[10px] tracking-wider"
-              style={{ background: libcat.accent, color: libcat.paperLight, ...mono }}
-            >
-              ARTICLE
-            </span>
-          )}
-
-          <h1
-            className="leading-tight"
-            style={{ ...serif, fontWeight: 700, fontSize: "clamp(1.5rem, 3vw, 2.25rem)" }}
+      {/* Main work area — col-md-9 main + col-md-3 sidebar, matching the
+          TinyCat result/sidebar split */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+        {/* MAIN */}
+        <div className="md:col-span-9">
+          {/* Header: cover + bibliographic info */}
+          <header
+            className="grid grid-cols-12 gap-4 pb-4 mb-4"
+            style={{ borderBottom: `1px solid ${libcat.borderLight}` }}
           >
-            {book.title}
-          </h1>
-          <p className="text-base sm:text-lg mt-1 italic" style={{ ...serif, color: libcat.inkSoft }}>
-            by{" "}
-            {book.authors.map((a, i) => (
-              <span key={a}>
-                <Link
-                  href={`/mockups/4?author=${encodeURIComponent(a)}`}
-                  className="hover:underline not-italic"
-                  style={{ color: libcat.link }}
-                >
-                  {a}
-                </Link>
-                {i < book.authors.length - 1 && ", "}
-              </span>
-            ))}
-          </p>
-
-          {/* Rating + status */}
-          <div className="flex items-center gap-3 mt-3">
-            {book.rating ? (
-              <span className="text-xl leading-none" style={{ color: libcat.brass }}>
-                {"★".repeat(book.rating)}
-                <span style={{ color: libcat.border }}>{"★".repeat(5 - book.rating)}</span>
-              </span>
-            ) : null}
-            <span
-              className="px-2 py-0.5 text-[10px] tracking-widest uppercase"
-              style={{
-                ...mono,
-                background:
-                  book.status === "read"
-                    ? libcat.green
-                    : book.status === "reading"
-                    ? libcat.accent
-                    : libcat.inkSoft,
-                color: libcat.paperLight,
-              }}
-            >
-              {book.status === "read"
-                ? "On the shelf"
-                : book.status === "reading"
-                ? "Currently out"
-                : "Queued"}
-            </span>
-            {book.favorite && (
-              <span
-                className="px-2 py-0.5 text-[10px] tracking-widest uppercase"
-                style={{ ...mono, background: libcat.brass, color: libcat.paperLight }}
+            <div className="col-span-4 sm:col-span-3 md:col-span-3">
+              <Cover book={book} />
+            </div>
+            <div className="col-span-8 sm:col-span-9 md:col-span-9">
+              <h1
+                style={{
+                  ...heading,
+                  fontSize: 26,
+                  margin: 0,
+                  marginBottom: 6,
+                  color: libcat.text,
+                }}
               >
-                ★ Favorite
-              </span>
-            )}
-          </div>
+                {book.title}
+              </h1>
+              <p style={{ fontSize: 16, margin: 0, marginBottom: 4 }}>
+                by{" "}
+                {book.authors.map((a, i) => (
+                  <span key={a}>
+                    <Link
+                      href={`/mockups/4?author=${encodeURIComponent(a)}`}
+                      style={{ color: libcat.link, textDecoration: "none" }}
+                      className="hover:underline"
+                    >
+                      {a}
+                    </Link>
+                    {i < book.authors.length - 1 && ", "}
+                  </span>
+                ))}
+              </p>
+              <p style={{ fontSize: 13, color: libcat.textMuted, marginBottom: 16 }}>
+                {book.item_type === "article" ? "Article" : "Book"}
+                {book.publication_year ? `, ${book.publication_year}` : ""}
+                {book.pages ? ` · ${book.pages} pages` : ""}
+              </p>
 
-          {/* Tags */}
-          {book.topics.length > 0 && (
-            <p className="mt-3 text-sm">
-              <span style={{ color: libcat.inkSoft }}>Tagged: </span>
-              {book.topics.map((t, i) => (
-                <span key={t}>
-                  <Link
-                    href={`/mockups/4?tag=${encodeURIComponent(t)}`}
+              {/* Bibliographic table — matches the labeled rows on search */}
+              {book.topics.length > 0 && (
+                <BibRow label={book.topics.length === 1 ? "Tag" : "Tags"}>
+                  {book.topics.map((t, i) => (
+                    <span key={t}>
+                      <Link
+                        href={`/mockups/4?tag=${encodeURIComponent(t)}`}
+                        style={{ color: libcat.link, textDecoration: "none" }}
+                        className="hover:underline"
+                      >
+                        {t}
+                      </Link>
+                      {i < book.topics.length - 1 && ", "}
+                    </span>
+                  ))}
+                </BibRow>
+              )}
+
+              {book.source && (
+                <BibRow
+                  label={book.source.includes(",") ? "Collections" : "Collection"}
+                >
+                  {book.source.split(",").map((s, i, arr) => {
+                    const v = s.trim();
+                    return (
+                      <span key={v}>
+                        <Link
+                          href={`/mockups/4?source=${encodeURIComponent(v)}`}
+                          style={{ color: libcat.link, textDecoration: "none" }}
+                          className="hover:underline"
+                        >
+                          {v}
+                        </Link>
+                        {i < arr.length - 1 && ", "}
+                      </span>
+                    );
+                  })}
+                </BibRow>
+              )}
+
+              {book.isbn && (
+                <BibRow label="ISBN">
+                  <span style={{ fontFamily: "Menlo, monospace", fontSize: 13 }}>
+                    {book.isbn}
+                  </span>
+                </BibRow>
+              )}
+
+              {book.doi && (
+                <BibRow label="DOI">
+                  <a
+                    href={`https://doi.org/${book.doi}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      color: libcat.link,
+                      fontFamily: "Menlo, monospace",
+                      fontSize: 13,
+                      textDecoration: "none",
+                    }}
                     className="hover:underline"
-                    style={{ color: libcat.link }}
                   >
-                    {t}
-                  </Link>
-                  {i < book.topics.length - 1 && ", "}
-                </span>
-              ))}
-            </p>
-          )}
+                    {book.doi}
+                  </a>
+                </BibRow>
+              )}
+
+              {book.journal && (
+                <BibRow label="Journal">
+                  <em>{book.journal}</em>
+                </BibRow>
+              )}
+
+              {(book.ddc || book.lcc) && (
+                <BibRow label="Call number">
+                  <span
+                    className="callnumber ddc_num_bare"
+                    style={{ fontFamily: "Menlo, monospace", fontSize: 13 }}
+                  >
+                    {book.ddc || book.lcc}
+                  </span>
+                </BibRow>
+              )}
+
+              <BibRow label="Date added">
+                {new Date(book.created_at).toLocaleDateString("en-US", {
+                  dateStyle: "medium",
+                })}
+              </BibRow>
+            </div>
+          </header>
 
           {/* Description / abstract */}
           {book.description && (
-            <p className="mt-4 leading-relaxed text-sm sm:text-base" style={{ ...serif, color: libcat.ink }}>
-              {book.description}
-            </p>
+            <section style={{ marginBottom: 24 }}>
+              <h2
+                style={{
+                  ...heading,
+                  fontSize: 18,
+                  marginTop: 0,
+                  marginBottom: 8,
+                  color: libcat.text,
+                  paddingBottom: 4,
+                  borderBottom: `1px solid ${libcat.borderLight}`,
+                }}
+              >
+                Description
+              </h2>
+              <p style={{ fontSize: 14, lineHeight: 1.6, color: libcat.text }}>
+                {book.description}
+              </p>
+            </section>
           )}
-        </div>
-      </header>
 
-      {/* ---- Two-column body: bibliographic table + reviews/holdings ---- */}
-      <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] gap-6">
-        {/* Left: bibliographic record */}
-        <div>
-          <Section title="Bibliographic record">
-            <BibTable book={book} />
-          </Section>
-
+          {/* Open Library auto-topics */}
           {book.auto_topics.length > 0 && (
-            <Section title="Additional subjects (from Open Library)">
-              <div className="flex flex-wrap gap-1.5">
-                {book.auto_topics.slice(0, 20).map((t) => (
-                  <Link
-                    key={t}
-                    href={`/mockups/4?tag=${encodeURIComponent(t)}`}
-                    className="text-xs px-2 py-0.5 hover:underline"
-                    style={{
-                      background: libcat.paperDeep,
-                      color: libcat.link,
-                      border: `1px solid ${libcat.border}`,
-                    }}
-                  >
-                    {t}
-                  </Link>
+            <section style={{ marginBottom: 24 }}>
+              <h2
+                style={{
+                  ...heading,
+                  fontSize: 18,
+                  marginTop: 0,
+                  marginBottom: 8,
+                  color: libcat.text,
+                  paddingBottom: 4,
+                  borderBottom: `1px solid ${libcat.borderLight}`,
+                }}
+              >
+                Subjects (from Open Library)
+              </h2>
+              <p style={{ fontSize: 14, color: libcat.text }}>
+                {book.auto_topics.slice(0, 25).map((t, i, arr) => (
+                  <span key={t}>
+                    <Link
+                      href={`/mockups/4?tag=${encodeURIComponent(t)}`}
+                      style={{ color: libcat.link, textDecoration: "none" }}
+                      className="hover:underline"
+                    >
+                      {t}
+                    </Link>
+                    {i < arr.length - 1 && " · "}
+                  </span>
                 ))}
-              </div>
-            </Section>
+              </p>
+            </section>
           )}
 
-          {book.item_type === "article" && (
-            <Section title="Article links">
-              <ul className="text-sm space-y-1.5">
-                {book.doi && (
-                  <li>
-                    <span style={{ color: libcat.inkSoft }}>DOI: </span>
-                    <a
-                      href={`https://doi.org/${book.doi}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="hover:underline font-mono"
-                      style={{ color: libcat.link, ...mono }}
-                    >
-                      {book.doi}
-                    </a>
-                  </li>
-                )}
-                {book.url && (
-                  <li>
-                    <span style={{ color: libcat.inkSoft }}>URL: </span>
-                    <a
-                      href={book.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="hover:underline break-all"
-                      style={{ color: libcat.link }}
-                    >
-                      {book.url}
-                    </a>
-                  </li>
-                )}
-              </ul>
-            </Section>
-          )}
+          {/* Back link */}
+          <p style={{ fontSize: 13, marginTop: 30 }}>
+            <Link
+              href="/mockups/4"
+              style={{ color: libcat.link, textDecoration: "none" }}
+              className="hover:underline"
+            >
+              ← Back to catalog
+            </Link>
+          </p>
         </div>
 
-        {/* Right: holdings + actions */}
-        <aside>
-          <Section title="Holdings">
-            <ul className="text-sm space-y-2">
-              <Row label="Library" value="Marzari Personal" />
-              <Row label="Status" value={book.status === "read" ? "Available" : book.status === "reading" ? "Checked out" : "On hold"} />
-              <Row label="Source" value={book.source || "—"} />
-              {book.lcc && <Row label="Call no." value={book.lcc} mono />}
-              {book.ddc && <Row label="DDC" value={book.ddc} mono />}
-            </ul>
-            <Link
-              href={`/mockups/4?lcc=${book.lcc ? book.lcc.charAt(0) : ""}`}
-              className="text-xs mt-3 inline-block hover:underline"
-              style={{ color: libcat.link }}
+        {/* SIDEBAR — actions / holdings */}
+        <aside className="hidden md:block md:col-span-3">
+          <div
+            className="sticky top-20"
+            style={{
+              background: "#FFF",
+              border: `1px solid ${libcat.borderLight}`,
+              borderRadius: 4,
+              padding: 12,
+              fontSize: 13,
+            }}
+          >
+            <h3
+              style={{
+                ...heading,
+                fontSize: 12,
+                color: libcat.textMuted,
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+                margin: "0 0 8px 0",
+                paddingBottom: 6,
+                borderBottom: `1px solid ${libcat.borderLight}`,
+              }}
             >
-              Browse adjacent items →
-            </Link>
-          </Section>
+              Status
+            </h3>
+            <p style={{ margin: "0 0 12px 0", fontSize: 14 }}>
+              {book.status === "read"
+                ? "On the shelf"
+                : book.status === "reading"
+                ? "Currently checked out"
+                : "Not yet read"}
+            </p>
 
-          <Section title="Catalog actions">
-            <div className="space-y-1.5 text-sm">
-              <ActionLink label="Edit this record" />
-              <ActionLink label="Add a review" />
-              <ActionLink label="Add to a list" />
-              <ActionLink label="Suggest a tag" />
-              <ActionLink label="Export MARC / BibTeX" />
-            </div>
-          </Section>
+            <h3
+              style={{
+                ...heading,
+                fontSize: 12,
+                color: libcat.textMuted,
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+                margin: "0 0 8px 0",
+                paddingBottom: 6,
+                borderBottom: `1px solid ${libcat.borderLight}`,
+              }}
+            >
+              This item
+            </h3>
+            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+              {[
+                "Edit this record",
+                "Add a review",
+                "Email to me",
+                "Add to a list",
+                "Print",
+              ].map((label) => (
+                <li key={label} style={{ marginBottom: 4 }}>
+                  <a
+                    style={{
+                      color: libcat.link,
+                      textDecoration: "none",
+                      cursor: "pointer",
+                      fontSize: 13,
+                    }}
+                    className="hover:underline"
+                  >
+                    {label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
         </aside>
-      </div>
-
-      {/* Back to results */}
-      <div className="mt-8 text-sm">
-        <Link href="/mockups/4" style={{ color: libcat.link }} className="hover:underline">
-          ← Back to catalog
-        </Link>
       </div>
     </LibcatShell>
   );
 }
-
-// ----------------------------------------------------------------------------
 
 function Cover({ book }: { book: CatalogBook }) {
   const src = coverFor(book);
@@ -273,121 +356,51 @@ function Cover({ book }: { book: CatalogBook }) {
       <img
         src={src}
         alt={book.title}
-        className="w-full aspect-[2/3] object-cover"
-        style={{ border: `1px solid ${libcat.border}` }}
+        style={{
+          width: "100%",
+          height: "auto",
+          border: `1px solid ${libcat.border}`,
+        }}
       />
     );
   }
   return (
     <div
-      className="w-full aspect-[2/3] flex items-center justify-center p-3 text-center"
       style={{
-        background: libcat.paperDeep,
+        width: "100%",
+        aspectRatio: "2 / 3",
+        background: "#F0F0F0",
         border: `1px solid ${libcat.border}`,
-        color: libcat.inkSoft,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 8,
+        textAlign: "center",
+        color: libcat.textMuted,
+        fontSize: 12,
+        ...sans,
       }}
     >
-      <span style={{ ...serif, fontSize: "0.75rem" }}>{book.title}</span>
+      no cover
     </div>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function BibRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <section className="mb-6">
-      <h2
-        className="mb-2 pb-1"
-        style={{
-          ...serif,
-          fontSize: "0.95rem",
-          fontWeight: 700,
-          color: libcat.ink,
-          borderBottom: `1px solid ${libcat.border}`,
-        }}
+    <div
+      className="grid grid-cols-12 gap-2 items-baseline"
+      style={{ marginTop: 4, fontSize: 14 }}
+    >
+      <div
+        className="col-span-4 sm:col-span-3"
+        style={{ color: libcat.textMuted }}
       >
-        {title}
-      </h2>
-      {children}
-    </section>
-  );
-}
-
-function BibTable({ book }: { book: CatalogBook }) {
-  const rows: { label: string; value: string | React.ReactNode; isMono?: boolean }[] = [];
-  rows.push({ label: "Title", value: book.title });
-  rows.push({ label: "Author(s)", value: book.author });
-  if (book.publication_year) rows.push({ label: "Published", value: String(book.publication_year) });
-  if (book.pages) rows.push({ label: "Pages", value: `${book.pages}` });
-  if (book.isbn) rows.push({ label: "ISBN", value: book.isbn, isMono: true });
-  if (book.doi) rows.push({ label: "DOI", value: book.doi, isMono: true });
-  if (book.journal) rows.push({ label: "Journal", value: book.journal });
-  if (book.lcc) {
-    const subj = lccSubject(book.lcc);
-    rows.push({
-      label: "LCC",
-      value: subj ? `${book.lcc} — ${subj}` : book.lcc,
-      isMono: !subj,
-    });
-  }
-  if (book.ddc) rows.push({ label: "DDC", value: book.ddc, isMono: true });
-  rows.push({ label: "Item type", value: book.item_type === "article" ? "Article" : "Book" });
-  rows.push({
-    label: "Date added",
-    value: new Date(book.created_at).toLocaleDateString("en-US", { dateStyle: "long" }),
-  });
-  rows.push({
-    label: "Last updated",
-    value: new Date(book.updated_at).toLocaleDateString("en-US", { dateStyle: "long" }),
-  });
-
-  return (
-    <table className="w-full text-sm" style={sans}>
-      <tbody>
-        {rows.map((r) => (
-          <tr key={r.label}>
-            <th
-              className="text-left align-top py-1.5 pr-3 font-normal whitespace-nowrap"
-              style={{
-                ...serif,
-                color: libcat.inkSoft,
-                width: "140px",
-                borderBottom: `1px solid ${libcat.rule}`,
-              }}
-            >
-              {r.label}
-            </th>
-            <td
-              className="py-1.5"
-              style={{
-                color: libcat.ink,
-                borderBottom: `1px solid ${libcat.rule}`,
-                ...(r.isMono ? mono : {}),
-              }}
-            >
-              {r.value}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
-function Row({ label, value, mono: isMono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <li className="flex items-baseline justify-between gap-2">
-      <span style={{ color: libcat.inkSoft, ...serif }}>{label}</span>
-      <span style={isMono ? mono : sans}>{value}</span>
-    </li>
-  );
-}
-
-function ActionLink({ label }: { label: string }) {
-  return (
-    <p>
-      <a className="hover:underline cursor-pointer" style={{ color: libcat.link }}>
         {label}
-      </a>
-    </p>
+      </div>
+      <div className="col-span-8 sm:col-span-9" style={{ color: libcat.text }}>
+        {children}
+      </div>
+    </div>
   );
 }

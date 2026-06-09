@@ -1,12 +1,41 @@
 "use client";
 
+// Mockup #4 — LibraryCat (TinyCat) catalog search page.
+// Layout matched to www.librarycat.org/lib/BibleProject/search/text/jonah:
+//
+// - Bootstrap 3 grid (.row / col-md-X)
+// - System font stack — no Google Fonts
+// - Sticky white navbar with search left + library name+logo right
+// - Sort/breadcrumb bar at top: "X items" · pagination · "relevancy ▾"
+// - Results: each .minipac_result row has col-md-1 cover + col-md-6 text
+// - Text column: <h2>Title</h2> · "by Author" · "Paperback, 1968"
+//   followed by Tags / Collections / Series / Call number labeled rows
+// - Right rail (col-md-3): faceted refinements — Tags, Collections, Series,
+//   Call number (DDC). On the real site this is AJAX-loaded into #facetsdiv.
+
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { LibcatShell, libcat, serif, sans, mono } from "./theme";
-import { coverFor, lccSubject, useCatalog, type CatalogBook } from "./useCatalog";
+import { LibcatShell, libcat, heading, sans } from "./theme";
+import { coverFor, useCatalog, type CatalogBook } from "./useCatalog";
 
-type SortKey = "relevance" | "title" | "author" | "year" | "added" | "rating";
-type StatusFilter = "all" | "read" | "reading" | "not_read" | "favorites";
+type SortKey =
+  | "relevancy"
+  | "acquisition"
+  | "title"
+  | "date"
+  | "author"
+  | "popularity"
+  | "series";
+
+const SORT_LABELS: Record<SortKey, string> = {
+  relevancy: "relevancy",
+  acquisition: "acquisition",
+  title: "title",
+  date: "date",
+  author: "author",
+  popularity: "popularity",
+  series: "series",
+};
 
 export default function LibcatCatalog() {
   const { books, loading } = useCatalog();
@@ -14,17 +43,19 @@ export default function LibcatCatalog() {
   const [query, setQuery] = useState("");
   const [appliedQuery, setAppliedQuery] = useState("");
   const [page, setPage] = useState(1);
-  const [sort, setSort] = useState<SortKey>("relevance");
-  const [pageSize] = useState(20);
+  const [sort, setSort] = useState<SortKey>("relevancy");
+  const pageSize = 20;
 
-  // Facets
+  // Facet selections — Tags, Collections (derived from `source`), Series
+  // (derived from series-tagged topics), DDC subject letter.
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
-  const [selectedAuthors, setSelectedAuthors] = useState<Set<string>>(new Set());
-  const [selectedSubjects, setSelectedSubjects] = useState<Set<string>>(new Set());
-  const [status, setStatus] = useState<StatusFilter>("all");
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [selectedCollections, setSelectedCollections] = useState<Set<string>>(new Set());
+  const [showAllTags, setShowAllTags] = useState(false);
+  const [showAllCollections, setShowAllCollections] = useState(false);
 
-  // -- Search match ----------------------------------------------------------
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+
+  // ---- search match ----
   const matches = (b: CatalogBook, q: string): boolean => {
     if (!q) return true;
     const lower = q.toLowerCase();
@@ -39,29 +70,18 @@ export default function LibcatCatalog() {
     );
   };
 
-  // -- Apply search + facets -------------------------------------------------
   const filtered = useMemo(() => {
     return books
       .filter((b) => matches(b, appliedQuery))
-      .filter((b) => {
-        if (status === "all") return true;
-        if (status === "favorites") return !!b.favorite || b.rating === 5;
-        return b.status === status;
-      })
       .filter((b) => {
         if (selectedTags.size === 0) return true;
         return b.topics.some((t) => selectedTags.has(t));
       })
       .filter((b) => {
-        if (selectedAuthors.size === 0) return true;
-        return b.authors.some((a) => selectedAuthors.has(a));
-      })
-      .filter((b) => {
-        if (selectedSubjects.size === 0) return true;
-        const subj = lccSubject(b.lcc);
-        return subj ? selectedSubjects.has(subj) : false;
+        if (selectedCollections.size === 0) return true;
+        return b.source ? selectedCollections.has(b.source) : false;
       });
-  }, [books, appliedQuery, status, selectedTags, selectedAuthors, selectedSubjects]);
+  }, [books, appliedQuery, selectedTags, selectedCollections]);
 
   const sorted = useMemo(() => {
     const out = [...filtered];
@@ -72,18 +92,21 @@ export default function LibcatCatalog() {
       case "author":
         out.sort((a, b) => a.author.localeCompare(b.author));
         break;
-      case "year":
+      case "date":
         out.sort((a, b) => (b.publication_year || 0) - (a.publication_year || 0));
         break;
-      case "added":
+      case "acquisition":
         out.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
         break;
-      case "rating":
+      case "popularity":
         out.sort((a, b) => (b.rating || 0) - (a.rating || 0));
         break;
-      case "relevance":
+      case "series":
+        // Group by series-ish (we'll use first topic as a stand-in)
+        out.sort((a, b) => (a.topics[0] || "z").localeCompare(b.topics[0] || "z"));
+        break;
+      case "relevancy":
       default:
-        // Surface exact title/author matches when there's a query, else alpha
         if (appliedQuery) {
           const q = appliedQuery.toLowerCase();
           const score = (b: CatalogBook) => {
@@ -92,7 +115,7 @@ export default function LibcatCatalog() {
             if (b.title.toLowerCase().startsWith(q)) s += 30;
             if (b.title.toLowerCase().includes(q)) s += 10;
             if (b.author.toLowerCase().includes(q)) s += 5;
-            if (b.topics.some((t) => t.toLowerCase() === q)) s += 8;
+            if (b.topics.some((t) => t.toLowerCase().includes(q))) s += 8;
             return s;
           };
           out.sort((a, b) => score(b) - score(a) || a.title.localeCompare(b.title));
@@ -104,58 +127,35 @@ export default function LibcatCatalog() {
     return out;
   }, [filtered, sort, appliedQuery]);
 
-  // -- Facet counts (computed over the books matching the search but BEFORE
-  //    that specific facet is applied — gives the user the "if I add this
-  //    facet, this is how many results I'll have" intuition).
+  // Facet counts derived from current search results
   const tagCounts = useMemo(() => {
     const m = new Map<string, number>();
     books
       .filter((b) => matches(b, appliedQuery))
-      .filter((b) => status === "all" || (status === "favorites" ? b.favorite || b.rating === 5 : b.status === status))
       .forEach((b) => b.topics.forEach((t) => m.set(t, (m.get(t) || 0) + 1)));
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1]);
-  }, [books, appliedQuery, status]);
+  }, [books, appliedQuery]);
 
-  const authorCounts = useMemo(() => {
+  const collectionCounts = useMemo(() => {
     const m = new Map<string, number>();
     books
       .filter((b) => matches(b, appliedQuery))
-      .filter((b) => status === "all" || (status === "favorites" ? b.favorite || b.rating === 5 : b.status === status))
-      .forEach((b) => b.authors.forEach((a) => m.set(a, (m.get(a) || 0) + 1)));
-    return Array.from(m.entries()).sort((a, b) => b[1] - a[1]);
-  }, [books, appliedQuery, status]);
-
-  const subjectCounts = useMemo(() => {
-    const m = new Map<string, number>();
-    books
-      .filter((b) => matches(b, appliedQuery))
-      .filter((b) => status === "all" || (status === "favorites" ? b.favorite || b.rating === 5 : b.status === status))
       .forEach((b) => {
-        const subj = lccSubject(b.lcc);
-        if (subj) m.set(subj, (m.get(subj) || 0) + 1);
+        if (b.source) m.set(b.source, (m.get(b.source) || 0) + 1);
       });
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1]);
-  }, [books, appliedQuery, status]);
+  }, [books, appliedQuery]);
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const pageStart = (page - 1) * pageSize;
   const pageBooks = sorted.slice(pageStart, pageStart + pageSize);
 
-  // -- Helpers ---------------------------------------------------------------
-  const toggle = <T,>(set: Set<T>, value: T, setter: (s: Set<T>) => void) => {
+  const toggleSet = <T,>(set: Set<T>, value: T, setter: (s: Set<T>) => void) => {
     const next = new Set(set);
     if (next.has(value)) next.delete(value);
     else next.add(value);
     setter(next);
-    setPage(1);
-  };
-
-  const clearAll = () => {
-    setSelectedTags(new Set());
-    setSelectedAuthors(new Set());
-    setSelectedSubjects(new Set());
-    setStatus("all");
     setPage(1);
   };
 
@@ -164,559 +164,603 @@ export default function LibcatCatalog() {
     setPage(1);
   };
 
+  // Result count text — matches "31 items" pattern
+  const resultCount = sorted.length;
+
   return (
     <LibcatShell
       query={query}
       onQueryChange={setQuery}
       onSubmit={applySearch}
     >
-      {/* Two-column layout — sidebar + main */}
-      <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-6 mt-2">
-        {/* ---- FACET SIDEBAR ---- */}
-        <aside className="md:sticky md:top-3 md:self-start space-y-5 md:max-h-[calc(100vh-2rem)] md:overflow-y-auto pr-1">
-          <FacetPanel title="Refine your search">
-            <button
-              onClick={clearAll}
-              className="text-xs hover:underline"
-              style={{ color: libcat.link }}
-            >
-              Clear all filters
-            </button>
-          </FacetPanel>
-
-          <FacetPanel title="Status">
-            <div className="space-y-0.5">
-              {([
-                { key: "all", label: "All items" },
-                { key: "read", label: "Read" },
-                { key: "reading", label: "Reading" },
-                { key: "not_read", label: "Not yet read" },
-                { key: "favorites", label: "Favorites" },
-              ] as { key: StatusFilter; label: string }[]).map((s) => {
-                const count =
-                  s.key === "all"
-                    ? books.length
-                    : s.key === "favorites"
-                    ? books.filter((b) => b.favorite || b.rating === 5).length
-                    : books.filter((b) => b.status === s.key).length;
-                const selected = status === s.key;
-                return (
-                  <label
-                    key={s.key}
-                    className="flex items-center gap-2 cursor-pointer text-sm"
-                    style={{ color: selected ? libcat.accent : libcat.ink }}
-                  >
-                    <input
-                      type="radio"
-                      name="status"
-                      checked={selected}
-                      onChange={() => {
-                        setStatus(s.key);
-                        setPage(1);
-                      }}
-                      className="accent-amber-700"
-                    />
-                    <span className="flex-1">{s.label}</span>
-                    <span className="text-xs" style={{ color: libcat.inkSoft }}>
-                      ({count})
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          </FacetPanel>
-
-          <FacetPanel title="Tags" badge={`${tagCounts.length}`}>
-            <FacetCheckList
-              items={tagCounts}
-              selected={selectedTags}
-              onToggle={(v) => toggle(selectedTags, v, setSelectedTags)}
-              limit={showAdvanced ? 50 : 8}
-              onSelectExclusive={(v) => {
-                setSelectedTags(new Set([v]));
-                setPage(1);
-              }}
-            />
-          </FacetPanel>
-
-          <FacetPanel title="Authors" badge={`${authorCounts.length}`}>
-            <FacetCheckList
-              items={authorCounts}
-              selected={selectedAuthors}
-              onToggle={(v) => toggle(selectedAuthors, v, setSelectedAuthors)}
-              limit={showAdvanced ? 30 : 6}
-              onSelectExclusive={(v) => {
-                setSelectedAuthors(new Set([v]));
-                setPage(1);
-              }}
-            />
-          </FacetPanel>
-
-          <FacetPanel title="Subject (LCC)" badge={`${subjectCounts.length}`}>
-            <FacetCheckList
-              items={subjectCounts}
-              selected={selectedSubjects}
-              onToggle={(v) => toggle(selectedSubjects, v, setSelectedSubjects)}
-              limit={20}
-            />
-          </FacetPanel>
-
-          <button
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className="text-xs hover:underline"
-            style={{ color: libcat.link }}
-          >
-            {showAdvanced ? "← Show fewer facets" : "Show all facets →"}
-          </button>
-        </aside>
-
-        {/* ---- RESULTS ---- */}
-        <main>
-          {/* Result count + sort */}
-          <div
-            className="flex items-center justify-between gap-3 pb-2 mb-3"
-            style={{ borderBottom: `2px solid ${libcat.border}` }}
-          >
-            <p className="text-sm" style={sans}>
-              {loading ? (
-                "Loading catalog..."
-              ) : appliedQuery ? (
-                <>
-                  <span style={{ ...serif, fontWeight: 700 }}>{sorted.length}</span>{" "}
-                  result{sorted.length === 1 ? "" : "s"} for{" "}
-                  <em style={{ color: libcat.accent }}>&ldquo;{appliedQuery}&rdquo;</em>
-                </>
-              ) : (
-                <>
-                  <span style={{ ...serif, fontWeight: 700 }}>{sorted.length}</span>{" "}
-                  item{sorted.length === 1 ? "" : "s"} in the catalog
-                </>
-              )}
-              {(selectedTags.size > 0 || selectedAuthors.size > 0 || selectedSubjects.size > 0) && (
-                <span style={{ color: libcat.inkSoft }}>
-                  {" "}· filtered
-                </span>
-              )}
-            </p>
-
-            <label className="flex items-center gap-1.5 text-xs" style={{ color: libcat.inkSoft }}>
-              Sort by
-              <select
-                value={sort}
-                onChange={(e) => {
-                  setSort(e.target.value as SortKey);
-                  setPage(1);
-                }}
-                className="px-2 py-1"
-                style={{
-                  background: libcat.card,
-                  border: `1px solid ${libcat.border}`,
-                  color: libcat.ink,
-                  ...sans,
-                }}
-              >
-                <option value="relevance">Relevance</option>
-                <option value="title">Title (A→Z)</option>
-                <option value="author">Author (A→Z)</option>
-                <option value="year">Year (newest)</option>
-                <option value="added">Date added</option>
-                <option value="rating">Rating</option>
-              </select>
-            </label>
+      {/* ---- Sortbar / breadcrumb (matches .col-md-12.minipac_sortbar) ---- */}
+      <div
+        style={{
+          background: libcat.breadcrumbBg,
+          padding: "8px 15px",
+          marginBottom: 20,
+          borderRadius: 4,
+        }}
+      >
+        <div className="flex items-center justify-between gap-3 flex-wrap" style={{ fontSize: 14 }}>
+          {/* Left — count */}
+          <div style={{ minWidth: 100 }}>
+            <strong>{resultCount}</strong> item{resultCount === 1 ? "" : "s"}
           </div>
 
-          {/* Active facet chips */}
-          {(selectedTags.size + selectedAuthors.size + selectedSubjects.size > 0) && (
-            <div className="flex flex-wrap gap-1.5 mb-3">
-              {[...selectedTags].map((t) => (
-                <ActiveChip key={`t-${t}`} label={`Tag: ${t}`} onRemove={() => toggle(selectedTags, t, setSelectedTags)} />
-              ))}
-              {[...selectedAuthors].map((a) => (
-                <ActiveChip key={`a-${a}`} label={`Author: ${a}`} onRemove={() => toggle(selectedAuthors, a, setSelectedAuthors)} />
-              ))}
-              {[...selectedSubjects].map((s) => (
-                <ActiveChip key={`s-${s}`} label={`Subject: ${s}`} onRemove={() => toggle(selectedSubjects, s, setSelectedSubjects)} />
-              ))}
-            </div>
-          )}
+          {/* Center — pagination */}
+          <div className="text-center flex-1">
+            {totalPages > 1 && (
+              <ul className="inline-flex" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+                <PageLink
+                  label="«"
+                  disabled={page === 1}
+                  onClick={() => setPage(page - 1)}
+                />
+                {Array.from({ length: totalPages }).map((_, i) => (
+                  <PageLink
+                    key={i}
+                    label={String(i + 1)}
+                    active={i + 1 === page}
+                    onClick={() => setPage(i + 1)}
+                  />
+                ))}
+                <PageLink
+                  label="»"
+                  disabled={page === totalPages}
+                  onClick={() => setPage(page + 1)}
+                />
+              </ul>
+            )}
+          </div>
 
-          {/* Result list */}
-          {!loading && pageBooks.length === 0 && (
-            <div
-              className="p-8 text-center"
-              style={{ background: libcat.card, border: `1px solid ${libcat.border}` }}
+          {/* Right — sort dropdown */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setSortMenuOpen(!sortMenuOpen)}
+              onBlur={() => setTimeout(() => setSortMenuOpen(false), 150)}
+              className="flex items-center gap-1.5"
+              style={{
+                background: libcat.btnBg,
+                border: `1px solid ${libcat.btnBorder}`,
+                color: libcat.text,
+                padding: "5px 10px",
+                fontSize: 12,
+                lineHeight: 1.5,
+                borderRadius: 3,
+                cursor: "pointer",
+                ...sans,
+              }}
+              aria-expanded={sortMenuOpen}
+              aria-haspopup="true"
             >
-              <p style={{ ...serif, fontSize: "1.1rem", color: libcat.inkSoft }}>
-                Nothing matches your query.
-              </p>
-              <p className="text-sm mt-2" style={{ color: libcat.inkSoft }}>
-                Try removing a filter, broadening your search, or clearing all.
-              </p>
+              {SORT_LABELS[sort]}
+              <SortIcon />
+              <Caret />
+            </button>
+            {sortMenuOpen && (
+              <ul
+                className="absolute right-0 mt-1 z-20"
+                style={{
+                  background: "#FFF",
+                  border: `1px solid rgba(0,0,0,0.15)`,
+                  borderRadius: 4,
+                  boxShadow: "0 6px 12px rgba(0,0,0,0.175)",
+                  padding: "5px 0",
+                  minWidth: 160,
+                  listStyle: "none",
+                  fontSize: 14,
+                  margin: 0,
+                }}
+              >
+                <li style={{ padding: "3px 20px", color: libcat.textMuted, fontSize: 12, textTransform: "uppercase" }}>
+                  Sort
+                </li>
+                {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => {
+                  const active = key === sort;
+                  return (
+                    <li key={key}>
+                      <button
+                        onClick={() => {
+                          setSort(key);
+                          setSortMenuOpen(false);
+                          setPage(1);
+                        }}
+                        className="block w-full text-left hover:bg-gray-100"
+                        style={{
+                          padding: "3px 20px",
+                          color: active ? libcat.text : libcat.link,
+                          fontWeight: active ? 700 : 400,
+                          background: "transparent",
+                          border: "none",
+                          cursor: "pointer",
+                          ...sans,
+                        }}
+                      >
+                        {SORT_LABELS[key]}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ---- 2-column layout: results + right-side facets ---- */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+        {/* Results column — col-md-9 (we use 9/12 with facets at 3/12) */}
+        <div className="md:col-span-9">
+          {loading && (
+            <div style={{ padding: 30, textAlign: "center", color: libcat.textMuted }}>
+              Loading catalog…
             </div>
           )}
 
-          <ol
-            style={{
-              background: libcat.card,
-              border: `1px solid ${libcat.border}`,
-            }}
-          >
+          {!loading && pageBooks.length === 0 && (
+            <div style={{ padding: 30, textAlign: "center", color: libcat.textMuted }}>
+              No items match this search.
+            </div>
+          )}
+
+          <div id="resultsbox">
             {pageBooks.map((b, i) => (
-              <BookRow
+              <ResultRow
                 key={b.id}
                 book={b}
-                index={pageStart + i + 1}
+                first={pageStart === 0 && i === 0}
                 onTagClick={(t) => {
                   setSelectedTags(new Set([t]));
                   setPage(1);
                 }}
-                onAuthorClick={(a) => {
-                  setSelectedAuthors(new Set([a]));
+                onSourceClick={(s) => {
+                  setSelectedCollections(new Set([s]));
                   setPage(1);
                 }}
               />
             ))}
-          </ol>
+          </div>
+        </div>
 
-          {/* Pagination */}
-          {sorted.length > pageSize && (
-            <nav
-              className="mt-4 flex items-center justify-between gap-3 text-sm"
-              style={mono}
+        {/* Facet sidebar — col-md-3.
+            Real TinyCat uses col-md-2 + display:none until ajax loads; we keep
+            it visible and a touch wider for readability. Hidden on mobile.   */}
+        <aside className="hidden md:block md:col-span-3">
+          <div
+            className="sticky top-20"
+            style={{
+              background: "#FFF",
+              border: `1px solid ${libcat.borderLight}`,
+              borderRadius: 4,
+              padding: 12,
+              fontSize: 13,
+            }}
+          >
+            <h3
+              style={{
+                ...heading,
+                fontSize: 16,
+                color: libcat.textMuted,
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+                margin: "0 0 8px 0",
+                paddingBottom: 6,
+                borderBottom: `1px solid ${libcat.borderLight}`,
+              }}
             >
-              <button
-                disabled={page === 1}
-                onClick={() => setPage(page - 1)}
-                className="px-3 py-1.5 disabled:opacity-30"
-                style={{
-                  background: libcat.card,
-                  border: `1px solid ${libcat.border}`,
-                  color: libcat.link,
-                }}
-              >
-                ← Prev
-              </button>
-              <p style={{ color: libcat.inkSoft }}>
-                Page {page} of {totalPages} · Showing {pageStart + 1}–
-                {Math.min(pageStart + pageSize, sorted.length)} of {sorted.length}
-              </p>
-              <button
-                disabled={page === totalPages}
-                onClick={() => setPage(page + 1)}
-                className="px-3 py-1.5 disabled:opacity-30"
-                style={{
-                  background: libcat.card,
-                  border: `1px solid ${libcat.border}`,
-                  color: libcat.link,
-                }}
-              >
-                Next →
-              </button>
-            </nav>
-          )}
-        </main>
+              Refine
+            </h3>
+
+            <FacetGroup
+              label="Tags"
+              entries={tagCounts}
+              selected={selectedTags}
+              onToggle={(v) => toggleSet(selectedTags, v, setSelectedTags)}
+              expanded={showAllTags}
+              setExpanded={setShowAllTags}
+            />
+
+            {collectionCounts.length > 0 && (
+              <FacetGroup
+                label="Collections"
+                entries={collectionCounts}
+                selected={selectedCollections}
+                onToggle={(v) => toggleSet(selectedCollections, v, setSelectedCollections)}
+                expanded={showAllCollections}
+                setExpanded={setShowAllCollections}
+              />
+            )}
+
+            {(selectedTags.size > 0 || selectedCollections.size > 0) && (
+              <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${libcat.borderLight}` }}>
+                <button
+                  onClick={() => {
+                    setSelectedTags(new Set());
+                    setSelectedCollections(new Set());
+                    setPage(1);
+                  }}
+                  style={{
+                    color: libcat.link,
+                    background: "transparent",
+                    border: "none",
+                    padding: 0,
+                    fontSize: 12,
+                    cursor: "pointer",
+                    textDecoration: "underline",
+                  }}
+                >
+                  Clear all
+                </button>
+              </div>
+            )}
+          </div>
+        </aside>
       </div>
     </LibcatShell>
   );
 }
 
-// ----------------------------------------------------------------------------
+// ---- Components -------------------------------------------------------------
 
-function FacetPanel({
-  title,
-  badge,
-  children,
+function ResultRow({
+  book,
+  first,
+  onTagClick,
+  onSourceClick,
 }: {
-  title: string;
-  badge?: string;
-  children: React.ReactNode;
+  book: CatalogBook;
+  first: boolean;
+  onTagClick: (t: string) => void;
+  onSourceClick: (s: string) => void;
 }) {
+  const cover = coverFor(book);
+  // Format line — matches the real "Paperback, 1968" / "Hardcover, 1986" /
+  // "Book, 2008". We pick "Article" for item_type='article', else fall back.
+  const formatLine = (() => {
+    if (book.item_type === "article") {
+      return book.publication_year
+        ? `Article, ${book.publication_year}`
+        : "Article";
+    }
+    const fmt = "Book";
+    const year = book.publication_year;
+    return year ? `${fmt}, ${year}` : fmt;
+  })();
+
   return (
-    <section>
-      <h3
-        className="flex items-baseline justify-between mb-1.5 pb-1"
-        style={{
-          ...serif,
-          fontSize: "0.95rem",
-          fontWeight: 700,
-          color: libcat.ink,
-          borderBottom: `1px solid ${libcat.border}`,
-        }}
-      >
-        <span>{title}</span>
-        {badge && (
-          <span className="text-[10px]" style={{ ...mono, color: libcat.inkSoft }}>
-            {badge}
-          </span>
-        )}
-      </h3>
-      {children}
-    </section>
+    <article
+      className="minipac_result"
+      style={{
+        padding: first ? "20px 0" : "20px 0",
+        borderTop: first ? "none" : `1px solid ${libcat.borderLight}`,
+      }}
+    >
+      <div className="grid grid-cols-12 gap-3">
+        {/* Cover — col-md-1 in real markup; we give it a touch more breathing
+            room (col-span-2 on mobile, 1 on desktop) */}
+        <div className="col-span-3 sm:col-span-2 md:col-span-1">
+          <Link href={`/mockups/4/book?id=${encodeURIComponent(book.id)}`}>
+            {cover ? (
+              <img
+                src={cover}
+                alt={book.title}
+                style={{
+                  width: "100%",
+                  maxWidth: 90,
+                  height: "auto",
+                  border: `1px solid ${libcat.borderLight}`,
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: "100%",
+                  maxWidth: 90,
+                  aspectRatio: "2 / 3",
+                  background: "#F0F0F0",
+                  border: `1px solid ${libcat.borderLight}`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 10,
+                  color: libcat.textMuted,
+                  padding: 4,
+                  textAlign: "center",
+                }}
+              >
+                no cover
+              </div>
+            )}
+          </Link>
+        </div>
+
+        {/* Text column — col-md-6 in real markup; we use 9/12 here so the
+            (otherwise empty) right margin doesn't waste space. */}
+        <div className="col-span-9 sm:col-span-10 md:col-span-11">
+          {/* Title — h2 + "by Author" + format line */}
+          <div className="minipac_tad">
+            <div className="minipac_tad_item minipac_tad_t">
+              <h2
+                style={{
+                  ...heading,
+                  fontSize: 22,
+                  margin: 0,
+                  marginBottom: 4,
+                }}
+              >
+                <Link
+                  href={`/mockups/4/book?id=${encodeURIComponent(book.id)}`}
+                  style={{ color: libcat.link, textDecoration: "none" }}
+                  className="hover:underline"
+                >
+                  {book.title}
+                </Link>
+              </h2>
+            </div>
+            <div className="minipac_tad_item minipac_tad_a">
+              <span className="minipac_tad_as" style={{ fontSize: 14, color: libcat.text }}>
+                by{" "}
+                {book.authors.map((a, i) => (
+                  <span key={a}>
+                    <Link
+                      href={`/mockups/4?author=${encodeURIComponent(a)}`}
+                      style={{ color: libcat.link, textDecoration: "none" }}
+                      className="hover:underline"
+                    >
+                      {a}
+                    </Link>
+                    {i < book.authors.length - 1 && ", "}
+                  </span>
+                ))}
+              </span>
+            </div>
+            <span
+              className="minipac_search_fmt"
+              style={{ fontSize: 13, color: libcat.textMuted }}
+            >
+              {formatLine}
+            </span>
+          </div>
+
+          {/* Tags row */}
+          {book.topics.length > 0 && (
+            <BibSection label={book.topics.length === 1 ? "Tag" : "Tags"}>
+              {book.topics.map((t, i) => (
+                <span key={t}>
+                  <button
+                    onClick={() => onTagClick(t)}
+                    style={{
+                      color: libcat.link,
+                      background: "transparent",
+                      border: "none",
+                      padding: 0,
+                      fontSize: 14,
+                      cursor: "pointer",
+                      ...sans,
+                    }}
+                    className="hover:underline"
+                  >
+                    {t}
+                  </button>
+                  {i < book.topics.length - 1 && ", "}
+                </span>
+              ))}
+            </BibSection>
+          )}
+
+          {/* Collections (we use `source` as the "collection" — e.g. "Strand",
+              "Library", "Tim's Library") */}
+          {book.source && (
+            <BibSection
+              label={book.source.includes(",") ? "Collections" : "Collection"}
+            >
+              {book.source.split(",").map((s, i, arr) => {
+                const v = s.trim();
+                return (
+                  <span key={v}>
+                    <button
+                      onClick={() => onSourceClick(v)}
+                      style={{
+                        color: libcat.link,
+                        background: "transparent",
+                        border: "none",
+                        padding: 0,
+                        fontSize: 14,
+                        cursor: "pointer",
+                        ...sans,
+                      }}
+                      className="hover:underline"
+                    >
+                      {v}
+                    </button>
+                    {i < arr.length - 1 && ", "}
+                  </span>
+                );
+              })}
+            </BibSection>
+          )}
+
+          {/* Call number — real markup shows DDC like "224.92077" */}
+          {(book.ddc || book.lcc) && (
+            <BibSection label="Call number">
+              <span
+                className="callnumber ddc_num_bare"
+                style={{ fontSize: 14, color: libcat.text }}
+              >
+                {book.ddc || book.lcc}
+              </span>
+            </BibSection>
+          )}
+        </div>
+      </div>
+    </article>
   );
 }
 
-function FacetCheckList({
-  items,
+// ".minipac_searchresults_section.row" structure: label col-md-2 + data col-md-10
+function BibSection({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div
+      className="grid grid-cols-12 gap-2 items-baseline"
+      style={{ marginTop: 6, fontSize: 14 }}
+    >
+      <div
+        className="col-span-3 sm:col-span-2"
+        style={{ color: libcat.textMuted }}
+      >
+        {label}
+      </div>
+      <div className="col-span-9 sm:col-span-10">{children}</div>
+    </div>
+  );
+}
+
+function FacetGroup({
+  label,
+  entries,
   selected,
   onToggle,
-  onSelectExclusive,
-  limit,
+  expanded,
+  setExpanded,
 }: {
-  items: [string, number][];
+  label: string;
+  entries: [string, number][];
   selected: Set<string>;
   onToggle: (v: string) => void;
-  onSelectExclusive?: (v: string) => void;
-  limit: number;
+  expanded: boolean;
+  setExpanded: (b: boolean) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const visible = expanded ? items : items.slice(0, limit);
-
-  if (items.length === 0) {
-    return (
-      <p className="text-xs italic" style={{ color: libcat.inkSoft }}>
-        None in current results.
-      </p>
-    );
-  }
+  const limit = 6;
+  const visible = expanded ? entries : entries.slice(0, limit);
 
   return (
-    <div>
-      <div className="space-y-0.5">
-        {visible.map(([name, count]) => {
-          const isSelected = selected.has(name);
-          return (
-            <div
-              key={name}
-              className="flex items-center gap-1.5 text-sm leading-snug"
-              style={{ color: isSelected ? libcat.accent : libcat.ink }}
+    <div style={{ marginBottom: 14 }}>
+      <h4
+        style={{
+          ...heading,
+          fontSize: 13,
+          color: libcat.text,
+          margin: "0 0 4px 0",
+          fontWeight: 700,
+        }}
+      >
+        {label}
+      </h4>
+      {entries.length === 0 ? (
+        <p style={{ fontSize: 12, color: libcat.textMuted, fontStyle: "italic" }}>
+          (none)
+        </p>
+      ) : (
+        <>
+          <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+            {visible.map(([name, count]) => {
+              const isSelected = selected.has(name);
+              return (
+                <li
+                  key={name}
+                  style={{
+                    fontSize: 13,
+                    lineHeight: 1.5,
+                    padding: "1px 0",
+                  }}
+                >
+                  <button
+                    onClick={() => onToggle(name)}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      padding: 0,
+                      color: isSelected ? libcat.text : libcat.link,
+                      fontWeight: isSelected ? 700 : 400,
+                      cursor: "pointer",
+                      ...sans,
+                    }}
+                    className="hover:underline text-left"
+                    title={name}
+                  >
+                    {name}
+                  </button>{" "}
+                  <span style={{ color: libcat.textMuted, fontSize: 12 }}>
+                    ({count})
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          {entries.length > limit && (
+            <button
+              onClick={() => setExpanded(!expanded)}
+              style={{
+                color: libcat.link,
+                background: "transparent",
+                border: "none",
+                padding: 0,
+                fontSize: 12,
+                cursor: "pointer",
+                marginTop: 4,
+              }}
+              className="hover:underline"
             >
-              <input
-                type="checkbox"
-                checked={isSelected}
-                onChange={() => onToggle(name)}
-                className="accent-amber-700 flex-shrink-0"
-              />
-              <button
-                onClick={() => onSelectExclusive?.(name) ?? onToggle(name)}
-                className="flex-1 text-left hover:underline truncate"
-                style={{
-                  color: isSelected ? libcat.accent : libcat.link,
-                  fontWeight: isSelected ? 600 : 400,
-                }}
-                title={name}
-              >
-                {name}
-              </button>
-              <span className="text-xs" style={{ ...mono, color: libcat.inkSoft }}>
-                ({count})
-              </span>
-            </div>
-          );
-        })}
-      </div>
-      {items.length > limit && (
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="text-xs hover:underline mt-1.5"
-          style={{ color: libcat.link }}
-        >
-          {expanded ? "← show less" : `+ ${items.length - limit} more`}
-        </button>
+              {expanded ? "show fewer" : `more (${entries.length - limit})`}
+            </button>
+          )}
+        </>
       )}
     </div>
   );
 }
 
-function ActiveChip({ label, onRemove }: { label: string; onRemove: () => void }) {
+function PageLink({
+  label,
+  active,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  active?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
   return (
-    <span
-      className="inline-flex items-center gap-1 px-2 py-0.5 text-xs"
-      style={{
-        background: libcat.accent + "1A",
-        color: libcat.accent,
-        border: `1px solid ${libcat.accent}55`,
-        ...sans,
-      }}
-    >
-      <span>{label}</span>
-      <button onClick={onRemove} className="opacity-70 hover:opacity-100" aria-label="Remove">
-        ×
+    <li style={{ display: "inline-block" }}>
+      <button
+        onClick={disabled ? undefined : onClick}
+        disabled={disabled}
+        style={{
+          background: active ? "#EEE" : libcat.btnBg,
+          color: active ? libcat.text : disabled ? libcat.textSubtle : libcat.link,
+          border: `1px solid ${libcat.btnBorder}`,
+          borderRight: "none",
+          padding: "5px 10px",
+          fontSize: 13,
+          cursor: disabled ? "not-allowed" : "pointer",
+          fontWeight: active ? 600 : 400,
+          ...sans,
+        }}
+      >
+        {label}
       </button>
-    </span>
+    </li>
   );
 }
 
-function BookRow({
-  book,
-  index,
-  onTagClick,
-  onAuthorClick,
-}: {
-  book: CatalogBook;
-  index: number;
-  onTagClick: (t: string) => void;
-  onAuthorClick: (a: string) => void;
-}) {
-  const cover = coverFor(book);
-  const subj = lccSubject(book.lcc);
-  const isArticle = book.item_type === "article";
-
+// "Sort amount down" — Font Awesome 6 `fa-sort-amount-down`
+function SortIcon() {
   return (
-    <li
-      className="grid grid-cols-[40px_60px_1fr_auto] gap-3 px-3 py-3 hover:bg-amber-50/40"
-      style={{ borderBottom: `1px solid ${libcat.rule}` }}
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 512 512"
+      fill="currentColor"
+      aria-hidden
     >
-      {/* Row index */}
-      <span
-        className="text-sm tabular-nums self-center text-right"
-        style={{ ...mono, color: libcat.inkFaint }}
-      >
-        {index}.
-      </span>
-
-      {/* Cover */}
-      <div>
-        {cover ? (
-          <img
-            src={cover}
-            alt=""
-            className="w-12 h-[68px] object-cover"
-            style={{ border: `1px solid ${libcat.border}` }}
-          />
-        ) : (
-          <div
-            className="w-12 h-[68px] flex items-center justify-center text-center p-1"
-            style={{
-              background: libcat.paperDeep,
-              border: `1px solid ${libcat.border}`,
-              color: libcat.inkSoft,
-            }}
-          >
-            <span className="text-[9px] leading-tight" style={serif}>
-              {book.title.slice(0, 24)}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Metadata column */}
-      <div className="min-w-0 self-center">
-        <p className="text-sm sm:text-base leading-snug">
-          <Link
-            href={`/mockups/4/book?id=${encodeURIComponent(book.id)}`}
-            className="hover:underline"
-            style={{ ...serif, color: libcat.link, fontWeight: 600 }}
-          >
-            {book.title}
-          </Link>
-          {isArticle && (
-            <span
-              className="ml-2 px-1.5 py-0.5 text-[9px] tracking-wider align-middle"
-              style={{
-                background: libcat.accent,
-                color: libcat.paperLight,
-                ...mono,
-              }}
-            >
-              ARTICLE
-            </span>
-          )}
-        </p>
-
-        <p className="text-xs sm:text-sm mt-0.5" style={{ color: libcat.inkSoft }}>
-          by{" "}
-          {book.authors.map((a, i) => (
-            <span key={a}>
-              <button
-                onClick={() => onAuthorClick(a)}
-                className="hover:underline"
-                style={{ color: libcat.link }}
-              >
-                {a}
-              </button>
-              {i < book.authors.length - 1 && ", "}
-            </span>
-          ))}
-          {book.publication_year && <span> · {book.publication_year}</span>}
-          {book.pages && <span> · {book.pages} pp.</span>}
-          {book.isbn && <span className="hidden sm:inline" style={mono}> · ISBN {book.isbn}</span>}
-        </p>
-
-        {book.topics.length > 0 && (
-          <p className="text-xs mt-1 leading-snug">
-            <span style={{ color: libcat.inkSoft }}>tagged: </span>
-            {book.topics.slice(0, 8).map((t, i) => (
-              <span key={t}>
-                <button
-                  onClick={() => onTagClick(t)}
-                  className="hover:underline"
-                  style={{ color: libcat.link }}
-                >
-                  {t}
-                </button>
-                {i < Math.min(8, book.topics.length) - 1 && ", "}
-              </span>
-            ))}
-            {book.topics.length > 8 && (
-              <span style={{ color: libcat.inkSoft }}> +{book.topics.length - 8} more</span>
-            )}
-          </p>
-        )}
-
-        {book.description && (
-          <p
-            className="text-xs mt-1.5 line-clamp-2 italic"
-            style={{ color: libcat.inkSoft }}
-          >
-            {book.description}
-          </p>
-        )}
-      </div>
-
-      {/* Right metadata column */}
-      <div className="self-center text-right space-y-1">
-        {/* Rating */}
-        {book.rating ? (
-          <p className="text-base leading-none" style={{ color: libcat.brass }}>
-            {"★".repeat(book.rating)}
-            <span style={{ color: libcat.border }}>{"★".repeat(5 - book.rating)}</span>
-          </p>
-        ) : null}
-
-        {/* Status */}
-        <p
-          className="text-[10px] tracking-widest uppercase"
-          style={{
-            ...mono,
-            color:
-              book.status === "read"
-                ? libcat.green
-                : book.status === "reading"
-                ? libcat.accent
-                : libcat.inkSoft,
-          }}
-        >
-          {book.status === "read" ? "On shelf" : book.status === "reading" ? "Out" : "Queued"}
-        </p>
-
-        {/* Call number */}
-        {book.lcc && (
-          <p
-            className="text-[11px] whitespace-nowrap"
-            style={{ ...mono, color: libcat.inkSoft }}
-          >
-            {book.lcc}
-          </p>
-        )}
-        {subj && (
-          <p
-            className="text-[10px] italic hidden sm:block"
-            style={{ ...serif, color: libcat.inkFaint }}
-          >
-            {subj}
-          </p>
-        )}
-      </div>
-    </li>
+      <path d="M240 96h64v32h-64zM240 192h128v32H240zM240 288h192v32H240zM240 384h256v32H240zM104 96l-72 80h48v272h48V176h48z" />
+    </svg>
   );
+}
+
+function Caret() {
+  return <span style={{ fontSize: 7, marginLeft: 2 }}>▾</span>;
 }

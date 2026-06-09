@@ -73,14 +73,14 @@ const MOCKUPS: Mockup[] = [
   {
     id: "4",
     name: "LibraryCat",
-    tagline: "Classic OPAC · TinyCat-style search",
+    tagline: "TinyCat OPAC · rebuilt from the real HTML",
     description:
-      "A library catalog with faceted search the way LibraryThing / TinyCat does it. Cream paper background, oxblood accents, serif headings, blue catalog links. Left sidebar facets (tags, authors, LCC subject, status) with counts. Dense result rows with cover, title, tags, rating, call number, and a status badge. Book detail page shows a proper bibliographic table.",
-    palette: ["#F4ECDA", "#2A2722", "#1652A1", "#8B3A2F", "#B08020", "#3F5B36"],
-    font: "Bitter + Inter + JetBrains Mono",
-    vibe: "Scholarly · Dense · Searchable",
-    bg: "linear-gradient(135deg, #F4ECDA 0%, #E8DEC4 100%)",
-    text: "#2A2722",
+      "Catalog search styled to actually match librarycat.org/lib/.../search. White page on Bootstrap 3 grid, system Helvetica/Arial (no Google Fonts), classic catalog-blue links (#337AB7), light gray breadcrumb sort bar, sticky white navbar with TinyCat orange-cat logo. Result rows use the real .minipac classes: col-md-1 cover + col-md-6 text, h2 title, \"by Author\", \"Paperback, 1968\" format line, labeled Tags / Collections / Series / Call number rows. Right-side facets (Tags + Collections) instead of left. Sort dropdown reads \"relevancy\" with the same options as the real site.",
+    palette: ["#FFFFFF", "#333333", "#337AB7", "#F5F5F5", "#F2A330", "#777777"],
+    font: "System UI · Helvetica/Arial (no webfonts)",
+    vibe: "Classic OPAC · Bootstrap 3 · Dense",
+    bg: "linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%)",
+    text: "#333333",
     sublinks: [
       { label: "Catalog", href: "/mockups/4" },
       { label: "Book", href: "/mockups/4/book" },
