@@ -371,13 +371,19 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
     if (t && !editTopics.includes(t)) { setEditTopics([...editTopics, t]); setTopicInput(""); scheduleAutoSave(); }
   };
 
+  // Reading rate = pages-per-session, where a "session" is a distinct calendar
+  // date you logged reading on. Gaps between sessions don't dilute the rate:
+  // 20 pages on Mon + 30 pages on Fri = 25 pg/session, not 10 pg/day.
   const readingSpeed = (() => {
-    if (updates.length < 2) return null;
-    const totalPages = updates.reduce((sum, u) => sum + u.pages_read, 0);
-    const first = new Date(updates[updates.length - 1].created_at);
-    const last = new Date(updates[0].created_at);
-    const days = Math.max((last.getTime() - first.getTime()) / (1000 * 60 * 60 * 24), 1);
-    return Math.round(totalPages / days);
+    if (updates.length === 0) return null;
+    const sessions = new Set<string>();
+    let totalPages = 0;
+    updates.forEach((u) => {
+      sessions.add(new Date(u.created_at).toLocaleDateString());
+      totalPages += u.pages_read || 0;
+    });
+    if (sessions.size === 0 || totalPages <= 0) return null;
+    return Math.round(totalPages / sessions.size);
   })();
 
   // Aggregate updates by day: sum pages_read, take max current_page, join notes
@@ -404,7 +410,9 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
     return days;
   }, [updates]);
 
-  const estimatedDays = (() => {
+  // Estimated reading sessions left until done, at the current pages-per-session
+  // rate. Falls back to avgPagesPerDay if there's no per-book history yet.
+  const estimatedSessions = (() => {
     const pace = readingSpeed || avgPagesPerDay;
     if (!pace || pace <= 0) return null;
     const totalPgs = book.reading_pages || computedReadingPages || book.pages;
@@ -690,8 +698,8 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
                           : `p. ${currentPg} of ${totalPgs}`}
                       </span>
                       <div className="flex items-center gap-3 text-xs text-muted">
-                        {readingSpeed && <span>~{readingSpeed} pg/day</span>}
-                        {estimatedDays && <span className="text-emerald-500">Est. {estimatedDays} {estimatedDays === 1 ? "day" : "days"}</span>}
+                        {readingSpeed && <span>~{readingSpeed} pg/session</span>}
+                        {estimatedSessions && <span className="text-emerald-500">Est. {estimatedSessions} {estimatedSessions === 1 ? "session" : "sessions"} left</span>}
                       </div>
                     </div>
                   </div>
