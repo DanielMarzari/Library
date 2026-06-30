@@ -105,7 +105,8 @@ function ensureAllTables(db: Database.Database) {
         name TEXT NOT NULL,
         description TEXT,
         color TEXT,
-        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
     `);
   }
@@ -174,4 +175,8 @@ function ensureAllTables(db: Database.Database) {
   addColumnSafe('recommendations', 'doi', 'TEXT');
   addColumnSafe('recommendations', 'journal', 'TEXT');
   addColumnSafe('recommendations', 'url', 'TEXT');
+
+  // SQLite forbids NOT NULL + non-constant DEFAULT on ADD COLUMN, so keep this
+  // nullable on the migration. App code always supplies a value on insert.
+  addColumnSafe('learning_goals', 'updated_at', "TEXT");
 }
