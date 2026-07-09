@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
     // Exclude cover_blob from list queries — it can be huge
     // We include has_cover_blob flag via CASE instead
-    let query = `SELECT id, title, author, isbn, cover_url, description, status, rating,
+    let query = `SELECT id, title, author, isbn, cover_url, description, status, rating, density,
       volume, pages, intro_pages, start_page, end_page, reading_pages,
       current_page, start_date, complete_date, source, lcc, ddc,
       topics, auto_topics, favorite, created_at, updated_at,
@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
       description,
       status,
       rating,
+      density,
       volume,
       pages,
       intro_pages,
@@ -98,13 +99,13 @@ export async function POST(request: NextRequest) {
 
     const stmt = db.prepare(`
       INSERT INTO books (
-        id, title, author, isbn, cover_url, description, status, rating,
+        id, title, author, isbn, cover_url, description, status, rating, density,
         volume, pages, intro_pages, start_page, end_page, reading_pages,
         current_page, start_date, complete_date, source, lcc, ddc,
         topics, auto_topics, favorite,
         item_type, doi, journal, publication_year, url,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -116,6 +117,7 @@ export async function POST(request: NextRequest) {
       description || null,
       status || 'not_read',
       rating || null,
+      density || null,
       volume || null,
       pages || null,
       intro_pages || null,
@@ -149,6 +151,7 @@ export async function POST(request: NextRequest) {
       description,
       status: status || 'not_read',
       rating,
+      density: density || null,
       volume,
       pages,
       intro_pages,

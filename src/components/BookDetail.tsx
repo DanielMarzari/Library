@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { api } from "@/lib/api-client";
-import { Book, ReadingUpdate } from "@/types/book";
+import { Book, ReadingUpdate, Density } from "@/types/book";
 import { enrichBook, searchBooks } from "@/lib/bookLookup";
 import { coverSrc, safeCoverUrl } from "@/lib/coverUrl";
 
@@ -19,6 +19,31 @@ const statusLabels: Record<Book["status"], string> = {
   not_read: "Not Read",
   reading: "Reading",
   read: "Read",
+};
+
+const densityLabels: Record<Density, string> = {
+  easy: "Easy",
+  moderate: "Moderate",
+  hard: "Hard",
+  technical: "Technical",
+  dense: "Extremely dense",
+};
+
+const densityHints: Record<Density, string> = {
+  easy: "Breezy — light reading, casual pace",
+  moderate: "Steady — some effort but approachable",
+  hard: "Demands focus — dense arguments or vocabulary",
+  technical: "Complex / technical — specialist knowledge helps",
+  dense: "Extremely dense — slow, deliberate reading required",
+};
+
+// Tailwind bg utilities per tier — cool → warm as difficulty rises
+const densityStyles: Record<Density, string> = {
+  easy: "bg-emerald-600",
+  moderate: "bg-teal-600",
+  hard: "bg-amber-600",
+  technical: "bg-orange-600",
+  dense: "bg-rose-700",
 };
 
 const CONFETTI_COLORS = ["#10b981", "#f59e0b", "#3b82f6", "#ef4444", "#a855f7", "#ec4899", "#06b6d4"];
@@ -72,6 +97,7 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
   const [endPage, setEndPage] = useState(book.end_page?.toString() || "");
   const [status, setStatus] = useState(book.status);
   const [rating, setRating] = useState(book.rating || 0);
+  const [density, setDensity] = useState<Book["density"] | undefined>(book.density);
   const [startDate, setStartDate] = useState(book.start_date || "");
   const [completeDate, setCompleteDate] = useState(book.complete_date || "");
   const [source, setSource] = useState(book.source || "");
@@ -190,8 +216,8 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
   };
 
   // Ref always holds the latest field values so doSave can read them without re-creating
-  const valuesRef = useRef({ title, author, coverUrl, pages, introPages, startPage, endPage, status, rating, startDate, completeDate, source, volume, lcc, ddc, editTopics, autoTopics, favorite });
-  valuesRef.current = { title, author, coverUrl, pages, introPages, startPage, endPage, status, rating, startDate, completeDate, source, volume, lcc, ddc, editTopics, autoTopics, favorite };
+  const valuesRef = useRef({ title, author, coverUrl, pages, introPages, startPage, endPage, status, rating, density, startDate, completeDate, source, volume, lcc, ddc, editTopics, autoTopics, favorite });
+  valuesRef.current = { title, author, coverUrl, pages, introPages, startPage, endPage, status, rating, density, startDate, completeDate, source, volume, lcc, ddc, editTopics, autoTopics, favorite };
 
   // Stable doSave — reads from ref, only depends on book.id
   const doSave = useCallback(async () => {
@@ -206,6 +232,9 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
         start_page: parseInt(v.startPage) || 1,
         end_page: v.endPage ? parseInt(v.endPage) : undefined,
         status: v.status, rating: v.rating || undefined,
+        // `density: null` clears the column server-side; Partial<Book> doesn't
+        // model null, so cast the payload where the null lives.
+        ...({ density: v.density ?? null } as Partial<Book>),
         start_date: v.startDate || undefined, complete_date: v.completeDate || undefined,
         source: v.source.trim() || undefined, volume: v.volume.trim() || undefined,
         lcc: v.lcc.trim() || undefined, ddc: v.ddc.trim() || undefined,
@@ -661,6 +690,26 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
                 <button key={star} onClick={() => { setRating(star === rating ? 0 : star); scheduleAutoSave(); }}
                   className={`text-2xl transition-colors ${star <= rating ? "text-amber-400" : "text-muted-2 hover:text-muted"}`}>★</button>
               ))}
+            </div>
+          </div>
+
+          {/* Density / technicality */}
+          <div>
+            <label className="block text-xs text-muted mb-2">Density</label>
+            <div className="flex flex-wrap gap-1.5">
+              {(Object.entries(densityLabels) as [Density, string][]).map(([key, label]) => {
+                const active = density === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => { setDensity(active ? undefined : key); scheduleAutoSave(); }}
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${active ? `${densityStyles[key]} text-white` : "bg-surface-2 text-muted hover:text-foreground"}`}
+                    title={densityHints[key]}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

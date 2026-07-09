@@ -41,6 +41,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       description,
       status,
       rating,
+      density,
       volume,
       pages,
       intro_pages,
@@ -108,6 +109,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (rating !== undefined) {
       updates.push('rating = ?');
       values.push(rating);
+    }
+    if (density !== undefined) {
+      updates.push('density = ?');
+      values.push(density);
     }
     if (volume !== undefined) {
       updates.push('volume = ?');

@@ -179,4 +179,7 @@ function ensureAllTables(db: Database.Database) {
   // SQLite forbids NOT NULL + non-constant DEFAULT on ADD COLUMN, so keep this
   // nullable on the migration. App code always supplies a value on insert.
   addColumnSafe('learning_goals', 'updated_at', "TEXT");
+
+  // Density / technicality tier — nullable. Values: easy | moderate | hard | technical | dense
+  addColumnSafe('books', 'density', 'TEXT');
 }

@@ -1,4 +1,5 @@
 export type ItemType = "book" | "article";
+export type Density = "easy" | "moderate" | "hard" | "technical" | "dense";
 
 export interface Book {
   id: string;
@@ -10,6 +11,7 @@ export interface Book {
   description?: string;
   status: "not_read" | "reading" | "read";
   rating?: number;
+  density?: Density;
   volume?: string;
   pages?: number;
   intro_pages?: number;
