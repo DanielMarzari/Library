@@ -7,6 +7,7 @@ import { api } from "@/lib/api-client";
 import { searchBooks, enrichBook, lookupDoi, looksLikeDoi, BookSearchResult } from "@/lib/bookLookup";
 import Link from "next/link";
 import { safeCoverUrl } from "@/lib/coverUrl";
+import { canonicalAuthor } from "@/lib/authorAliases";
 
 interface Recommendation {
   id: string;
@@ -294,6 +295,8 @@ export default function RecommendationsPage() {
   const [sortMode, setSortMode] = useState<SortMode>("recent");
   const [fetchingPrices, setFetchingPrices] = useState(false);
   const [priceProgress, setPriceProgress] = useState({ done: 0, total: 0 });
+  const [fetchingCovers, setFetchingCovers] = useState(false);
+  const [coverProgress, setCoverProgress] = useState({ done: 0, total: 0, hits: 0 });
   const [possibleDupes, setPossibleDupes] = useState<Array<{ rec: Recommendation; libraryMatch: string }>>([]);
   const [showDupes, setShowDupes] = useState(true);
   const [dismissedDupeIds, setDismissedDupeIds] = useState<Set<string>>(() => {
@@ -563,6 +566,23 @@ export default function RecommendationsPage() {
       setAllRecs((prev) => [normalized, ...prev]);
       resetAddForm();
       setShowAddForm(false);
+
+      // If the new rec has no cover, try Open Library in the background so it
+      // doesn't block the UI. Books only — articles rarely have one.
+      if (!normalized.cover_url && normalized.item_type !== "article") {
+        (async () => {
+          try {
+            const q = normalized.isbn || `${normalized.title}${normalized.author ? " " + normalized.author : ""}`;
+            const results = await searchBooks(q, 1);
+            if (results.length === 0) return;
+            const enriched = await enrichBook(results[0]);
+            if (!enriched.cover_url) return;
+            await api.recommendations.update(normalized.id, { cover_url: enriched.cover_url } as any);
+            setRecommendations(prev => prev.map(r => r.id === normalized.id ? { ...r, cover_url: enriched.cover_url } : r));
+            setAllRecs(prev => prev.map(r => r.id === normalized.id ? { ...r, cover_url: enriched.cover_url } : r));
+          } catch { /* best-effort */ }
+        })();
+      }
     } catch (error) {
       console.error("Error adding recommendation:", error);
       alert("Failed to save. Check the console for details.");
@@ -663,15 +683,17 @@ export default function RecommendationsPage() {
   }, [recommendations]);
 
   // Most-recommended authors across the whole (unfiltered) rec set. Splits on
-  // "&" and "," so co-authored books credit each author. Skips a few dud values.
+  // "&" and "," so co-authored books credit each author, and normalizes aliases
+  // (Tom Wright / N.T. Wright, etc.) so they don't show up as separate people.
   const topAuthors = useMemo(() => {
     const counts: Record<string, number> = {};
     allRecs.forEach(r => {
       const a = (r.author || "").trim();
       if (!a) return;
       a.split(/,| and | & /i).forEach(part => {
-        const n = part.trim();
-        if (!n || n.toLowerCase() === "unknown") return;
+        const raw = part.trim();
+        if (!raw || raw.toLowerCase() === "unknown") return;
+        const n = canonicalAuthor(raw);
         counts[n] = (counts[n] || 0) + 1;
       });
     });
@@ -718,9 +740,16 @@ export default function RecommendationsPage() {
       if (excludeSource && rec.recommended_by === excludeSource) return false;
       if (searchFilter) {
         const q = searchFilter.toLowerCase();
+        // Include each author's canonical form so a search for "N.T. Wright"
+        // still hits a rec whose author field says "Tom Wright" (and vice versa).
+        const authorParts = (rec.author || "").split(/,| and | & /i)
+          .map(p => p.trim())
+          .filter(Boolean);
+        const canon = authorParts.map(canonicalAuthor).join(" ");
         const haystack = [
           rec.title,
           rec.author || "",
+          canon,
           rec.recommended_by || "",
         ].join(" ").toLowerCase();
         if (!haystack.includes(q)) return false;
@@ -805,6 +834,38 @@ export default function RecommendationsPage() {
       await new Promise(r => setTimeout(r, 1000));
     }
     setFetchingPrices(false);
+  };
+
+  // Walk visible recs without a cover and try Open Library. Uses the same
+  // enrichBook helper the add-form uses, so behavior stays consistent.
+  const COVER_BATCH = 50;
+  const handleFetchMissingCovers = async () => {
+    const missing = filteredRecs.filter(r => !r.cover_url).slice(0, COVER_BATCH);
+    if (missing.length === 0) return;
+    setFetchingCovers(true);
+    setCoverProgress({ done: 0, total: missing.length, hits: 0 });
+    let hits = 0;
+    for (let i = 0; i < missing.length; i++) {
+      const rec = missing[i];
+      try {
+        const q = rec.isbn || `${rec.title}${rec.author ? " " + rec.author : ""}`;
+        const results = await searchBooks(q, 1);
+        if (results.length > 0) {
+          const enriched = await enrichBook(results[0]);
+          if (enriched.cover_url) {
+            await api.recommendations.update(rec.id, { cover_url: enriched.cover_url } as any);
+            setRecommendations(prev => prev.map(r => r.id === rec.id ? { ...r, cover_url: enriched.cover_url } : r));
+            setAllRecs(prev => prev.map(r => r.id === rec.id ? { ...r, cover_url: enriched.cover_url } : r));
+            hits += 1;
+          }
+        }
+      } catch (e) {
+        console.log("Cover fetch skipped for", rec.title);
+      }
+      setCoverProgress({ done: i + 1, total: missing.length, hits });
+      await new Promise(r => setTimeout(r, 300));
+    }
+    setFetchingCovers(false);
   };
 
   const hasMore = paginatedRecs.length < filteredRecs.length;
@@ -1216,6 +1277,19 @@ export default function RecommendationsPage() {
               </button>
             ))}
             <div className="ml-auto flex items-center gap-2">
+              {fetchingCovers ? (
+                <span className="text-[10px] text-muted animate-pulse">
+                  Covers... {coverProgress.done}/{coverProgress.total} · {coverProgress.hits} found
+                </span>
+              ) : (
+                <button
+                  onClick={handleFetchMissingCovers}
+                  className="px-2.5 py-1 bg-emerald-500/10 text-emerald-500 rounded text-[10px] font-medium hover:bg-emerald-500/20 transition-colors"
+                  title="Look up cover images for the first 50 visible recs that don't have one"
+                >
+                  🖼 Fetch Covers
+                </button>
+              )}
               {fetchingPrices ? (
                 <span className="text-[10px] text-muted animate-pulse">
                   Refreshing... {priceProgress.done}/{priceProgress.total}

@@ -187,4 +187,21 @@ function ensureAllTables(db: Database.Database) {
   // Legacy `source_book_id` (single) is preserved for backward compat and
   // treated as `[source_book_id]` at read time.
   addColumnSafe('recommendations', 'source_book_ids', 'TEXT');
+
+  // Backfill: books marked read but missing complete_date get one derived from
+  // updated_at (the most recent write to the row). This is only a proxy for the
+  // real "marked read" moment — the DB doesn't log status transitions — but it
+  // is the least-wrong choice available. Idempotent: once every read row has a
+  // date, this UPDATE hits nothing on subsequent boots.
+  try {
+    db.exec(`
+      UPDATE books
+      SET complete_date = substr(updated_at, 1, 10)
+      WHERE status = 'read'
+        AND (complete_date IS NULL OR complete_date = '')
+        AND updated_at IS NOT NULL
+    `);
+  } catch (e) {
+    console.error('complete_date backfill skipped:', e);
+  }
 }

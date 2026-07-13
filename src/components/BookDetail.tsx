@@ -289,9 +289,16 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
         setStartDate(today);
       }
 
-      // Auto-complete on last page
+      // Auto-complete when the reading percentage reaches 100 — mirrors the
+      // pct formula used to render the progress bar so the trigger matches
+      // exactly what the user sees. Skips if the book is already marked read.
       const totalPgs = displayPages || book.pages || 0;
-      if (totalPgs > 0 && cp >= totalPgs) {
+      const ip = book.intro_pages || parseInt(introPages) || 0;
+      const sp = book.start_page || parseInt(startPage) || 1;
+      const mainPagesRead = cp > 0 ? Math.max(cp - sp + 1, 0) : 0;
+      const actualPagesRead = mainPagesRead + (cp > 0 ? ip : 0);
+      const pct = totalPgs > 0 ? (actualPagesRead / totalPgs) * 100 : 0;
+      if (status !== "read" && totalPgs > 0 && pct >= 100) {
         const today = new Date().toISOString().split("T")[0];
         bookUpdate.status = "read";
         bookUpdate.complete_date = today;
