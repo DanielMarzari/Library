@@ -22,12 +22,31 @@ interface Recommendation {
   lowest_price?: number | null;
   thriftbooks_price?: number | null;
   source_book_id?: string | null;
+  // Multiple books that recommended this item. On the wire this is a JSON
+  // string (or null); the client normalizes to string[] on load.
+  source_book_ids?: string[];
   created_at: string;
   // Article support
   item_type?: "book" | "article";
   doi?: string;
   journal?: string;
   url?: string;
+}
+
+// Backfill: legacy rows only have source_book_id. Newer rows have a JSON array
+// in source_book_ids. Whatever the server returns, hand back a real string[].
+function normalizeRec(raw: any): Recommendation {
+  let ids: string[] = [];
+  if (typeof raw.source_book_ids === "string" && raw.source_book_ids.trim()) {
+    try {
+      const parsed = JSON.parse(raw.source_book_ids);
+      if (Array.isArray(parsed)) ids = parsed.filter((v) => typeof v === "string");
+    } catch { /* fall through to legacy */ }
+  } else if (Array.isArray(raw.source_book_ids)) {
+    ids = raw.source_book_ids.filter((v: unknown) => typeof v === "string");
+  }
+  if (ids.length === 0 && raw.source_book_id) ids = [raw.source_book_id];
+  return { ...raw, source_book_ids: ids };
 }
 
 type AddMode = "book" | "article";
@@ -39,6 +58,190 @@ interface LibraryBook {
   title: string;
   author: string;
   status: string;
+}
+
+// -----------------------------------------------------------------------------
+// Edit modal — lets the user change any field on a recommendation, and pick
+// multiple books from the library as the "recommended in" source(s).
+// -----------------------------------------------------------------------------
+interface EditRecModalProps {
+  rec: Recommendation;
+  libraryBooks: LibraryBook[];
+  onClose: () => void;
+  onSaved: (updated: Recommendation) => void;
+  onDeleted: (id: string) => void;
+}
+
+function EditRecModal({ rec, libraryBooks, onClose, onSaved, onDeleted }: EditRecModalProps) {
+  const [title, setTitle] = useState(rec.title || "");
+  const [author, setAuthor] = useState(rec.author || "");
+  const [coverUrl, setCoverUrl] = useState(rec.cover_url || "");
+  const [recommendedBy, setRecommendedBy] = useState(rec.recommended_by || "");
+  const [notes, setNotes] = useState(rec.notes || "");
+  const [topic, setTopic] = useState(rec.topic || "");
+  const [sourceIds, setSourceIds] = useState<string[]>(rec.source_book_ids || []);
+  const [sourceQuery, setSourceQuery] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const bookById = useMemo(() => {
+    const m: Record<string, LibraryBook> = {};
+    libraryBooks.forEach(b => { m[b.id] = b; });
+    return m;
+  }, [libraryBooks]);
+
+  const sourceMatches = useMemo(() => {
+    const q = sourceQuery.trim().toLowerCase();
+    if (q.length < 2) return [];
+    return libraryBooks
+      .filter(b =>
+        !sourceIds.includes(b.id) &&
+        (b.title.toLowerCase().includes(q) || (b.author || "").toLowerCase().includes(q))
+      )
+      .slice(0, 8);
+  }, [sourceQuery, libraryBooks, sourceIds]);
+
+  const addSource = (id: string) => {
+    setSourceIds(prev => prev.includes(id) ? prev : [...prev, id]);
+    setSourceQuery("");
+  };
+  const removeSource = (id: string) => setSourceIds(prev => prev.filter(x => x !== id));
+
+  const handleSave = async () => {
+    if (!title.trim()) return;
+    setSaving(true);
+    try {
+      const payload: any = {
+        title: title.trim(),
+        author: author.trim() || null,
+        cover_url: coverUrl.trim() || null,
+        recommended_by: recommendedBy.trim() || null,
+        notes: notes.trim() || null,
+        topic: topic.trim() || null,
+        source_book_ids: sourceIds.length > 0 ? JSON.stringify(sourceIds) : null,
+        source_book_id: sourceIds[0] || null,
+      };
+      const updated = await api.recommendations.update(rec.id, payload);
+      onSaved(normalizeRec(updated));
+      onClose();
+    } catch (err) {
+      console.error("Save recommendation error:", err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      await api.recommendations.delete(rec.id);
+      onDeleted(rec.id);
+      onClose();
+    } catch (err) {
+      console.error("Delete recommendation error:", err);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-surface border border-border-custom rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="px-5 py-4 border-b border-border-custom flex items-center justify-between sticky top-0 bg-surface z-10">
+          <h2 className="text-base font-semibold text-foreground">Edit recommendation</h2>
+          <button onClick={onClose} className="text-muted hover:text-foreground text-xl leading-none">×</button>
+        </div>
+
+        <div className="p-5 space-y-3">
+          <div>
+            <label className="block text-xs text-muted mb-1">Title</label>
+            <input value={title} onChange={e => setTitle(e.target.value)}
+              className="w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-600" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-muted mb-1">Author</label>
+              <input value={author} onChange={e => setAuthor(e.target.value)}
+                className="w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-600" />
+            </div>
+            <div>
+              <label className="block text-xs text-muted mb-1">Topic</label>
+              <input value={topic} onChange={e => setTopic(e.target.value)}
+                className="w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-600" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs text-muted mb-1">Cover URL</label>
+            <input value={coverUrl} onChange={e => setCoverUrl(e.target.value)} type="url"
+              className="w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-600" />
+          </div>
+          <div>
+            <label className="block text-xs text-muted mb-1">Recommended by</label>
+            <input value={recommendedBy} onChange={e => setRecommendedBy(e.target.value)}
+              className="w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-600" />
+          </div>
+          <div>
+            <label className="block text-xs text-muted mb-1">Notes</label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+              className="w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-600" />
+          </div>
+
+          {/* Multi-select: source books */}
+          <div>
+            <label className="block text-xs text-muted mb-1">Referenced in library books ({sourceIds.length})</label>
+            <div className="flex flex-wrap gap-1.5 mb-2 min-h-[24px]">
+              {sourceIds.length === 0 && (
+                <span className="text-xs text-muted italic">None yet — search below to add.</span>
+              )}
+              {sourceIds.map(id => {
+                const b = bookById[id];
+                const label = b ? `${b.title}${b.author ? " · " + b.author : ""}` : id;
+                return (
+                  <span key={id} className="inline-flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/30 text-blue-300 rounded-lg px-2 py-1 text-[11px] max-w-full">
+                    <span className="truncate max-w-[220px]">{label}</span>
+                    <button type="button" onClick={() => removeSource(id)} className="text-blue-300/70 hover:text-blue-200 flex-shrink-0" aria-label="Remove source">✕</button>
+                  </span>
+                );
+              })}
+            </div>
+            <div className="relative">
+              <input value={sourceQuery} onChange={e => setSourceQuery(e.target.value)}
+                placeholder="Search library to add a source book…"
+                className="w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-600" />
+              {sourceMatches.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-surface-2 border border-border-custom rounded-lg shadow-lg z-20 max-h-56 overflow-y-auto">
+                  {sourceMatches.map(b => (
+                    <button key={b.id} type="button" onClick={() => addSource(b.id)}
+                      className="w-full text-left px-3 py-2 hover:bg-border-custom border-b border-border-custom last:border-0 transition-colors">
+                      <div className="font-medium text-foreground text-sm truncate">{b.title}</div>
+                      <div className="text-xs text-muted truncate">{b.author || "Unknown"}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="px-5 py-3 border-t border-border-custom flex items-center justify-between sticky bottom-0 bg-surface">
+          {confirmDelete ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-red-400">Delete?</span>
+              <button onClick={handleDelete} className="px-2.5 py-1 bg-red-600 text-white rounded text-xs font-medium">Yes</button>
+              <button onClick={() => setConfirmDelete(false)} className="px-2.5 py-1 bg-surface-2 text-muted rounded text-xs">No</button>
+            </div>
+          ) : (
+            <button onClick={() => setConfirmDelete(true)} className="text-xs text-muted hover:text-red-400 transition-colors">Delete</button>
+          )}
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} className="px-3 py-1.5 bg-surface-2 text-muted rounded-lg text-xs font-medium hover:text-foreground transition-colors">Cancel</button>
+            <button onClick={handleSave} disabled={saving || !title.trim()}
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-border-custom disabled:text-muted text-white rounded-lg text-xs font-medium transition-colors">
+              {saving ? "Saving…" : "Save"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function RecommendationsPage() {
@@ -71,6 +274,7 @@ export default function RecommendationsPage() {
   const [excludeSource, setExcludeSource] = useState<string | null>(null);
   const [searchFilter, setSearchFilter] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingRec, setEditingRec] = useState<Recommendation | null>(null);
 
   // -- Add-flow extensions: article support + manual fallback when nothing
   // can be found in Open Library / Crossref. The user can always save by
@@ -109,7 +313,8 @@ export default function RecommendationsPage() {
         setLoading(true);
 
         // Load all recommendations
-        const allRecsData = await api.recommendations.list();
+        const rawRecsData = await api.recommendations.list();
+        const allRecsData = rawRecsData.map(normalizeRec);
 
         // Load library books
         const books = await api.books.list();
@@ -353,9 +558,9 @@ export default function RecommendationsPage() {
       }
 
       const data = await api.recommendations.create(payload as any);
-
-      setRecommendations((prev) => [data as Recommendation, ...prev]);
-      setAllRecs((prev) => [data as Recommendation, ...prev]);
+      const normalized = normalizeRec(data);
+      setRecommendations((prev) => [normalized, ...prev]);
+      setAllRecs((prev) => [normalized, ...prev]);
       resetAddForm();
       setShowAddForm(false);
     } catch (error) {
@@ -457,6 +662,25 @@ export default function RecommendationsPage() {
     return Object.entries(counts).sort((a, b) => b[1] - a[1]);
   }, [recommendations]);
 
+  // Most-recommended authors across the whole (unfiltered) rec set. Splits on
+  // "&" and "," so co-authored books credit each author. Skips a few dud values.
+  const topAuthors = useMemo(() => {
+    const counts: Record<string, number> = {};
+    allRecs.forEach(r => {
+      const a = (r.author || "").trim();
+      if (!a) return;
+      a.split(/,| and | & /i).forEach(part => {
+        const n = part.trim();
+        if (!n || n.toLowerCase() === "unknown") return;
+        counts[n] = (counts[n] || 0) + 1;
+      });
+    });
+    return Object.entries(counts)
+      .filter(([, c]) => c >= 2) // authors with just 1 rec aren't interesting here
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 12);
+  }, [allRecs]);
+
   // 3-state filter: null = all, filterTopic = include, excludeTopic = exclude
   const toggleTopicFilter = (topic: string) => {
     if (filterTopic === topic) {
@@ -494,7 +718,12 @@ export default function RecommendationsPage() {
       if (excludeSource && rec.recommended_by === excludeSource) return false;
       if (searchFilter) {
         const q = searchFilter.toLowerCase();
-        if (!rec.title.toLowerCase().includes(q) && !(rec.author || "").toLowerCase().includes(q)) return false;
+        const haystack = [
+          rec.title,
+          rec.author || "",
+          rec.recommended_by || "",
+        ].join(" ").toLowerCase();
+        if (!haystack.includes(q)) return false;
       }
       return true;
     });
@@ -644,6 +873,40 @@ export default function RecommendationsPage() {
               <p className="text-[10px] uppercase tracking-wider text-muted font-medium">Other Recs</p>
               <p className="text-2xl font-bold text-foreground mt-1">{stats.otherTotal}</p>
               <p className="text-[10px] text-muted mt-0.5">other sources</p>
+            </div>
+          </div>
+        )}
+
+        {/* Most-recommended authors — click a chip to filter by that author */}
+        {!loading && topAuthors.length > 0 && (
+          <div className="bg-surface border border-border-custom rounded-xl p-3 mb-5">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] uppercase tracking-wider text-muted font-medium">
+                Most-Recommended Authors
+              </p>
+              <p className="text-[10px] text-muted">
+                {topAuthors.length} of {topAuthors.length === 12 ? "top 12" : "authors"}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {topAuthors.map(([author, count]) => {
+                const active = searchFilter.trim().toLowerCase() === author.toLowerCase();
+                return (
+                  <button
+                    key={author}
+                    onClick={() => setSearchFilter(active ? "" : author)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors border ${
+                      active
+                        ? "bg-emerald-600 text-white border-emerald-600"
+                        : "bg-surface-2 text-foreground border-border-custom hover:bg-emerald-500/10 hover:text-emerald-500 hover:border-emerald-500/30"
+                    }`}
+                    title={`${count} recommendation${count === 1 ? "" : "s"} — click to filter`}
+                  >
+                    {author}
+                    <span className={`ml-1 ${active ? "opacity-80" : "text-muted"}`}>{count}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -1202,14 +1465,21 @@ export default function RecommendationsPage() {
 
                     {/* Title & Author */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {rec.item_type === "article" && (
-                          <span className="px-1.5 py-0.5 bg-blue-500/10 text-blue-400 rounded text-[9px] font-medium mr-1.5">
-                            Article
-                          </span>
-                        )}
-                        {rec.title}
-                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setEditingRec(rec)}
+                        className="text-left w-full"
+                        title="Edit recommendation"
+                      >
+                        <p className="text-sm font-medium text-foreground truncate hover:text-emerald-400 transition-colors">
+                          {rec.item_type === "article" && (
+                            <span className="px-1.5 py-0.5 bg-blue-500/10 text-blue-400 rounded text-[9px] font-medium mr-1.5">
+                              Article
+                            </span>
+                          )}
+                          {rec.title}
+                        </p>
+                      </button>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                         {rec.author && (
                           <span className="text-xs text-muted truncate">{rec.author}</span>
@@ -1236,11 +1506,11 @@ export default function RecommendationsPage() {
                             {coll}
                           </span>
                         ))}
-                        {rec.source_book_id && bookIdMap[rec.source_book_id] && (
-                          <span className="px-1.5 py-0 bg-blue-500/10 text-blue-400 rounded text-[9px] font-medium flex-shrink-0 hidden sm:inline">
-                            via {bookIdMap[rec.source_book_id]}
+                        {(rec.source_book_ids || []).filter(id => bookIdMap[id]).map(id => (
+                          <span key={id} className="px-1.5 py-0 bg-blue-500/10 text-blue-400 rounded text-[9px] font-medium flex-shrink-0 hidden sm:inline">
+                            via {bookIdMap[id]}
                           </span>
-                        )}
+                        ))}
                       </div>
                     </div>
 
@@ -1265,6 +1535,13 @@ export default function RecommendationsPage() {
 
                     {/* Actions (visible on hover) */}
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                      <button
+                        onClick={() => setEditingRec(rec)}
+                        className="px-2 py-1 bg-surface-2 text-muted hover:text-foreground rounded text-[9px] font-medium transition-colors"
+                        title="Edit"
+                      >
+                        Edit
+                      </button>
                       <a
                         href={`https://www.amazon.com/s?k=${encodeURIComponent(rec.title + (rec.author ? " " + rec.author : ""))}&i=stripbooks`}
                         target="_blank"
@@ -1337,6 +1614,22 @@ export default function RecommendationsPage() {
           </>
         )}
       </main>
+
+      {editingRec && (
+        <EditRecModal
+          rec={editingRec}
+          libraryBooks={libraryBooks}
+          onClose={() => setEditingRec(null)}
+          onSaved={(updated) => {
+            setRecommendations(prev => prev.map(r => r.id === updated.id ? { ...r, ...updated } : r));
+            setAllRecs(prev => prev.map(r => r.id === updated.id ? { ...r, ...updated } : r));
+          }}
+          onDeleted={(id) => {
+            setRecommendations(prev => prev.filter(r => r.id !== id));
+            setAllRecs(prev => prev.filter(r => r.id !== id));
+          }}
+        />
+      )}
     </div>
   );
 }

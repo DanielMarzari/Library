@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     const {
       title, author, isbn, cover_url,
       recommended_by, notes, topic, interest, year,
-      source_book_id,
+      source_book_id, source_book_ids,
       // Article fields (item_type === 'article' uses these)
       item_type, doi, journal, url,
       // Accept old field names for backward compat
@@ -38,19 +38,28 @@ export async function POST(request: NextRequest) {
     const actualRecommendedBy = recommended_by || source || null;
     const resolvedItemType = item_type === 'article' ? 'article' : 'book';
 
+    // Accept an array from callers, but persist as JSON. Fall back to wrapping
+    // the legacy single `source_book_id` if the array wasn't sent.
+    const idsArray: string[] = Array.isArray(source_book_ids)
+      ? source_book_ids.filter(Boolean)
+      : source_book_id
+      ? [source_book_id]
+      : [];
+    const idsJson = idsArray.length > 0 ? JSON.stringify(idsArray) : null;
+
     const stmt = db.prepare(`
       INSERT INTO recommendations (
         id, title, author, isbn, cover_url, recommended_by, notes, topic,
-        interest, year, source_book_id,
+        interest, year, source_book_id, source_book_ids,
         item_type, doi, journal, url,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
       id, title.trim(), actualAuthor, isbn || null, cover_url || null,
       actualRecommendedBy, notes || null, topic || null, interest || null, year || null,
-      source_book_id || null,
+      idsArray[0] || null, idsJson,
       resolvedItemType, doi || null, journal || null, url || null,
       now
     );

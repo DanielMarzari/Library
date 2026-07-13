@@ -182,4 +182,9 @@ function ensureAllTables(db: Database.Database) {
 
   // Density / technicality tier — nullable. Values: easy | moderate | hard | technical | dense
   addColumnSafe('books', 'density', 'TEXT');
+
+  // Multiple source books per recommendation — JSON-encoded array of book IDs.
+  // Legacy `source_book_id` (single) is preserved for backward compat and
+  // treated as `[source_book_id]` at read time.
+  addColumnSafe('recommendations', 'source_book_ids', 'TEXT');
 }

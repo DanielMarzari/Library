@@ -32,7 +32,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const fields = [
       'title', 'author', 'isbn', 'cover_url',
       'recommended_by', 'notes', 'topic', 'interest', 'year',
-      'lowest_price', 'thriftbooks_price', 'source_book_id',
+      'lowest_price', 'thriftbooks_price', 'source_book_id', 'source_book_ids',
       'item_type', 'doi', 'journal', 'url',
     ];
     for (const field of fields) {
