@@ -751,6 +751,8 @@ export default function RecommendationsPage() {
           rec.author || "",
           canon,
           rec.recommended_by || "",
+          getRecTags(rec).join(" "),
+          rec.interest || "",
         ].join(" ").toLowerCase();
         if (!haystack.includes(q)) return false;
       }
