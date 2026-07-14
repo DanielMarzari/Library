@@ -32,8 +32,10 @@ export async function GET(request: NextRequest) {
 
     if (search && search.trim()) {
       const searchTerm = `%${search.trim()}%`;
-      query += ' AND (title LIKE ? OR author LIKE ?)';
-      params.push(searchTerm, searchTerm);
+      // topics/auto_topics are JSON text (e.g. ["philosophy","history"]) so a
+      // LIKE on the raw JSON is a cheap substring match against tag names.
+      query += ' AND (title LIKE ? OR author LIKE ? OR topics LIKE ? OR auto_topics LIKE ?)';
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
     query += ` ORDER BY ${sort}`;
