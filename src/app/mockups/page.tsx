@@ -86,6 +86,61 @@ const MOCKUPS: Mockup[] = [
       { label: "Book", href: "/mockups/4/book" },
     ],
   },
+  {
+    id: "5",
+    name: "Kinetic Field",
+    tagline: "A cover archive that responds in waves",
+    description: "A high-energy Anime.js cover field with center-out entrance choreography and pointer-driven local ripples. The collection itself becomes the hero while every cover remains directly browsable.",
+    palette: ["#EDFF55", "#0D0C12", "#FF5438", "#FFFFFF"],
+    font: "Arial Black + Arial",
+    vibe: "Kinetic · Graphic · Responsive",
+    bg: "linear-gradient(135deg, #EDFF55 0%, #FF5438 100%)",
+    text: "#0D0C12",
+  },
+  {
+    id: "6",
+    name: "Orbiting Canon",
+    tagline: "Books and ideas arranged by gravity",
+    description: "A spatial relationship browser built around an orbiting canon. Selecting a cover redraws the center of gravity and surfaces the ideas attached to it.",
+    palette: ["#060D19", "#163C50", "#FFB703", "#F5F0E8"],
+    font: "Georgia + Arial",
+    vibe: "Spatial · Quiet · Relational",
+    bg: "radial-gradient(circle at 70% 40%, #163C50, #060D19 70%)",
+    text: "#F5F0E8",
+  },
+  {
+    id: "7",
+    name: "Reading River",
+    tagline: "A library experienced through time",
+    description: "A horizontally flowing reading history with strong chronology, alternating rhythm, and scroll-snap navigation. The motion follows your actual reading path rather than presenting a generic shelf.",
+    palette: ["#F1E9DC", "#202827", "#0C7C78", "#FFFFFF"],
+    font: "Georgia + Arial",
+    vibe: "Temporal · Reflective · Fluid",
+    bg: "linear-gradient(135deg, #F1E9DC, #B9D9D2)",
+    text: "#202827",
+  },
+  {
+    id: "8",
+    name: "Knowledge Constellation",
+    tagline: "Browse the ideas behind the shelf",
+    description: "An interactive topic constellation that filters the surrounding book cluster. It turns subject metadata into a visual discovery tool while retaining direct search and book access.",
+    palette: ["#050509", "#241339", "#CF9FFF", "#F4F0FF"],
+    font: "Georgia + Arial",
+    vibe: "Celestial · Connected · Exploratory",
+    bg: "radial-gradient(circle at 65% 45%, #40245F, #050509 70%)",
+    text: "#F4F0FF",
+  },
+  {
+    id: "9",
+    name: "Living Stack",
+    tagline: "Tactile, one-book-at-a-time discovery",
+    description: "A draggable stack that makes browsing feel physical. Pull the top volume away or use accessible controls to reveal the next recommendation without losing the book details.",
+    palette: ["#FF6847", "#15110F", "#B8F4DC", "#FFFFFF"],
+    font: "Arial Black + Arial",
+    vibe: "Tactile · Bold · Serendipitous",
+    bg: "linear-gradient(135deg, #FF6847, #B8F4DC)",
+    text: "#15110F",
+  },
 ];
 
 export default function MockupsIndex() {
@@ -100,9 +155,8 @@ export default function MockupsIndex() {
             </p>
             <h1 className="text-4xl font-bold text-emerald-500">Mockups</h1>
             <p className="text-muted mt-2 max-w-2xl">
-              Three directions. Bento Pop now has multiple sub-pages for mobile,
-              The Catalog shows every book on one academic page, and Reel is a
-              moody cinematic take. Mock data only — nothing here writes.
+              Nine visual systems, including five immersive animation studies.
+              The new concepts read your real collection but do not write to it.
             </p>
           </div>
           <Link
@@ -114,7 +168,7 @@ export default function MockupsIndex() {
         </div>
 
         {/* Preview grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {MOCKUPS.map((m) => (
             <div
               key={m.id}

@@ -1,0 +1,193 @@
+.shell { min-height: 100svh; position: relative; overflow: hidden; color: var(--ink); background: var(--paper); font-family: Arial, Helvetica, sans-serif; letter-spacing: 0; }
+.shell * { box-sizing: border-box; }
+.shell button, .shell a { -webkit-tap-highlight-color: transparent; }
+.topbar { position: fixed; z-index: 80; top: 0; left: 0; right: 0; height: 64px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 28px; border-bottom: 1px solid color-mix(in srgb, var(--ink), transparent 82%); backdrop-filter: blur(18px); background: color-mix(in srgb, var(--paper), transparent 12%); }
+.brand { display: inline-flex; align-items: center; gap: 10px; color: inherit; font-size: 14px; font-weight: 700; text-decoration: none; }
+.conceptName { font-size: 12px; text-transform: uppercase; font-weight: 700; }
+.topActions { justify-self: end; display: flex; gap: 6px; }
+.topActions a, .topActions button { width: 38px; height: 38px; display: grid; place-items: center; color: inherit; background: transparent; border: 0; cursor: pointer; }
+.topActions a:hover, .topActions button:hover, .topActions a:focus-visible, .topActions button:focus-visible { background: var(--accent); color: var(--accentInk); outline: 0; }
+.conceptRail { position: fixed; z-index: 70; left: 28px; right: 28px; bottom: 18px; display: flex; justify-content: space-between; gap: 8px; pointer-events: none; }
+.conceptRail a { min-width: 42px; display: flex; gap: 8px; align-items: center; color: inherit; text-decoration: none; opacity: .5; pointer-events: auto; font-size: 10px; text-transform: uppercase; }
+.conceptRail a b { display: none; letter-spacing: 0; }
+.conceptRail a[aria-current="page"] { opacity: 1; }
+.conceptRail a[aria-current="page"] b { display: block; }
+.loading { min-height: 100svh; display: grid; place-items: center; font-size: 12px; text-transform: uppercase; }
+.coverFallback { display: flex !important; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 12px; background: #e8e5dc; color: #25231f; text-align: center; font-size: 11px; overflow: hidden; }
+.coverFallback svg { width: 24px; }
+
+.searchOverlay { position: fixed; z-index: 200; inset: 0; display: grid; place-items: start center; padding: 84px 20px 20px; background: rgba(10, 10, 12, .72); backdrop-filter: blur(18px); }
+.searchOverlay section { width: min(720px, 100%); max-height: calc(100svh - 110px); overflow: auto; background: #f7f5ef; color: #111; box-shadow: 0 30px 90px rgba(0,0,0,.32); }
+.searchInput { height: 72px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; padding: 0 20px; border-bottom: 1px solid #d8d4ca; }
+.searchInput input { width: 100%; height: 100%; border: 0; outline: 0; background: transparent; font: 600 18px/1 Arial, sans-serif; }
+.searchInput button { width: 40px; height: 40px; display: grid; place-items: center; border: 0; background: transparent; cursor: pointer; }
+.searchResults { display: grid; }
+.searchResults a { min-height: 78px; display: grid; grid-template-columns: 42px 1fr auto; gap: 14px; align-items: center; padding: 10px 18px; color: inherit; text-decoration: none; border-bottom: 1px solid #e4e0d7; }
+.searchResults a:hover { background: #e8ff62; }
+.searchResults img, .searchResults .coverFallback { width: 42px; height: 58px; object-fit: cover; }
+.searchResults .coverFallback span, .searchResults .coverFallback svg { display: none; }
+.searchResults span { min-width: 0; }
+.searchResults b, .searchResults small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.searchResults b { font-size: 14px; }
+.searchResults small { margin-top: 5px; color: #6c6962; }
+
+/* 05: Kinetic field */
+.concept5 { --paper: #edff55; --ink: #0d0c12; --accent: #ff5438; --accentInk: #fff; }
+.kinetic { min-height: 100svh; position: relative; display: grid; grid-template-columns: minmax(330px, 42%) 1fr; padding-top: 64px; background: #edff55; }
+.kineticCopy { position: relative; z-index: 8; align-self: center; padding: 48px 5vw 88px; }
+.kineticCopy > span, .orbitCopy > span, .riverHeader > span, .constellationCopy > span, .stackCopy > span { display: block; margin-bottom: 18px; font: 700 11px/1 Arial, sans-serif; text-transform: uppercase; }
+.kineticCopy h1 { max-width: 620px; margin: 0; font: 900 clamp(54px, 7vw, 112px)/.86 Arial Black, Arial, sans-serif; text-transform: uppercase; }
+.kineticCopy p { max-width: 430px; margin: 26px 0; font: 500 16px/1.5 Arial, sans-serif; }
+.kineticCopy a { display: inline-flex; align-items: center; gap: 8px; color: inherit; font-weight: 800; text-decoration: none; border-bottom: 2px solid; padding: 0 0 6px; }
+.kineticField { position: relative; display: grid; grid-template-columns: repeat(6, minmax(70px, 1fr)); grid-template-rows: repeat(4, 1fr); gap: 10px; padding: 38px 32px 82px 12px; perspective: 1200px; }
+.kineticBook { position: relative; min-width: 0; overflow: hidden; border: 2px solid #0d0c12; background: #fff; box-shadow: 5px 5px 0 #0d0c12; transform-origin: center; opacity: 0; }
+.kineticBook:nth-child(4n + 1) { transform: translateY(12px); }
+.kineticBook:nth-child(5n + 2) { transform: translateY(-8px); }
+.kineticBook:hover, .kineticBook:focus-visible { z-index: 10; outline: 4px solid #ff5438; }
+.kineticBook img, .kineticBook .coverFallback { width: 100%; height: 100%; object-fit: cover; display: block; }
+.kineticBook .coverFallback span { font-size: 8px; }
+.kineticStat { position: absolute; z-index: 10; left: calc(42% - 92px); bottom: 76px; width: 144px; height: 144px; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 50%; background: #ff5438; color: #fff; transform: rotate(-7deg); }
+.kineticStat b { font-size: 40px; line-height: 1; }
+.kineticStat span { width: 80px; margin-top: 5px; font-size: 10px; line-height: 1.2; text-align: center; text-transform: uppercase; }
+
+/* 06: Orbit */
+.concept6 { --paper: #060d19; --ink: #f5f0e8; --accent: #ffb703; --accentInk: #07101f; }
+.orbit { min-height: 100svh; position: relative; display: grid; grid-template-columns: .8fr 1.2fr; background: radial-gradient(circle at 68% 48%, #163c50 0, #091b2b 27%, #060d19 67%); padding-top: 64px; }
+.orbitCopy { align-self: center; padding: 40px 5vw 110px; }
+.orbitCopy h1 { max-width: 520px; margin: 0; font: 400 clamp(58px, 7vw, 108px)/.88 Georgia, serif; }
+.orbitCopy p { max-width: 320px; margin-top: 28px; color: #a9bcc5; line-height: 1.5; }
+.orbitScene { position: relative; min-height: calc(100svh - 64px); perspective: 1200px; }
+.orbitLines, .orbitLines i { position: absolute; inset: 50%; border: 1px solid rgba(230,247,255,.2); border-radius: 50%; transform: translate(-50%, -50%); }
+.orbitLines { width: min(74vw, 740px); height: min(74vw, 740px); }
+.orbitLines i:nth-child(1) { width: 74%; height: 74%; }
+.orbitLines i:nth-child(2) { width: 48%; height: 48%; }
+.orbitLines i:nth-child(3) { width: 23%; height: 23%; background: rgba(255,183,3,.05); }
+.orbitCore { position: absolute; z-index: 10; left: 50%; top: 50%; width: 260px; display: grid; grid-template-columns: 108px 1fr; gap: 20px; align-items: center; translate: -50% -50%; }
+.orbitCore > img, .orbitCore > .coverFallback { width: 108px; height: 156px; object-fit: cover; box-shadow: 0 22px 60px #000; }
+.orbitCore small { color: #ffb703; text-transform: uppercase; font-size: 9px; }
+.orbitCore h2 { margin: 8px 0; font: 400 22px/1.05 Georgia, serif; }
+.orbitCore p { margin: 0; color: #9eb2bc; font-size: 12px; }
+.orbitNode { position: absolute; z-index: 12; left: calc(50% + var(--x)); top: calc(50% + var(--y)); width: 64px; padding: 0; translate: -50% -50%; border: 0; background: transparent; color: #f5f0e8; cursor: pointer; }
+.orbitNode img, .orbitNode .coverFallback { width: 54px; height: 76px; margin: auto; object-fit: cover; border: 1px solid rgba(255,255,255,.4); box-shadow: 0 8px 26px rgba(0,0,0,.55); }
+.orbitNode .coverFallback span, .orbitNode .coverFallback svg { display: none; }
+.orbitNode span { display: block; margin-top: 5px; overflow: hidden; text-overflow: ellipsis; font-size: 8px; white-space: nowrap; opacity: .7; }
+.orbitNode[aria-pressed="true"] img, .orbitNode:focus-visible img { outline: 3px solid #ffb703; outline-offset: 3px; }
+.orbitTopics { position: absolute; z-index: 14; left: 5vw; bottom: 72px; display: flex; flex-wrap: wrap; gap: 8px; max-width: 34vw; }
+.orbitTopics span { padding: 7px 10px; border: 1px solid #365565; color: #bed0d8; font-size: 10px; text-transform: uppercase; }
+
+/* 07: Reading river */
+.concept7 { --paper: #f1e9dc; --ink: #202827; --accent: #0c7c78; --accentInk: #fff; }
+.river { min-height: 100svh; position: relative; padding-top: 64px; background: #f1e9dc; }
+.riverHeader { position: absolute; z-index: 15; top: 102px; left: 5vw; max-width: 560px; }
+.riverHeader h1 { margin: 0; font: 400 clamp(48px, 6vw, 92px)/.9 Georgia, serif; }
+.riverHeader p { max-width: 360px; margin-top: 18px; color: #5e6a66; line-height: 1.5; }
+.riverControls { position: absolute; z-index: 20; top: 120px; right: 4vw; display: flex; gap: 8px; }
+.riverControls button, .stackButtons button { width: 48px; height: 48px; display: grid; place-items: center; border: 1px solid currentColor; background: transparent; color: inherit; cursor: pointer; }
+.riverControls button:hover, .riverControls button:focus-visible { background: #0c7c78; color: white; outline: 0; }
+.riverTrack { position: absolute; z-index: 10; left: 0; right: 0; bottom: 58px; height: 56svh; display: flex; align-items: end; gap: clamp(70px, 10vw, 150px); overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none; padding: 40px 12vw 68px 46vw; }
+.riverTrack::-webkit-scrollbar { display: none; }
+.riverBook { position: relative; flex: 0 0 min(520px, 76vw); display: grid; grid-template-columns: 170px 1fr; gap: 28px; align-items: end; scroll-snap-align: center; }
+.riverBook:nth-child(even) { transform: translateY(-54px); }
+.riverBook a { display: block; }
+.riverBook img, .riverBook .coverFallback { width: 170px; height: 250px; object-fit: cover; box-shadow: 10px 12px 0 #0c7c78; }
+.riverBook h2 { margin: 8px 0; font: 400 28px/1.05 Georgia, serif; }
+.riverBook p { margin: 0 0 16px; color: #61706b; }
+.riverBook b { font-size: 10px; color: #0c7c78; text-transform: uppercase; }
+.riverBook small { font-size: 10px; }
+.riverYear { position: absolute; left: 0; top: -30px; font: 700 10px/1 Arial, sans-serif; color: #0c7c78; }
+.riverLine { position: absolute; z-index: 2; left: 0; right: 0; bottom: calc(58px + 28svh); height: 3px; background: #0c7c78; }
+.riverLine::after { content: ""; position: absolute; inset: -12px 0; background: repeating-radial-gradient(circle at 12px 50%, #0c7c78 0 2px, transparent 3px 24px); opacity: .28; }
+
+/* 08: Constellation */
+.concept8 { --paper: #050509; --ink: #f4f0ff; --accent: #cf9fff; --accentInk: #130b1c; }
+.constellation { min-height: 100svh; position: relative; padding-top: 64px; background: radial-gradient(circle at 69% 52%, #241339 0, #0b0712 42%, #050509 72%); }
+.starNoise { position: absolute; inset: 64px 0 0; opacity: .45; background-image: radial-gradient(circle, rgba(255,255,255,.8) 0 1px, transparent 1.5px), radial-gradient(circle, rgba(207,159,255,.7) 0 1px, transparent 1.5px); background-position: 0 0, 37px 42px; background-size: 78px 78px, 113px 113px; }
+.constellationCopy { position: absolute; z-index: 10; left: 5vw; top: 17vh; width: 33vw; }
+.constellationCopy h1 { margin: 0; font: 400 clamp(50px, 6.4vw, 100px)/.88 Georgia, serif; }
+.constellationCopy p { max-width: 350px; color: #a89db5; line-height: 1.5; }
+.topicRing { position: absolute; z-index: 12; right: 5vw; top: 13vh; width: min(50vw, 650px); aspect-ratio: 1; border: 1px solid rgba(207,159,255,.18); border-radius: 50%; }
+.topicRing::before, .topicRing::after { content: ""; position: absolute; inset: 17%; border: 1px solid rgba(207,159,255,.16); border-radius: 50%; }
+.topicRing::after { inset: 35%; }
+.topicRing > button { position: absolute; left: var(--x); top: var(--y); transform: translate(-50%, -50%); min-width: 92px; padding: 8px; border: 0; color: #d5c9e3; background: transparent; cursor: pointer; }
+.topicRing > button::before { content: ""; display: block; width: 9px; height: 9px; margin: 0 auto 6px; border-radius: 50%; background: #cf9fff; box-shadow: 0 0 20px 7px rgba(207,159,255,.3); }
+.topicRing > button span, .topicRing > button small { display: block; }
+.topicRing > button span { font-size: 9px; line-height: 1.2; text-transform: uppercase; }
+.topicRing > button small { margin-top: 4px; color: #786a87; }
+.topicRing > button:hover, .topicRing > button:focus-visible, .topicRing > button[aria-pressed="true"] { color: #fff; outline: 0; transform: translate(-50%, -50%) scale(1.13); }
+.topicCore { position: absolute; left: 50%; top: 50%; width: 150px; height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; transform: translate(-50%, -50%); border-radius: 50%; background: #cf9fff; color: #160d20; text-align: center; }
+.topicCore span { max-width: 110px; font: 700 13px/1.1 Arial, sans-serif; }
+.topicCore small { font-size: 8px; text-transform: uppercase; }
+.constellationBooks { position: absolute; z-index: 20; left: 5vw; right: 5vw; bottom: 64px; display: flex; gap: 10px; align-items: end; pointer-events: none; }
+.constellationBooks > div { pointer-events: auto; }
+.constellationBooks a { width: 58px; display: block; color: #fff; text-decoration: none; }
+.constellationBooks img, .constellationBooks .coverFallback { width: 58px; height: 82px; object-fit: cover; border: 1px solid rgba(255,255,255,.24); }
+.constellationBooks .coverFallback span, .constellationBooks .coverFallback svg { display: none; }
+.constellationBooks a > span { display: none; }
+.constellationBooks a:hover, .constellationBooks a:focus-visible { outline: 3px solid #cf9fff; outline-offset: 3px; }
+
+/* 09: Living stack */
+.concept9 { --paper: #ff6847; --ink: #15110f; --accent: #b8f4dc; --accentInk: #15110f; }
+.stack { min-height: 100svh; position: relative; display: grid; grid-template-columns: 42% 58%; padding-top: 64px; background: #ff6847; }
+.stackCopy { align-self: center; padding: 30px 4vw 100px 6vw; }
+.stackCopy h1 { margin: 0; font: 900 clamp(50px, 6.3vw, 104px)/.86 Arial Black, Arial, sans-serif; text-transform: uppercase; }
+.stackCopy p { max-width: 410px; line-height: 1.5; }
+.stackButtons { display: flex; gap: 8px; margin-top: 26px; }
+.stackButtons button:hover, .stackButtons button:focus-visible { background: #b8f4dc; outline: 0; }
+.stackScene { position: relative; min-height: calc(100svh - 64px); perspective: 1400px; }
+.stackBook { position: absolute; left: 37%; top: 48%; width: clamp(190px, 20vw, 300px); aspect-ratio: 2 / 3; transform-origin: 50% 100%; }
+.stackBook img, .stackBook .coverFallback { width: 100%; height: 100%; object-fit: cover; border: 2px solid #15110f; box-shadow: 14px 18px 0 rgba(21,17,15,.92); user-select: none; }
+.stackShadow { position: absolute; left: 25%; right: 16%; bottom: 10%; height: 50px; border-radius: 50%; background: rgba(60,14,5,.32); filter: blur(22px); }
+.stackMeta { position: absolute; z-index: 50; right: 5vw; bottom: 72px; width: min(300px, 28vw); padding: 18px; border-left: 3px solid #15110f; background: rgba(255,104,71,.86); backdrop-filter: blur(8px); }
+.stackMeta small { font-weight: 800; }
+.stackMeta h2 { margin: 8px 0; font: 700 24px/1.05 Arial, sans-serif; }
+.stackMeta p { margin: 0 0 14px; }
+.stackMeta a { display: inline-flex; gap: 8px; align-items: center; color: inherit; font-weight: 800; text-decoration: none; border-bottom: 2px solid; padding-bottom: 4px; }
+
+@media (max-width: 900px) {
+  .topbar { grid-template-columns: 1fr auto; padding: 0 16px; }
+  .conceptName { display: none; }
+  .conceptRail { left: 16px; right: 16px; bottom: 10px; }
+  .conceptRail a b { display: none !important; }
+  .kinetic { display: block; overflow-y: auto; }
+  .kineticCopy { padding: 50px 22px 34px; }
+  .kineticCopy h1 { font-size: clamp(48px, 15vw, 76px); }
+  .kineticField { min-height: 72svh; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(6, 140px); padding: 18px 14px 80px; }
+  .kineticStat { position: fixed; left: auto; right: 16px; bottom: 58px; width: 94px; height: 94px; }
+  .kineticStat b { font-size: 28px; }
+  .orbit { display: block; overflow-y: auto; padding-bottom: 70px; }
+  .orbitCopy { position: relative; z-index: 20; padding: 50px 22px 0; }
+  .orbitCopy h1 { font-size: clamp(52px, 16vw, 82px); }
+  .orbitScene { min-height: 66svh; margin-top: -10px; }
+  .orbitCore { width: 205px; grid-template-columns: 82px 1fr; gap: 14px; }
+  .orbitCore > img, .orbitCore > .coverFallback { width: 82px; height: 120px; }
+  .orbitTopics { display: none; }
+  .riverHeader { position: relative; top: auto; left: auto; padding: 50px 22px 0; }
+  .riverHeader h1 { font-size: clamp(50px, 15vw, 74px); }
+  .riverControls { top: 78px; right: 16px; }
+  .riverControls button { width: 42px; height: 42px; }
+  .riverTrack { height: 56svh; padding-left: 28px; padding-right: 20vw; bottom: 40px; gap: 60px; }
+  .riverBook { flex-basis: 78vw; grid-template-columns: 125px 1fr; gap: 18px; }
+  .riverBook img, .riverBook .coverFallback { width: 125px; height: 184px; box-shadow: 7px 9px 0 #0c7c78; }
+  .riverBook h2 { font-size: 22px; }
+  .riverLine { bottom: calc(40px + 26svh); }
+  .constellation { overflow-y: auto; min-height: 120svh; }
+  .constellationCopy { position: relative; left: auto; top: auto; width: auto; padding: 50px 22px 0; }
+  .constellationCopy h1 { font-size: clamp(50px, 15vw, 76px); }
+  .topicRing { top: 49svh; right: 50%; width: min(86vw, 540px); transform: translateX(50%); }
+  .topicRing > button { min-width: 70px; }
+  .constellationBooks { position: fixed; left: 16px; right: 16px; bottom: 45px; overflow-x: auto; padding: 6px; background: rgba(5,5,9,.78); backdrop-filter: blur(14px); scrollbar-width: none; }
+  .constellationBooks::-webkit-scrollbar { display: none; }
+  .stack { display: block; overflow-y: auto; min-height: 115svh; }
+  .stackCopy { position: relative; z-index: 30; padding: 50px 22px 0; }
+  .stackCopy h1 { font-size: clamp(50px, 14vw, 74px); }
+  .stackCopy p { max-width: 86%; }
+  .stackScene { min-height: 64svh; margin-top: -110px; }
+  .stackBook { left: 24%; top: 46%; width: min(48vw, 240px); }
+  .stackMeta { position: fixed; right: 16px; bottom: 44px; width: min(52vw, 240px); padding: 12px; }
+  .stackMeta h2 { font-size: 17px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell *, .shell *::before, .shell *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  .kineticBook { opacity: 1; }
+}
