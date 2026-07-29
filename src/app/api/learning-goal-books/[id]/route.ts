@@ -24,7 +24,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params;
     const db = getDb();
     const body = await request.json();
-    const { goal_id, book_id } = body;
+    const { goal_id, book_id, rec_id } = body;
 
     const updates: string[] = [];
     const values: any[] = [];
@@ -36,6 +36,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (book_id !== undefined) {
       updates.push('book_id = ?');
       values.push(book_id);
+    }
+    if (rec_id !== undefined) {
+      updates.push('rec_id = ?');
+      values.push(rec_id);
     }
 
     values.push(id);

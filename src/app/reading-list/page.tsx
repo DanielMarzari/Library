@@ -25,13 +25,28 @@ interface LearningGoal {
   created_at: string;
 }
 
-interface GoalBook {
+interface RecMini {
+  id: string;
+  title: string;
+  author?: string;
+  cover_url?: string;
+  isbn?: string;
+  recommended_by?: string;
+  topic?: string;
+}
+
+// A goal entry may reference an owned book (kind:'book') OR a recommendation
+// the user doesn't own yet (kind:'rec'). Exactly one of book_id / rec_id is set.
+interface GoalItem {
   id: string;
   goal_id: string;
-  book_id: string;
+  book_id: string | null;
+  rec_id: string | null;
   priority: number;
   added_at: string;
-  book: Book;
+  kind: "book" | "rec";
+  book?: Book;
+  rec?: RecMini;
 }
 
 const COLORS = [
@@ -81,7 +96,8 @@ export default function ReadingListPage() {
 
   // Learning goals state
   const [goals, setGoals] = useState<LearningGoal[]>([]);
-  const [goalBooks, setGoalBooks] = useState<Record<string, GoalBook[]>>({});
+  const [goalBooks, setGoalBooks] = useState<Record<string, GoalItem[]>>({});
+  const [recs, setRecs] = useState<RecMini[]>([]);
   const [showNewGoal, setShowNewGoal] = useState(false);
   const [newGoalName, setNewGoalName] = useState("");
   const [newGoalDesc, setNewGoalDesc] = useState("");
@@ -101,14 +117,23 @@ export default function ReadingListPage() {
       try {
         setLoading(true);
 
-        const [booksData, itemsData, goalsData, goalBooksData] = await Promise.all([
+        const [booksData, itemsData, goalsData, goalBooksData, recsData] = await Promise.all([
           api.books.list(),
           api.readingList.list(selectedYear),
           api.learningGoals.list(),
           api.learningGoalBooks.list(),
+          api.recommendations.list(),
         ]);
 
         setBooks(booksData);
+        const recsMini: RecMini[] = (recsData || []).map((r: any) => ({
+          id: r.id, title: r.title, author: r.author,
+          cover_url: r.cover_url, isbn: r.isbn,
+          recommended_by: r.recommended_by, topic: r.topic,
+        }));
+        setRecs(recsMini);
+        const recById: Record<string, RecMini> = {};
+        recsMini.forEach(r => { recById[r.id] = r; });
 
         // Enrich reading list items
         if (itemsData && itemsData.length > 0) {
@@ -135,14 +160,23 @@ export default function ReadingListPage() {
           setGoals([]);
         }
 
-        // Enrich goal books
+        // Enrich goal items (a mix of owned books and unowned recommendations)
         if (goalBooksData && goalBooksData.length > 0) {
-          const grouped: Record<string, GoalBook[]> = {};
-          goalBooksData.forEach(gb => {
-            const book = booksData.find(b => b.id === gb.book_id);
-            if (book) {
+          const grouped: Record<string, GoalItem[]> = {};
+          goalBooksData.forEach((gb: any) => {
+            const bookId = gb.book_id || null;
+            const recId = gb.rec_id || null;
+            let item: GoalItem | null = null;
+            if (bookId) {
+              const book = booksData.find(b => b.id === bookId);
+              if (book) item = { ...gb, book_id: bookId, rec_id: null, kind: "book", book };
+            } else if (recId) {
+              const rec = recById[recId];
+              if (rec) item = { ...gb, book_id: null, rec_id: recId, kind: "rec", rec };
+            }
+            if (item) {
               if (!grouped[gb.goal_id]) grouped[gb.goal_id] = [];
-              grouped[gb.goal_id].push({ ...gb, book });
+              grouped[gb.goal_id].push(item);
             }
           });
           setGoalBooks(grouped);
@@ -284,18 +318,38 @@ export default function ReadingListPage() {
       const data = await api.learningGoalBooks.create({
         goal_id: goalId,
         book_id: bookId,
-      });
+      } as any);
       const book = books.find(b => b.id === bookId);
       if (book) {
         setGoalBooks(prev => ({
           ...prev,
-          [goalId]: [...(prev[goalId] || []), { ...data, book } as GoalBook],
+          [goalId]: [...(prev[goalId] || []), { ...data, book_id: bookId, rec_id: null, kind: "book", book } as GoalItem],
         }));
       }
       setAddingToGoal(null);
       setGoalSearchQuery("");
     } catch (error) {
       console.error("Error adding book to goal:", error);
+    }
+  };
+
+  const addRecToGoal = async (goalId: string, recId: string) => {
+    try {
+      const data = await api.learningGoalBooks.create({
+        goal_id: goalId,
+        rec_id: recId,
+      } as any);
+      const rec = recs.find(r => r.id === recId);
+      if (rec) {
+        setGoalBooks(prev => ({
+          ...prev,
+          [goalId]: [...(prev[goalId] || []), { ...data, book_id: null, rec_id: recId, kind: "rec", rec } as GoalItem],
+        }));
+      }
+      setAddingToGoal(null);
+      setGoalSearchQuery("");
+    } catch (error) {
+      console.error("Error adding rec to goal:", error);
     }
   };
 
@@ -311,22 +365,42 @@ export default function ReadingListPage() {
     }
   };
 
-  // Available books for a specific goal (not already in that goal)
-  const availableBooksForGoal = useCallback((goalId: string) => {
-    const inGoal = new Set((goalBooks[goalId] || []).map(gb => gb.book_id));
-    const q = goalSearchQuery.toLowerCase();
-    return books
-      .filter(b => !inGoal.has(b.id))
-      .filter(b => !q || b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q))
-      .sort((a, b) => a.title.localeCompare(b.title));
-  }, [books, goalBooks, goalSearchQuery]);
+  // Available candidates for a goal: owned books + recommendations not already
+  // on the goal. Returned as a tagged union so the render can distinguish.
+  type Candidate =
+    | { kind: "book"; id: string; title: string; author: string; sub?: string }
+    | { kind: "rec"; id: string; title: string; author: string; sub?: string };
+
+  const availableBooksForGoal = useCallback((goalId: string): Candidate[] => {
+    const inGoalBookIds = new Set(
+      (goalBooks[goalId] || []).filter(gb => gb.kind === "book").map(gb => gb.book_id as string)
+    );
+    const inGoalRecIds = new Set(
+      (goalBooks[goalId] || []).filter(gb => gb.kind === "rec").map(gb => gb.rec_id as string)
+    );
+    const q = goalSearchQuery.toLowerCase().trim();
+    const bookMatches: Candidate[] = books
+      .filter(b => !inGoalBookIds.has(b.id))
+      .filter(b => !q || b.title.toLowerCase().includes(q) || (b.author || "").toLowerCase().includes(q))
+      .map(b => ({ kind: "book", id: b.id, title: b.title, author: b.author || "", sub: "In library" }));
+    const recMatches: Candidate[] = recs
+      .filter(r => !inGoalRecIds.has(r.id))
+      .filter(r => !q || r.title.toLowerCase().includes(q) || (r.author || "").toLowerCase().includes(q))
+      .map(r => ({ kind: "rec", id: r.id, title: r.title, author: r.author || "", sub: r.recommended_by ? `Rec · ${r.recommended_by}` : "Recommendation" }));
+    return [...bookMatches, ...recMatches].sort((a, b) => a.title.localeCompare(b.title));
+  }, [books, recs, goalBooks, goalSearchQuery]);
 
   const renderGoalCard = (goal: LearningGoal) => {
     const gBooks = goalBooks[goal.id] || [];
-    const readCount = gBooks.filter(gb => gb.book.status === "read" || (gb.book.status as string) === "completed").length;
-    const readingCount = gBooks.filter(gb => gb.book.status === "reading").length;
-    const totalPages = gBooks.reduce((sum, gb) => sum + (gb.book.pages || 0), 0);
-    const readPages = gBooks.filter(gb => gb.book.status === "read" || (gb.book.status as string) === "completed").reduce((sum, gb) => sum + (gb.book.pages || 0), 0);
+    // Only owned books can be "read"/"reading"; recs always count as unread here.
+    const bookItems = gBooks.filter(gb => gb.kind === "book" && gb.book);
+    const recCount = gBooks.filter(gb => gb.kind === "rec").length;
+    const readCount = bookItems.filter(gb => gb.book!.status === "read" || (gb.book!.status as string) === "completed").length;
+    const readingCount = bookItems.filter(gb => gb.book!.status === "reading").length;
+    const totalPages = bookItems.reduce((sum, gb) => sum + (gb.book!.pages || 0), 0);
+    const readPages = bookItems
+      .filter(gb => gb.book!.status === "read" || (gb.book!.status as string) === "completed")
+      .reduce((sum, gb) => sum + (gb.book!.pages || 0), 0);
     const pct = gBooks.length > 0 ? Math.round((readCount / gBooks.length) * 100) : 0;
     const isExpanded = expandedGoal === goal.id;
     const cc = getColorClasses(goal.color);
@@ -344,8 +418,9 @@ export default function ReadingListPage() {
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-foreground text-sm">{goal.name}</h3>
                 <span className="text-[10px] text-muted">
-                  {readCount}/{gBooks.length} books
+                  {readCount}/{gBooks.length} items
                   {readingCount > 0 && ` · ${readingCount} reading`}
+                  {recCount > 0 && ` · ${recCount} rec${recCount === 1 ? "" : "s"}`}
                 </span>
               </div>
               {goal.description && (
@@ -371,36 +446,48 @@ export default function ReadingListPage() {
         {/* Expanded Content */}
         {isExpanded && (
           <div className="border-t border-border-custom">
-            {/* Book list */}
+            {/* Item list — mix of owned books and unowned recs */}
             {gBooks.length > 0 && (
               <div className="divide-y divide-border-custom">
                 {gBooks.map(gb => {
-                  const isRead = gb.book.status === "read" || (gb.book.status as string) === "completed";
-                  const isReading = gb.book.status === "reading";
+                  const isBook = gb.kind === "book";
+                  const title = isBook ? gb.book!.title : gb.rec!.title;
+                  const author = isBook ? gb.book!.author : (gb.rec!.author || "");
+                  const cover = isBook
+                    ? coverSrc(gb.book!)
+                    : (gb.rec!.cover_url ? gb.rec!.cover_url : "");
+                  const pages = isBook ? gb.book!.pages : undefined;
+                  const isRead = isBook && (gb.book!.status === "read" || (gb.book!.status as string) === "completed");
+                  const isReading = isBook && gb.book!.status === "reading";
                   return (
                     <div key={gb.id} className={`flex items-center gap-3 px-4 py-2.5 group ${isRead ? "opacity-60" : ""}`}>
-                      {coverSrc(gb.book) ? (
-                        <img src={coverSrc(gb.book)} alt="" className="w-8 h-11 object-cover rounded flex-shrink-0" />
+                      {cover ? (
+                        <img src={cover} alt="" className="w-8 h-11 object-cover rounded flex-shrink-0" />
                       ) : (
                         <div className="w-8 h-11 bg-surface-2 rounded flex-shrink-0 flex items-center justify-center">
-                          <span className="text-[10px] text-muted">📖</span>
+                          <span className="text-[10px] text-muted">{isBook ? "📖" : "💡"}</span>
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium truncate ${isRead ? "line-through text-muted" : "text-foreground"}`}>{gb.book.title}</p>
+                        <p className={`text-sm font-medium truncate ${isRead ? "line-through text-muted" : "text-foreground"}`}>{title}</p>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-xs text-muted truncate">{gb.book.author}</span>
-                          {gb.book.pages && <span className="text-[10px] text-muted-2">{gb.book.pages}p</span>}
+                          <span className="text-xs text-muted truncate">{author}</span>
+                          {pages && <span className="text-[10px] text-muted-2">{pages}p</span>}
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {!isBook && (
+                          <span className="px-1.5 py-0.5 bg-amber-500/15 text-amber-500 rounded text-[9px] font-medium" title="Recommendation — not yet in library">
+                            Rec
+                          </span>
+                        )}
                         {isRead && (
                           <span className="px-1.5 py-0.5 bg-emerald-500/15 text-emerald-500 rounded text-[9px] font-medium">Read</span>
                         )}
                         {isReading && (
                           <span className="px-1.5 py-0.5 bg-blue-500/15 text-blue-500 rounded text-[9px] font-medium">Reading</span>
                         )}
-                        {!isRead && !isReading && (
+                        {isBook && !isRead && !isReading && (
                           <span className="px-1.5 py-0.5 bg-surface-2 text-muted rounded text-[9px] font-medium">To Read</span>
                         )}
                         <button
@@ -424,25 +511,37 @@ export default function ReadingListPage() {
                 <div>
                   <input
                     type="text"
-                    placeholder="Search your library..."
+                    placeholder="Search your library or recommendations…"
                     value={goalSearchQuery}
                     onChange={(e) => setGoalSearchQuery(e.target.value)}
                     className="w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted focus:outline-none focus:ring-1 focus:ring-emerald-600 mb-2"
                     autoFocus
                   />
                   <div className="max-h-48 overflow-y-auto rounded-lg border border-border-custom bg-surface-2">
-                    {availableBooksForGoal(goal.id).slice(0, 30).map(book => (
+                    {availableBooksForGoal(goal.id).slice(0, 30).map(cand => (
                       <button
-                        key={book.id}
-                        onClick={() => addBookToGoal(goal.id, book.id)}
-                        className="w-full text-left px-3 py-2 hover:bg-border-custom border-b border-border-custom last:border-0 transition-colors"
+                        key={`${cand.kind}-${cand.id}`}
+                        onClick={() => cand.kind === "book" ? addBookToGoal(goal.id, cand.id) : addRecToGoal(goal.id, cand.id)}
+                        className="w-full text-left px-3 py-2 hover:bg-border-custom border-b border-border-custom last:border-0 transition-colors flex items-start gap-2"
                       >
-                        <p className="text-sm font-medium text-foreground truncate">{book.title}</p>
-                        <p className="text-xs text-muted">{book.author}</p>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{cand.title}</p>
+                          <p className="text-xs text-muted truncate">
+                            {cand.author}
+                            {cand.sub && <span className="text-muted-2"> · {cand.sub}</span>}
+                          </p>
+                        </div>
+                        <span className={`flex-shrink-0 px-1.5 py-0.5 rounded text-[9px] font-medium ${
+                          cand.kind === "book"
+                            ? "bg-emerald-500/15 text-emerald-500"
+                            : "bg-amber-500/15 text-amber-500"
+                        }`}>
+                          {cand.kind === "book" ? "Library" : "Rec"}
+                        </span>
                       </button>
                     ))}
                     {availableBooksForGoal(goal.id).length === 0 && (
-                      <p className="p-3 text-sm text-muted text-center">No matching books</p>
+                      <p className="p-3 text-sm text-muted text-center">No matching books or recommendations</p>
                     )}
                   </div>
                   <button onClick={() => { setAddingToGoal(null); setGoalSearchQuery(""); }} className="mt-2 text-xs text-muted hover:text-foreground">
@@ -455,7 +554,7 @@ export default function ReadingListPage() {
                     onClick={() => setAddingToGoal(goal.id)}
                     className={`flex-1 text-center py-1.5 rounded-lg text-xs font-medium transition-colors ${cc.bg} ${cc.text} hover:opacity-80`}
                   >
-                    + Add Book
+                    + Add Book or Rec
                   </button>
 
                   {/* Edit / Delete */}
