@@ -50,6 +50,14 @@ function normalizeRec(raw: any): Recommendation {
   return { ...raw, source_book_ids: ids };
 }
 
+// Escape one CSV cell — quote it when it holds a comma, quote, newline, or
+// edge whitespace, doubling any embedded quotes. Same rules as /api/export-csv.
+function csvEscape(val: unknown): string {
+  if (val === null || val === undefined) return "";
+  const s = String(val);
+  return /[",\n\r]/.test(s) || s !== s.trim() ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
 type AddMode = "book" | "article";
 
 type SortMode = "recent" | "abe_asc" | "abe_desc" | "thrift_asc" | "thrift_desc" | "alpha";
@@ -870,6 +878,47 @@ export default function RecommendationsPage() {
     setFetchingCovers(false);
   };
 
+  // Download whatever is currently in view (filters + sort applied) as a
+  // lightweight CSV: readable columns only — no cover URLs, internal ids, or
+  // raw source_book_ids JSON. Built in the browser, so there's no round trip.
+  const handleExportCsv = useCallback(() => {
+    if (filteredRecs.length === 0) return;
+
+    const columns: Array<[string, (r: Recommendation) => unknown]> = [
+      ["title", r => r.title],
+      ["author", r => r.author],
+      ["type", r => r.item_type || "book"],
+      ["recommended_by", r => r.recommended_by],
+      ["topic", r => r.topic],
+      ["notes", r => r.notes],
+      ["year", r => r.year],
+      ["isbn", r => r.isbn],
+      ["journal", r => r.journal],
+      ["doi", r => r.doi],
+      ["url", r => r.url],
+      ["abebooks_price", r => r.lowest_price],
+      ["thriftbooks_price", r => r.thriftbooks_price],
+      // Source books resolve to titles. Ids we can't resolve are dropped rather
+      // than leaked into the export as opaque strings.
+      ["referenced_in", r =>
+        (r.source_book_ids || []).map(id => bookIdMap[id]).filter(Boolean).join("; ")],
+      ["added", r => (r.created_at || "").slice(0, 10)],
+    ];
+
+    const csv = [
+      columns.map(([name]) => name).join(","),
+      ...filteredRecs.map(rec => columns.map(([, read]) => csvEscape(read(rec))).join(",")),
+    ].join("\n");
+
+    // Lead with a BOM so Excel reads the accents and em-dashes as UTF-8.
+    const url = URL.createObjectURL(new Blob(["﻿", csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `recommendations-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [filteredRecs, bookIdMap]);
+
   const hasMore = paginatedRecs.length < filteredRecs.length;
 
   // Reset page when filters change
@@ -1279,6 +1328,14 @@ export default function RecommendationsPage() {
               </button>
             ))}
             <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={handleExportCsv}
+                disabled={filteredRecs.length === 0}
+                className="px-2.5 py-1 bg-surface-2 text-muted rounded text-[10px] font-medium hover:text-foreground disabled:opacity-40 disabled:hover:text-muted transition-colors"
+                title={`Download the ${filteredRecs.length.toLocaleString()} recommendation${filteredRecs.length === 1 ? "" : "s"} shown as a CSV`}
+              >
+                ⬇ Export CSV
+              </button>
               {fetchingCovers ? (
                 <span className="text-[10px] text-muted animate-pulse">
                   Covers... {coverProgress.done}/{coverProgress.total} · {coverProgress.hits} found
