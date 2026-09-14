@@ -7,6 +7,9 @@ export interface Author {
   name: string;
   ethnicity?: string | null;
   nationality?: string | null;
+  country?: string | null;
+  birth_year?: number | null;
+  death_year?: number | null;
   religious_tradition?: string | null;
   gender?: string | null;
   image_url?: string | null;

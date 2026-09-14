@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 
 interface WikidataResult {
   gender?: string;
-  nationality?: string;
+  nationality?: string;   // demonym form ("American", "British")
+  country?: string;       // full country name ("United States of America")
+  ethnicity?: string;     // Wikidata P172 label
+  birth_year?: number;    // year from P569
+  death_year?: number;    // year from P570 (null if living)
   religion?: string;
   image_url?: string;
 }
@@ -65,6 +69,8 @@ async function fetchFromWikidata(authorName: string): Promise<WikidataResult> {
       const countryId = claims.P27[0].mainsnak.datavalue.value.id;
       const label = await getLabel(countryId);
       if (label) {
+        // Keep the raw country name too — the demonym is derived from it below.
+        result.country = label;
         // Convert country name to nationality demonym where possible
         const demonymMap: Record<string, string> = {
           "United States of America": "American",
@@ -149,6 +155,31 @@ async function fetchFromWikidata(authorName: string): Promise<WikidataResult> {
         else if (lower.includes("mormon") || lower.includes("latter")) result.religion = "Mormon / LDS";
         else result.religion = label;
       }
+    }
+
+    // P569 = date of birth — Wikidata returns ISO-like "+1935-11-16T00:00:00Z"
+    // (with a leading +/- for era). We only keep the year.
+    const parseYear = (raw?: string): number | undefined => {
+      if (!raw) return undefined;
+      const m = raw.match(/^[+-]?(\d{1,5})-/);
+      if (!m) return undefined;
+      const y = parseInt(m[1], 10);
+      return isNaN(y) ? undefined : y;
+    };
+    const birthRaw = claims.P569?.[0]?.mainsnak?.datavalue?.value?.time;
+    const birthYear = parseYear(birthRaw);
+    if (birthYear) result.birth_year = birthYear;
+
+    // P570 = date of death (absent for living people)
+    const deathRaw = claims.P570?.[0]?.mainsnak?.datavalue?.value?.time;
+    const deathYear = parseYear(deathRaw);
+    if (deathYear) result.death_year = deathYear;
+
+    // P172 = ethnic group (only some biographies have this)
+    if (claims.P172?.[0]?.mainsnak?.datavalue?.value?.id) {
+      const ethId = claims.P172[0].mainsnak.datavalue.value.id;
+      const ethLabel = await getLabel(ethId);
+      if (ethLabel) result.ethnicity = ethLabel;
     }
 
     // P18 = image

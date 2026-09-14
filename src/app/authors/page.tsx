@@ -14,6 +14,9 @@ interface AuthorData {
   averageRating: number | null;
   ethnicity: string | null;
   nationality: string | null;
+  country: string | null;
+  birth_year: number | null;
+  death_year: number | null;
   religious_tradition: string | null;
   gender: string | null;
   image_url: string | null;
@@ -562,6 +565,9 @@ export default function AuthorsPage() {
                   averageRating: null,
                   ethnicity: null,
                   nationality: null,
+                  country: null,
+                  birth_year: null,
+                  death_year: null,
                   religious_tradition: null,
                   gender: null,
                   image_url: null,
@@ -599,6 +605,9 @@ export default function AuthorsPage() {
             if (author) {
               author.ethnicity = metadata.ethnicity ?? null;
               author.nationality = metadata.nationality ?? null;
+              author.country = metadata.country ?? null;
+              author.birth_year = metadata.birth_year ?? null;
+              author.death_year = metadata.death_year ?? null;
               author.religious_tradition = metadata.religious_tradition ?? null;
               author.gender = metadata.gender ?? null;
               author.image_url = metadata.image_url ?? null;
@@ -661,6 +670,9 @@ export default function AuthorsPage() {
           name: authorName,
           ethnicity: currentAuthor?.ethnicity ?? null,
           nationality: currentAuthor?.nationality ?? null,
+          country: currentAuthor?.country ?? null,
+          birth_year: currentAuthor?.birth_year ?? null,
+          death_year: currentAuthor?.death_year ?? null,
           religious_tradition: currentAuthor?.religious_tradition ?? null,
           gender: currentAuthor?.gender ?? null,
           image_url: currentAuthor?.image_url ?? null,
@@ -699,6 +711,9 @@ export default function AuthorsPage() {
           name: authorName,
           ethnicity: currentAuthor?.ethnicity ?? null,
           nationality: currentAuthor?.nationality ?? null,
+          country: currentAuthor?.country ?? null,
+          birth_year: currentAuthor?.birth_year ?? null,
+          death_year: currentAuthor?.death_year ?? null,
           religious_tradition: currentAuthor?.religious_tradition ?? null,
           gender: currentAuthor?.gender ?? null,
           image_url: imageUrl,
@@ -759,6 +774,22 @@ export default function AuthorsPage() {
           updates.nationality = info.nationality;
           changed = true;
         }
+        if (info.country && !currentAuthor?.country) {
+          updates.country = info.country;
+          changed = true;
+        }
+        if (info.ethnicity && !currentAuthor?.ethnicity) {
+          updates.ethnicity = info.ethnicity;
+          changed = true;
+        }
+        if (info.birth_year && !currentAuthor?.birth_year) {
+          updates.birth_year = info.birth_year;
+          changed = true;
+        }
+        if (info.death_year && !currentAuthor?.death_year) {
+          updates.death_year = info.death_year;
+          changed = true;
+        }
         if (info.religion && !currentAuthor?.religious_tradition) {
           updates.religious_tradition = info.religion;
           changed = true;
@@ -773,6 +804,9 @@ export default function AuthorsPage() {
             name: authorName,
             ethnicity: currentAuthor?.ethnicity ?? null,
             nationality: currentAuthor?.nationality ?? null,
+            country: currentAuthor?.country ?? null,
+            birth_year: currentAuthor?.birth_year ?? null,
+            death_year: currentAuthor?.death_year ?? null,
             religious_tradition: currentAuthor?.religious_tradition ?? null,
             gender: currentAuthor?.gender ?? null,
             image_url: currentAuthor?.image_url ?? null,
@@ -813,14 +847,26 @@ export default function AuthorsPage() {
   );
 
   const isAuthorComplete = useCallback((author: AuthorData) => {
-    return !!author.image_url;
+    // "Complete" = we've collected the demographics that let diversity /
+    // country / age analysis work, plus a profile picture.
+    return !!(
+      author.image_url &&
+      author.gender &&
+      (author.nationality || author.country) &&
+      author.birth_year
+    );
   }, []);
 
   const incompleteAuthors = useMemo(() => filteredAndSortedAuthors.filter(a => !isAuthorComplete(a)), [filteredAndSortedAuthors, isAuthorComplete]);
   const completeAuthors = useMemo(() => filteredAndSortedAuthors.filter(a => isAuthorComplete(a)), [filteredAndSortedAuthors, isAuthorComplete]);
 
   const handleBatchFetchAll = useCallback(async () => {
-    const toFetch = incompleteAuthors.filter(a => !a.gender || !a.nationality || !a.religious_tradition || !a.image_url);
+    // Retry any author missing any of the enrichable fields — country, birth
+    // year, and image are the most-often-empty ones on the current dataset.
+    const toFetch = incompleteAuthors.filter(a =>
+      !a.gender || !a.nationality || !a.country || !a.birth_year ||
+      !a.religious_tradition || !a.image_url
+    );
     if (toFetch.length === 0) return;
 
     setBatchFetching(true);
@@ -945,6 +991,17 @@ export default function AuthorsPage() {
                       <h3 className="text-center font-bold text-foreground mb-3 text-sm break-words">{author.name}</h3>
                       <div className="text-center text-xs text-muted mb-4">
                         <div className="font-semibold text-foreground">{author.bookCount} books · {author.readCount} read · {author.averageRating !== null ? author.averageRating.toFixed(1) : "—"}★ avg</div>
+                        {(author.country || author.birth_year) && (
+                          <div className="text-muted mt-0.5">
+                            {author.country || null}
+                            {author.country && author.birth_year ? " · " : ""}
+                            {author.birth_year ? (
+                              author.death_year
+                                ? `${author.birth_year}–${author.death_year}`
+                                : `b. ${author.birth_year}`
+                            ) : null}
+                          </div>
+                        )}
                       </div>
                       <div className="space-y-2 mb-4">
                         <DropdownSelector value={author.gender} options={GENDER_OPTIONS} onSelect={(v) => handleSaveMetadata(author.name, "gender", v)} onClear={() => handleSaveMetadata(author.name, "gender", null)} label="Gender" />

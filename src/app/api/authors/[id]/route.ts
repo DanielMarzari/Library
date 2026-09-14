@@ -5,6 +5,9 @@ const UPDATABLE_FIELDS = [
   'name',
   'ethnicity',
   'nationality',
+  'country',
+  'birth_year',
+  'death_year',
   'religious_tradition',
   'gender',
   'image_url',
@@ -32,11 +35,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { id } = await params;
     const db = getDb();
-    const body = (await request.json()) as Record<string, string | null | undefined>;
+    const body = (await request.json()) as Record<string, string | number | null | undefined>;
 
     const now = new Date().toISOString();
     const updates: string[] = [];
-    const values: Array<string | null> = [];
+    const values: Array<string | number | null> = [];
 
     for (const field of UPDATABLE_FIELDS) {
       if (body[field] !== undefined) {

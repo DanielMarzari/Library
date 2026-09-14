@@ -192,6 +192,12 @@ function ensureAllTables(db: Database.Database) {
   // book_id / rec_id is set on each row; the app enforces exclusivity.
   addColumnSafe('learning_goal_books', 'rec_id', 'TEXT');
 
+  // Author demographic enrichment — country of origin, birth/death years for
+  // age derivation, ethnicity as a Wikidata-sourced string.
+  addColumnSafe('authors', 'country', 'TEXT');
+  addColumnSafe('authors', 'birth_year', 'INTEGER');
+  addColumnSafe('authors', 'death_year', 'INTEGER');
+
   // Backfill: books marked read but missing complete_date get one derived from
   // updated_at (the most recent write to the row). This is only a proxy for the
   // real "marked read" moment — the DB doesn't log status transitions — but it
