@@ -385,37 +385,56 @@ export default function ReadingListPage() {
     return { mode: "text", term: raw.trim().toLowerCase() };
   }, [goalSearchQuery]);
 
-  // All known topics across books + recs, sorted by usage — powers the #
-  // typeahead chip list.
-  const allTopics = useMemo(() => {
-    const counts: Record<string, number> = {};
-    const addTag = (t: string) => {
-      const s = t.trim();
-      if (!s) return;
-      counts[s] = (counts[s] || 0) + 1;
-    };
-    books.forEach(b => {
-      (b.topics || []).forEach(addTag);
-      (b.auto_topics || []).forEach(addTag);
+  // Aggregate a list of raw string values into [displayName, count] pairs,
+  // grouping case-insensitively so "Tim Mackie" and "tim mackie" collapse
+  // into one entry (keeping the most-common casing as the display).
+  const aggregateCaseInsensitive = (values: (string | null | undefined)[]): [string, number][] => {
+    const groups: Record<string, { count: number; variants: Record<string, number> }> = {};
+    values.forEach(v => {
+      const raw = (v || "").trim();
+      if (!raw || raw === "---") return;
+      const key = raw.toLowerCase();
+      if (!groups[key]) groups[key] = { count: 0, variants: {} };
+      groups[key].count += 1;
+      groups[key].variants[raw] = (groups[key].variants[raw] || 0) + 1;
     });
-    recs.forEach(r => { if (r.topic) addTag(r.topic); });
-    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  }, [books, recs]);
+    return Object.values(groups)
+      .map(g => {
+        const display = Object.entries(g.variants).sort((a, b) => b[1] - a[1])[0][0];
+        return [display, g.count] as [string, number];
+      })
+      .sort((a, b) => b[1] - a[1]);
+  };
 
-  // All known "sources" — merged from books.source and recs.recommended_by
-  // because they mean the same thing in this app (who / where a title came
-  // from). Sorted by usage across both sets combined.
-  const allSources = useMemo(() => {
-    const counts: Record<string, number> = {};
-    const bump = (v?: string) => {
-      const s = (v || "").trim();
-      if (!s || s === "---") return;
-      counts[s] = (counts[s] || 0) + 1;
+  // Build topic/source suggestion chips for one goal, counting only items NOT
+  // already in that goal so a chip that's fully absorbed doesn't reappear.
+  const chipsForGoal = useCallback((goalId: string) => {
+    const inGoalBookIds = new Set(
+      (goalBooks[goalId] || []).filter(gb => gb.kind === "book").map(gb => gb.book_id as string)
+    );
+    const inGoalRecIds = new Set(
+      (goalBooks[goalId] || []).filter(gb => gb.kind === "rec").map(gb => gb.rec_id as string)
+    );
+
+    const topicValues: string[] = [];
+    const sourceValues: string[] = [];
+    books.forEach(b => {
+      if (inGoalBookIds.has(b.id)) return;
+      (b.topics || []).forEach(t => topicValues.push(t));
+      (b.auto_topics || []).forEach(t => topicValues.push(t));
+      if (b.source) sourceValues.push(b.source);
+    });
+    recs.forEach(r => {
+      if (inGoalRecIds.has(r.id)) return;
+      if (r.topic) topicValues.push(r.topic);
+      if (r.recommended_by) sourceValues.push(r.recommended_by);
+    });
+
+    return {
+      topics: aggregateCaseInsensitive(topicValues),
+      sources: aggregateCaseInsensitive(sourceValues),
     };
-    books.forEach(b => bump(b.source));
-    recs.forEach(r => bump(r.recommended_by));
-    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  }, [books, recs]);
+  }, [books, recs, goalBooks]);
 
   const availableBooksForGoal = useCallback((goalId: string): Candidate[] => {
     const inGoalBookIds = new Set(
@@ -634,11 +653,12 @@ export default function ReadingListPage() {
                   // Which suggestion chips to show (only when the user has typed just # or @, or is refining one)
                   const showTopicChips = parsedQuery.mode === "topic";
                   const showSourceChips = parsedQuery.mode === "source";
+                  const chips = chipsForGoal(goal.id);
                   const topicSugs = showTopicChips
-                    ? allTopics.filter(([t]) => !parsedQuery.term || t.toLowerCase().includes(parsedQuery.term)).slice(0, 12)
+                    ? chips.topics.filter(([t]) => !parsedQuery.term || t.toLowerCase().includes(parsedQuery.term)).slice(0, 12)
                     : [];
                   const sourceSugs = showSourceChips
-                    ? allSources.filter(([s]) => !parsedQuery.term || s.toLowerCase().includes(parsedQuery.term)).slice(0, 12)
+                    ? chips.sources.filter(([s]) => !parsedQuery.term || s.toLowerCase().includes(parsedQuery.term)).slice(0, 12)
                     : [];
                   return (
                     <div>
