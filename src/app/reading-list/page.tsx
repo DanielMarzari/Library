@@ -371,6 +371,45 @@ export default function ReadingListPage() {
     | { kind: "book"; id: string; title: string; author: string; sub?: string }
     | { kind: "rec"; id: string; title: string; author: string; sub?: string };
 
+  // Parse the goal search input. Prefix `#` is a topic filter, `@` is a source
+  // (recommended_by) filter. Both are substring matches, case-insensitive.
+  // Anything else falls back to title/author search.
+  type ParsedQuery =
+    | { mode: "topic"; term: string }
+    | { mode: "source"; term: string }
+    | { mode: "text"; term: string };
+  const parsedQuery: ParsedQuery = useMemo(() => {
+    const raw = goalSearchQuery;
+    if (raw.startsWith("#")) return { mode: "topic", term: raw.slice(1).trim().toLowerCase() };
+    if (raw.startsWith("@")) return { mode: "source", term: raw.slice(1).trim().toLowerCase() };
+    return { mode: "text", term: raw.trim().toLowerCase() };
+  }, [goalSearchQuery]);
+
+  // All known topics across books + recs, sorted by usage — powers the #
+  // typeahead chip list.
+  const allTopics = useMemo(() => {
+    const counts: Record<string, number> = {};
+    const addTag = (t: string) => {
+      const s = t.trim();
+      if (!s) return;
+      counts[s] = (counts[s] || 0) + 1;
+    };
+    books.forEach(b => {
+      (b.topics || []).forEach(addTag);
+      (b.auto_topics || []).forEach(addTag);
+    });
+    recs.forEach(r => { if (r.topic) addTag(r.topic); });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  }, [books, recs]);
+
+  // All known sources (rec.recommended_by), sorted by usage — powers the @
+  // typeahead chip list.
+  const allSources = useMemo(() => {
+    const counts: Record<string, number> = {};
+    recs.forEach(r => { if (r.recommended_by) counts[r.recommended_by] = (counts[r.recommended_by] || 0) + 1; });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  }, [recs]);
+
   const availableBooksForGoal = useCallback((goalId: string): Candidate[] => {
     const inGoalBookIds = new Set(
       (goalBooks[goalId] || []).filter(gb => gb.kind === "book").map(gb => gb.book_id as string)
@@ -378,17 +417,81 @@ export default function ReadingListPage() {
     const inGoalRecIds = new Set(
       (goalBooks[goalId] || []).filter(gb => gb.kind === "rec").map(gb => gb.rec_id as string)
     );
-    const q = goalSearchQuery.toLowerCase().trim();
+
     const bookMatches: Candidate[] = books
       .filter(b => !inGoalBookIds.has(b.id))
-      .filter(b => !q || b.title.toLowerCase().includes(q) || (b.author || "").toLowerCase().includes(q))
+      .filter(b => {
+        const t = parsedQuery.term;
+        if (parsedQuery.mode === "topic") {
+          if (!t) return true;
+          const bag = [...(b.topics || []), ...(b.auto_topics || [])];
+          return bag.some(tag => tag.toLowerCase().includes(t));
+        }
+        if (parsedQuery.mode === "source") {
+          if (!t) return false; // owned books don't carry recommender info — hide until we widen
+          return (b.source || "").toLowerCase().includes(t);
+        }
+        return !t || b.title.toLowerCase().includes(t) || (b.author || "").toLowerCase().includes(t);
+      })
       .map(b => ({ kind: "book", id: b.id, title: b.title, author: b.author || "", sub: "In library" }));
+
     const recMatches: Candidate[] = recs
       .filter(r => !inGoalRecIds.has(r.id))
-      .filter(r => !q || r.title.toLowerCase().includes(q) || (r.author || "").toLowerCase().includes(q))
-      .map(r => ({ kind: "rec", id: r.id, title: r.title, author: r.author || "", sub: r.recommended_by ? `Rec · ${r.recommended_by}` : "Recommendation" }));
+      .filter(r => {
+        const t = parsedQuery.term;
+        if (parsedQuery.mode === "topic") {
+          if (!t) return true;
+          return (r.topic || "").toLowerCase().includes(t);
+        }
+        if (parsedQuery.mode === "source") {
+          if (!t) return true;
+          return (r.recommended_by || "").toLowerCase().includes(t);
+        }
+        return !t || r.title.toLowerCase().includes(t) || (r.author || "").toLowerCase().includes(t);
+      })
+      .map(r => ({
+        kind: "rec",
+        id: r.id,
+        title: r.title,
+        author: r.author || "",
+        sub: parsedQuery.mode === "topic"
+          ? (r.topic ? `Topic · ${r.topic}` : "Recommendation")
+          : (r.recommended_by ? `Rec · ${r.recommended_by}` : "Recommendation"),
+      }));
+
     return [...bookMatches, ...recMatches].sort((a, b) => a.title.localeCompare(b.title));
-  }, [books, recs, goalBooks, goalSearchQuery]);
+  }, [books, recs, goalBooks, parsedQuery]);
+
+  // Bulk add — walks the current candidate list, writing one at a time so the
+  // API doesn't get a burst and the count can tick down in the UI. Bypasses
+  // addBookToGoal/addRecToGoal on purpose because those close the modal.
+  const [bulkAdding, setBulkAdding] = useState<{ goalId: string; done: number; total: number } | null>(null);
+  const bulkAddToGoal = async (goalId: string) => {
+    const candidates = availableBooksForGoal(goalId);
+    if (candidates.length === 0) return;
+    setBulkAdding({ goalId, done: 0, total: candidates.length });
+    const additions: GoalItem[] = [];
+    for (let i = 0; i < candidates.length; i++) {
+      const c = candidates[i];
+      try {
+        if (c.kind === "book") {
+          const data = await api.learningGoalBooks.create({ goal_id: goalId, book_id: c.id } as any);
+          const book = books.find(b => b.id === c.id);
+          if (book) additions.push({ ...(data as any), book_id: c.id, rec_id: null, kind: "book", book });
+        } else {
+          const data = await api.learningGoalBooks.create({ goal_id: goalId, rec_id: c.id } as any);
+          const rec = recs.find(r => r.id === c.id);
+          if (rec) additions.push({ ...(data as any), book_id: null, rec_id: c.id, kind: "rec", rec });
+        }
+      } catch (e) {
+        console.error("Bulk add skipped one:", c.title, e);
+      }
+      setBulkAdding({ goalId, done: i + 1, total: candidates.length });
+    }
+    setGoalBooks(prev => ({ ...prev, [goalId]: [...(prev[goalId] || []), ...additions] }));
+    setBulkAdding(null);
+    setGoalSearchQuery("");
+  };
 
   const renderGoalCard = (goal: LearningGoal) => {
     const gBooks = goalBooks[goal.id] || [];
@@ -508,46 +611,114 @@ export default function ReadingListPage() {
             {/* Add book to goal */}
             <div className="p-3 border-t border-border-custom">
               {addingToGoal === goal.id ? (
-                <div>
-                  <input
-                    type="text"
-                    placeholder="Search your library or recommendations…"
-                    value={goalSearchQuery}
-                    onChange={(e) => setGoalSearchQuery(e.target.value)}
-                    className="w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted focus:outline-none focus:ring-1 focus:ring-emerald-600 mb-2"
-                    autoFocus
-                  />
-                  <div className="max-h-48 overflow-y-auto rounded-lg border border-border-custom bg-surface-2">
-                    {availableBooksForGoal(goal.id).slice(0, 30).map(cand => (
-                      <button
-                        key={`${cand.kind}-${cand.id}`}
-                        onClick={() => cand.kind === "book" ? addBookToGoal(goal.id, cand.id) : addRecToGoal(goal.id, cand.id)}
-                        className="w-full text-left px-3 py-2 hover:bg-border-custom border-b border-border-custom last:border-0 transition-colors flex items-start gap-2"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{cand.title}</p>
-                          <p className="text-xs text-muted truncate">
-                            {cand.author}
-                            {cand.sub && <span className="text-muted-2"> · {cand.sub}</span>}
-                          </p>
+                (() => {
+                  const results = availableBooksForGoal(goal.id);
+                  const isBulk = bulkAdding?.goalId === goal.id;
+                  const filterActive = parsedQuery.mode !== "text" && parsedQuery.term.length > 0;
+                  // Which suggestion chips to show (only when the user has typed just # or @, or is refining one)
+                  const showTopicChips = parsedQuery.mode === "topic";
+                  const showSourceChips = parsedQuery.mode === "source";
+                  const topicSugs = showTopicChips
+                    ? allTopics.filter(([t]) => !parsedQuery.term || t.toLowerCase().includes(parsedQuery.term)).slice(0, 12)
+                    : [];
+                  const sourceSugs = showSourceChips
+                    ? allSources.filter(([s]) => !parsedQuery.term || s.toLowerCase().includes(parsedQuery.term)).slice(0, 12)
+                    : [];
+                  return (
+                    <div>
+                      <input
+                        type="text"
+                        placeholder="Search, or #topic, or @source…"
+                        value={goalSearchQuery}
+                        onChange={(e) => setGoalSearchQuery(e.target.value)}
+                        className="w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted focus:outline-none focus:ring-1 focus:ring-emerald-600 mb-1"
+                        autoFocus
+                        disabled={isBulk}
+                      />
+                      <p className="text-[10px] text-muted-2 mb-2 px-1">
+                        Type <span className="text-emerald-500">#topic</span> to filter by tag,{" "}
+                        <span className="text-amber-500">@source</span> for recommender, or plain text for title/author.
+                      </p>
+
+                      {/* Suggestion chips for topic / source */}
+                      {(topicSugs.length > 0 || sourceSugs.length > 0) && (
+                        <div className="flex flex-wrap gap-1 mb-2">
+                          {topicSugs.map(([t, count]) => (
+                            <button
+                              key={t}
+                              onClick={() => setGoalSearchQuery("#" + t)}
+                              className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 text-[10px] font-medium"
+                            >
+                              #{t} <span className="text-muted-2">{count}</span>
+                            </button>
+                          ))}
+                          {sourceSugs.map(([s, count]) => (
+                            <button
+                              key={s}
+                              onClick={() => setGoalSearchQuery("@" + s)}
+                              className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 text-[10px] font-medium"
+                            >
+                              @{s} <span className="text-muted-2">{count}</span>
+                            </button>
+                          ))}
                         </div>
-                        <span className={`flex-shrink-0 px-1.5 py-0.5 rounded text-[9px] font-medium ${
-                          cand.kind === "book"
-                            ? "bg-emerald-500/15 text-emerald-500"
-                            : "bg-amber-500/15 text-amber-500"
-                        }`}>
-                          {cand.kind === "book" ? "Library" : "Rec"}
-                        </span>
+                      )}
+
+                      {/* Bulk-add button — appears when a topic/source filter narrows to >1 hits */}
+                      {filterActive && results.length > 1 && (
+                        <button
+                          onClick={() => bulkAddToGoal(goal.id)}
+                          disabled={isBulk}
+                          className={`w-full mb-2 py-1.5 rounded-lg text-xs font-semibold transition-colors ${cc.bg} ${cc.text} hover:opacity-80 disabled:opacity-50`}
+                        >
+                          {isBulk
+                            ? `Adding… ${bulkAdding!.done}/${bulkAdding!.total}`
+                            : `+ Add all ${results.length} to "${goal.name}"`}
+                        </button>
+                      )}
+
+                      <div className="max-h-48 overflow-y-auto rounded-lg border border-border-custom bg-surface-2">
+                        {results.slice(0, 30).map(cand => (
+                          <button
+                            key={`${cand.kind}-${cand.id}`}
+                            onClick={() => cand.kind === "book" ? addBookToGoal(goal.id, cand.id) : addRecToGoal(goal.id, cand.id)}
+                            className="w-full text-left px-3 py-2 hover:bg-border-custom border-b border-border-custom last:border-0 transition-colors flex items-start gap-2"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">{cand.title}</p>
+                              <p className="text-xs text-muted truncate">
+                                {cand.author}
+                                {cand.sub && <span className="text-muted-2"> · {cand.sub}</span>}
+                              </p>
+                            </div>
+                            <span className={`flex-shrink-0 px-1.5 py-0.5 rounded text-[9px] font-medium ${
+                              cand.kind === "book"
+                                ? "bg-emerald-500/15 text-emerald-500"
+                                : "bg-amber-500/15 text-amber-500"
+                            }`}>
+                              {cand.kind === "book" ? "Library" : "Rec"}
+                            </span>
+                          </button>
+                        ))}
+                        {results.length === 0 && (
+                          <p className="p-3 text-sm text-muted text-center">No matching books or recommendations</p>
+                        )}
+                        {results.length > 30 && (
+                          <p className="p-2 text-[10px] text-muted-2 text-center">
+                            Showing 30 of {results.length} — refine, or use “+ Add all”.
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => { setAddingToGoal(null); setGoalSearchQuery(""); }}
+                        className="mt-2 text-xs text-muted hover:text-foreground"
+                        disabled={isBulk}
+                      >
+                        Cancel
                       </button>
-                    ))}
-                    {availableBooksForGoal(goal.id).length === 0 && (
-                      <p className="p-3 text-sm text-muted text-center">No matching books or recommendations</p>
-                    )}
-                  </div>
-                  <button onClick={() => { setAddingToGoal(null); setGoalSearchQuery(""); }} className="mt-2 text-xs text-muted hover:text-foreground">
-                    Cancel
-                  </button>
-                </div>
+                    </div>
+                  );
+                })()
               ) : (
                 <div className="flex items-center gap-2">
                   <button
