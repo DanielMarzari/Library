@@ -402,13 +402,20 @@ export default function ReadingListPage() {
     return Object.entries(counts).sort((a, b) => b[1] - a[1]);
   }, [books, recs]);
 
-  // All known sources (rec.recommended_by), sorted by usage — powers the @
-  // typeahead chip list.
+  // All known "sources" — merged from books.source and recs.recommended_by
+  // because they mean the same thing in this app (who / where a title came
+  // from). Sorted by usage across both sets combined.
   const allSources = useMemo(() => {
     const counts: Record<string, number> = {};
-    recs.forEach(r => { if (r.recommended_by) counts[r.recommended_by] = (counts[r.recommended_by] || 0) + 1; });
+    const bump = (v?: string) => {
+      const s = (v || "").trim();
+      if (!s || s === "---") return;
+      counts[s] = (counts[s] || 0) + 1;
+    };
+    books.forEach(b => bump(b.source));
+    recs.forEach(r => bump(r.recommended_by));
     return Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  }, [recs]);
+  }, [books, recs]);
 
   const availableBooksForGoal = useCallback((goalId: string): Candidate[] => {
     const inGoalBookIds = new Set(
@@ -428,12 +435,21 @@ export default function ReadingListPage() {
           return bag.some(tag => tag.toLowerCase().includes(t));
         }
         if (parsedQuery.mode === "source") {
-          if (!t) return false; // owned books don't carry recommender info — hide until we widen
-          return (b.source || "").toLowerCase().includes(t);
+          // books.source is populated with the same kind of value as
+          // recs.recommended_by (e.g. "Tim Mackie"), so match it here too.
+          const src = (b.source || "").toLowerCase();
+          if (!t) return src.length > 0;
+          return src.includes(t);
         }
         return !t || b.title.toLowerCase().includes(t) || (b.author || "").toLowerCase().includes(t);
       })
-      .map(b => ({ kind: "book", id: b.id, title: b.title, author: b.author || "", sub: "In library" }));
+      .map(b => ({
+        kind: "book",
+        id: b.id,
+        title: b.title,
+        author: b.author || "",
+        sub: parsedQuery.mode === "source" && b.source ? `Library · ${b.source}` : "In library",
+      }));
 
     const recMatches: Candidate[] = recs
       .filter(r => !inGoalRecIds.has(r.id))
