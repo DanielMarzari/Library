@@ -9,37 +9,7 @@ import Link from "next/link";
 // Real world country polygons, pre-projected to viewBox 720×360.
 // Built from Natural Earth 110m via world-atlas — see scratchpad/build-world.mjs.
 import WORLD_COUNTRIES from "@/lib/worldCountries.json";
-
-// Map our free-text `country` values (from author enrichment) to the Natural
-// Earth canonical name so a country lights up on the map regardless of which
-// short-form the source used.
-const COUNTRY_NAME_ALIASES: Record<string, string> = {
-  "United States": "United States of America",
-  "USA": "United States of America",
-  "US": "United States of America",
-  "UK": "United Kingdom",
-  "England": "United Kingdom",
-  "Scotland": "United Kingdom",
-  "Wales": "United Kingdom",
-  "Northern Ireland": "United Kingdom",
-  "Kingdom of England": "United Kingdom",
-  "United Kingdom of Great Britain and Ireland": "United Kingdom",
-  "Great Britain": "United Kingdom",
-  "Kingdom of the Netherlands": "Netherlands",
-  "Republic of Ireland": "Ireland",
-  "Russian Federation": "Russia",
-  "South Korea": "South Korea",
-  "Republic of Korea": "South Korea",
-  "North Korea": "North Korea",
-  "Czechia": "Czechia",
-  "Czech Republic": "Czechia",
-  "Bohemia": "Czechia",
-  "Vatican": "Vatican",
-  "Roman Empire": "Italy",
-};
-function canonicalCountryName(name: string): string {
-  return COUNTRY_NAME_ALIASES[name] || name;
-}
+import { canonicalCountryName } from "@/lib/countryAliases";
 
 interface ReadingUpdate {
   id: string;
@@ -1305,6 +1275,10 @@ function WorldMap({ topCountries }: { topCountries: [string, number, number][] }
                       y: e.clientY - rect.top,
                     });
                   }}
+                  onClick={() => {
+                    if (!entry) return;
+                    window.location.href = `/?country=${encodeURIComponent(c.name)}`;
+                  }}
                   style={{ cursor: entry ? "pointer" : "default" }}
                 />
                 {readOverlayColor && (
@@ -1332,16 +1306,17 @@ function WorldMap({ topCountries }: { topCountries: [string, number, number][] }
           >
             <div className="text-xs font-semibold">{hover.name}</div>
             {hover.books > 0 ? (
-              <div className="text-[11px] text-slate-300 tabular-nums">
-                <span className="text-emerald-400 font-medium">{hover.books}</span> books
-                <span className="mx-1 opacity-50">·</span>
-                <span className="text-emerald-300 font-medium">{hover.read}</span> read
-                {hover.books > 0 && (
+              <>
+                <div className="text-[11px] text-slate-300 tabular-nums">
+                  <span className="text-emerald-400 font-medium">{hover.books}</span> books
+                  <span className="mx-1 opacity-50">·</span>
+                  <span className="text-emerald-300 font-medium">{hover.read}</span> read
                   <span className="opacity-60 ml-1">
                     ({Math.round((hover.read / hover.books) * 100)}%)
                   </span>
-                )}
-              </div>
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">click to view books →</div>
+              </>
             ) : (
               <div className="text-[11px] text-slate-500">no books</div>
             )}

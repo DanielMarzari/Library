@@ -9,6 +9,7 @@ import { BookShelf } from "@/components/BookShelf";
 import { BookDetail } from "@/components/BookDetail";
 import { AddBookSheet } from "@/components/AddBookSheet";
 import Link from "next/link";
+import { canonicalCountryName } from "@/lib/countryAliases";
 
 type FilterStatus = "all" | "not_read" | "reading" | "read" | "exclude_read" | "favorites" | "on_reading_list";
 type SortMode = "recent" | "last" | "alpha" | "rating" | "lcc" | "ddc" | "pages_asc" | "pages_desc";
@@ -34,6 +35,41 @@ export default function Home() {
   const [readingListIds, setReadingListIds] = useState<Set<string>>(new Set());
   const [availableLists, setAvailableLists] = useState<Array<{ id: string; name: string; type: "year" | "goal" }>>([]);
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
+
+  // Country filter — set from ?country=… (e.g. clicking a country on the /stats
+  // world map). Books are matched by looking up each author's `country` in the
+  // authors table and canonicalizing both sides.
+  const [countryFilter, setCountryFilter] = useState<string | null>(null);
+  const [authorCountryByName, setAuthorCountryByName] = useState<Record<string, string>>({});
+
+  // Pick up the country filter from the URL on first render.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const c = params.get("country");
+    if (c) setCountryFilter(c);
+  }, []);
+
+  // Load author metadata once — name → canonical country — for the filter.
+  useEffect(() => {
+    let ignore = false;
+    api.authors.list().then((rows) => {
+      if (ignore) return;
+      const m: Record<string, string> = {};
+      (rows || []).forEach((a: any) => {
+        if (a.name && a.country) m[a.name] = canonicalCountryName(a.country);
+      });
+      setAuthorCountryByName(m);
+    }).catch(() => {});
+    return () => { ignore = true; };
+  }, []);
+
+  const clearCountryFilter = () => {
+    setCountryFilter(null);
+    // Also drop it from the URL so a refresh doesn't bring it back.
+    const url = new URL(window.location.href);
+    url.searchParams.delete("country");
+    window.history.replaceState({}, "", url.toString());
+  };
 
   // Load persisted preferences
   useEffect(() => {
@@ -181,6 +217,16 @@ export default function Home() {
       sorted = sorted.filter(b => b.status !== "read");
     }
 
+    // Country filter — any of the book's authors (comma-split) must have a
+    // canonicalized country matching the requested one.
+    if (countryFilter) {
+      const target = canonicalCountryName(countryFilter);
+      sorted = sorted.filter(b => {
+        const authors = (b.author || "").split(",").map(s => s.trim()).filter(Boolean);
+        return authors.some(a => authorCountryByName[a] === target);
+      });
+    }
+
     switch (sortMode) {
       case "last":
         // Most recently touched anything: book row edits, status changes, and
@@ -236,7 +282,7 @@ export default function Home() {
         break;
     }
     return sorted;
-  }, [books, sortMode, filter, readingListIds]);
+  }, [books, sortMode, filter, readingListIds, countryFilter, authorCountryByName]);
 
   // Average pages per day from read books with both dates
   const avgPagesPerDay = useMemo(() => {
@@ -463,6 +509,23 @@ export default function Home() {
             onChange={(e) => setSearch(e.target.value)}
             className="w-full bg-surface border border-border-custom rounded-lg px-4 py-2.5 text-sm text-foreground placeholder-muted-2 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent mb-3"
           />
+
+          {/* Country filter chip — set when you click a country on the stats map */}
+          {countryFilter && (
+            <div className="flex items-center gap-2 mb-3">
+              <span className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-xs">
+                <span>🌍 Country: <span className="font-medium">{countryFilter}</span></span>
+                <button
+                  onClick={clearCountryFilter}
+                  className="w-4 h-4 rounded-full hover:bg-emerald-500/20 flex items-center justify-center text-emerald-300 hover:text-emerald-100"
+                  aria-label="Clear country filter"
+                >
+                  ×
+                </button>
+              </span>
+              <span className="text-[10px] text-muted-2">{sortedBooks.length} matching</span>
+            </div>
+          )}
 
           {/* Filter / Sort toggle row */}
           <div className="flex items-center gap-2">
