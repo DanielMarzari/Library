@@ -85,27 +85,52 @@ const COUNTRY_LATLON: Record<string, [number, number]> = {
   "Afghanistan": [33.9, 67.7], "Kingdom of England": [52.5, -1.5],
 };
 
-// Simplified world land-mass outline for the map background. Points are the
-// convex hulls of each continent in equirectangular space (viewBox 720×360 =
-// [-180…180, -90…90] with y flipped). Approximation only — the goal is a
-// legible shape behind the country dots, not cartographic accuracy.
+// Simplified world land-mass outlines for the map background.
+// Coordinates are in equirectangular space (viewBox 720×360 covers -180…180
+// longitude and 90…-90 latitude). Continents are hand-traced with enough
+// points to be recognizable — not cartographically accurate, but legibly a
+// world map rather than a set of blobs.
 const WORLD_LAND_PATHS = [
-  // North America
-  "M 60 60 L 130 45 L 175 55 L 220 90 L 240 130 L 210 170 L 170 175 L 145 155 L 120 120 L 90 100 L 60 90 Z",
-  // South America
-  "M 200 195 L 240 195 L 260 240 L 250 290 L 230 315 L 200 305 L 190 260 L 195 220 Z",
-  // Europe
-  "M 335 65 L 400 55 L 430 70 L 445 100 L 430 125 L 400 130 L 370 120 L 340 105 Z",
-  // Africa
-  "M 355 145 L 420 140 L 445 170 L 460 230 L 435 280 L 400 285 L 375 250 L 360 200 Z",
-  // Asia
-  "M 445 55 L 560 45 L 640 70 L 670 110 L 665 155 L 610 170 L 555 165 L 500 145 L 465 120 L 445 90 Z",
-  // Indian subcontinent nub
-  "M 515 155 L 550 155 L 555 200 L 535 210 L 520 190 Z",
-  // Southeast Asia
-  "M 600 175 L 655 175 L 660 210 L 630 215 L 605 200 Z",
+  // North America (Alaska → Arctic Canada → Newfoundland → US East → Florida → Central America → Baja → US West)
+  "M 20 62 L 40 48 L 70 42 L 120 34 L 160 30 L 200 34 L 232 42 L 250 62 L 246 80 L 254 88 L 240 96 L 232 108 L 224 116 L 214 120 L 206 132 L 198 148 L 192 156 L 200 166 L 186 156 L 174 144 L 166 138 L 156 126 L 150 128 L 142 132 L 134 126 L 122 122 L 116 108 L 110 96 L 106 82 L 96 72 L 74 66 L 52 68 L 34 66 Z",
+  // Central America bridge to South America
+  "M 186 156 L 200 166 L 210 176 L 200 178 L 190 168 Z",
+  // Greenland
+  "M 248 28 L 270 20 L 296 26 L 306 42 L 302 62 L 288 70 L 266 66 L 254 54 L 246 40 Z",
+  // South America (northern coast, Amazon delta, Brazil bulge, Patagonia)
+  "M 196 178 L 224 176 L 244 184 L 258 204 L 264 226 L 260 250 L 250 274 L 240 296 L 228 314 L 214 322 L 204 318 L 198 300 L 192 282 L 186 258 L 182 232 L 184 208 L 190 190 Z",
+  // Europe (Iberia, France, Scandinavia, British Isles)
+  "M 328 78 L 340 68 L 356 62 L 378 58 L 396 54 L 414 58 L 428 66 L 444 72 L 456 82 L 454 96 L 448 108 L 436 116 L 420 122 L 402 126 L 384 128 L 366 124 L 352 116 L 340 106 L 332 94 Z",
+  // British Isles island
+  "M 322 82 L 334 78 L 340 90 L 336 104 L 326 108 L 318 96 Z",
+  // Scandinavia peninsula
+  "M 388 42 L 408 40 L 420 50 L 424 62 L 414 68 L 402 62 L 394 56 Z",
+  // Africa (Mediterranean coast, Horn of Africa, Cape, west bulge)
+  "M 348 138 L 372 132 L 398 130 L 424 134 L 448 140 L 464 156 L 476 176 L 480 200 L 478 226 L 468 254 L 452 278 L 434 292 L 416 296 L 402 290 L 388 274 L 378 256 L 370 232 L 364 206 L 358 180 L 352 158 Z",
+  // Madagascar
+  "M 480 244 L 490 244 L 494 262 L 488 278 L 480 274 L 478 258 Z",
+  // Arabian peninsula
+  "M 458 148 L 484 148 L 494 168 L 490 188 L 476 194 L 464 178 L 458 164 Z",
+  // Asia mainland (huge blob — Anatolia to Kamchatka, north to south)
+  "M 444 72 L 472 60 L 508 48 L 550 40 L 594 38 L 630 42 L 660 52 L 686 68 L 704 90 L 706 116 L 694 138 L 674 154 L 646 166 L 618 172 L 590 168 L 562 162 L 538 158 L 514 154 L 498 148 L 484 138 L 470 120 L 458 100 L 448 84 Z",
+  // Indian subcontinent
+  "M 510 154 L 540 154 L 554 172 L 560 196 L 550 214 L 536 220 L 522 208 L 512 188 L 508 168 Z",
+  // Southeast Asia mainland
+  "M 590 170 L 620 168 L 638 180 L 640 196 L 626 208 L 612 208 L 598 196 L 592 184 Z",
+  // Indonesia / Malay archipelago
+  "M 588 214 L 620 210 L 654 214 L 682 220 L 690 232 L 670 236 L 640 236 L 610 232 L 590 226 Z",
+  // Philippines
+  "M 640 190 L 654 188 L 662 200 L 660 214 L 650 216 L 640 208 Z",
+  // Japan
+  "M 664 100 L 676 96 L 686 108 L 690 122 L 680 130 L 668 122 Z",
   // Australia
-  "M 605 250 L 665 245 L 685 275 L 665 295 L 620 290 L 605 275 Z",
+  "M 610 260 L 636 254 L 660 252 L 678 260 L 686 274 L 682 290 L 668 300 L 640 302 L 618 296 L 606 284 L 604 270 Z",
+  // Tasmania
+  "M 638 304 L 648 302 L 652 314 L 644 318 L 638 314 Z",
+  // New Zealand
+  "M 692 292 L 702 292 L 706 306 L 700 320 L 692 322 L 688 310 Z",
+  // Antarctica (thin band across bottom)
+  "M 30 348 L 120 342 L 220 340 L 320 340 L 420 342 L 520 341 L 610 344 L 690 346 L 706 352 L 640 356 L 500 358 L 320 358 L 160 356 L 40 354 Z",
 ];
 
 export default function StatsPage() {
@@ -426,78 +451,105 @@ export default function StatsPage() {
 
     // Gender counts weighted by number of books
     const genderBookCounts: Record<string, number> = { Male: 0, Female: 0, Unknown: 0 };
+    const genderReadCounts: Record<string, number> = { Male: 0, Female: 0, Unknown: 0 };
     const genderAuthorCounts: Record<string, number> = { Male: 0, Female: 0, Unknown: 0 };
-    const ethnicityBookCounts: Record<string, number> = {};
-    const ethnicityAuthorCounts: Record<string, number> = {};
-    const countryBookCounts: Record<string, number> = {};
+    // Track books AND read counts side-by-side for every dimension so the
+    // stacked bars can render the read portion inside the owned portion.
+    const bump = (map: Record<string, [number, number]>, key: string, b: number, r: number) => {
+      if (!map[key]) map[key] = [0, 0];
+      map[key][0] += b;
+      map[key][1] += r;
+    };
+    const ethnicityCounts: Record<string, [number, number]> = {};
+    const countryCounts: Record<string, [number, number]> = {};
+    const disciplineCounts: Record<string, [number, number]> = {};
+    const eraCounts: Record<string, [number, number]> = {};
+    const denominationCounts: Record<string, [number, number]> = {};
+    const schoolCounts: Record<string, [number, number]> = {};
+    const decadeCounts: Record<number, [number, number]> = {};
     const countryAuthorCounts: Record<string, number> = {};
-    const disciplineBookCounts: Record<string, number> = {};
-    const eraBookCounts: Record<string, number> = {};
-    const denominationBookCounts: Record<string, number> = {};
-    const schoolBookCounts: Record<string, number> = {};
-    // Country → also count of dead vs living for the map opacity treatment
-    const currentYear = new Date().getFullYear();
-    // Decade of birth histogram
-    const decadeCounts: Record<number, number> = {};
+    const countryReadCounts: Record<string, number> = {};
+    const ethnicityAuthorCounts: Record<string, number> = {};
 
     Object.entries(authorCounts).forEach(([name, counts]) => {
       const meta = metaByName[name];
       const gender = meta?.gender || "Unknown";
       const genderKey = gender.charAt(0).toUpperCase() === "M" ? "Male" : gender.charAt(0).toUpperCase() === "F" ? "Female" : "Unknown";
       genderBookCounts[genderKey] = (genderBookCounts[genderKey] || 0) + counts.books;
+      genderReadCounts[genderKey] = (genderReadCounts[genderKey] || 0) + counts.read;
       genderAuthorCounts[genderKey] = (genderAuthorCounts[genderKey] || 0) + 1;
 
       if (meta?.ethnicity) {
-        ethnicityBookCounts[meta.ethnicity] = (ethnicityBookCounts[meta.ethnicity] || 0) + counts.books;
+        bump(ethnicityCounts, meta.ethnicity, counts.books, counts.read);
         ethnicityAuthorCounts[meta.ethnicity] = (ethnicityAuthorCounts[meta.ethnicity] || 0) + 1;
       }
       if (meta?.country) {
-        countryBookCounts[meta.country] = (countryBookCounts[meta.country] || 0) + counts.books;
+        bump(countryCounts, meta.country, counts.books, counts.read);
         countryAuthorCounts[meta.country] = (countryAuthorCounts[meta.country] || 0) + 1;
+        countryReadCounts[meta.country] = (countryReadCounts[meta.country] || 0) + counts.read;
       }
-      if (meta?.discipline) {
-        disciplineBookCounts[meta.discipline] = (disciplineBookCounts[meta.discipline] || 0) + counts.books;
-      }
-      if (meta?.era) {
-        eraBookCounts[meta.era] = (eraBookCounts[meta.era] || 0) + counts.books;
-      }
-      if (meta?.denomination) {
-        denominationBookCounts[meta.denomination] = (denominationBookCounts[meta.denomination] || 0) + counts.books;
-      }
-      if (meta?.school) {
-        schoolBookCounts[meta.school] = (schoolBookCounts[meta.school] || 0) + counts.books;
-      }
+      if (meta?.discipline) bump(disciplineCounts, meta.discipline, counts.books, counts.read);
+      if (meta?.era) bump(eraCounts, meta.era, counts.books, counts.read);
+      if (meta?.denomination) bump(denominationCounts, meta.denomination, counts.books, counts.read);
+      if (meta?.school) bump(schoolCounts, meta.school, counts.books, counts.read);
       if (meta?.birth_year) {
         const decade = Math.floor(meta.birth_year / 10) * 10;
-        decadeCounts[decade] = (decadeCounts[decade] || 0) + counts.books;
+        if (!decadeCounts[decade]) decadeCounts[decade] = [0, 0];
+        decadeCounts[decade][0] += counts.books;
+        decadeCounts[decade][1] += counts.read;
       }
     });
 
     const totalGenderBooks = genderBookCounts.Male + genderBookCounts.Female + genderBookCounts.Unknown;
-    const topEthnicities = Object.entries(ethnicityBookCounts).sort((a, b) => b[1] - a[1]);
-    const topCountries = Object.entries(countryBookCounts).sort((a, b) => b[1] - a[1]);
-    const topDisciplines = Object.entries(disciplineBookCounts).sort((a, b) => b[1] - a[1]);
-    const topDenominations = Object.entries(denominationBookCounts).sort((a, b) => b[1] - a[1]);
-    const topSchools = Object.entries(schoolBookCounts).sort((a, b) => b[1] - a[1]);
 
-    // Era in canonical order (not by count)
+    // Turn each map into a sorted [label, books, read] triple.
+    type Row3 = [string, number, number];
+    const toTriples = (m: Record<string, [number, number]>): Row3[] =>
+      Object.entries(m).map(([k, [b, r]]) => [k, b, r] as Row3).sort((a, b) => b[1] - a[1]);
+    const topEthnicities = toTriples(ethnicityCounts);
+    const topCountries = toTriples(countryCounts);
+    const topDisciplines = toTriples(disciplineCounts);
+    const topDenominations = toTriples(denominationCounts);
+    const topSchools = toTriples(schoolCounts);
+
+    // Era in canonical order.
     const ERA_ORDER = ["Ancient (pre-500)", "Medieval (500–1500)", "Reformation (1500–1700)", "Enlightenment (1700–1800)", "Modern (1800–1945)", "Contemporary (1945+)"];
-    const eraSeries = ERA_ORDER.map(e => [e, eraBookCounts[e] || 0] as [string, number]);
+    const eraSeries: Row3[] = ERA_ORDER.map(e => {
+      const [b, r] = eraCounts[e] || [0, 0];
+      return [e, b, r];
+    });
 
-    // Decade series in chronological order
-    const decadeSeries = Object.entries(decadeCounts)
-      .map(([d, n]) => [parseInt(d), n] as [number, number])
+    // Birth decade in chronological order — fill gaps so the timeline reads
+    // properly (a gap between 1500 and 1700 shows as empty bars).
+    const decadeEntries = Object.entries(decadeCounts)
+      .map(([d, br]) => [parseInt(d), br[0], br[1]] as [number, number, number])
       .sort((a, b) => a[0] - b[0]);
+    let decadeSeries: [number, number, number][] = [];
+    if (decadeEntries.length > 0) {
+      const minD = decadeEntries[0][0];
+      const maxD = decadeEntries[decadeEntries.length - 1][0];
+      const byDec: Record<number, [number, number]> = {};
+      decadeEntries.forEach(([d, b, r]) => { byDec[d] = [b, r]; });
+      for (let d = minD; d <= maxD; d += 10) {
+        const [b, r] = byDec[d] || [0, 0];
+        decadeSeries.push([d, b, r]);
+      }
+    }
 
-    // World map: countries with book counts + coordinates
+    // World map — countries with book counts + coordinates.
     const countryMapPoints = topCountries
       .map(([country, books]) => {
         const latlon = COUNTRY_LATLON[country];
         if (!latlon) return null;
         const [lat, lon] = latlon;
-        const x = (lon + 180) * 2; // 0–720
-        const y = (90 - lat) * 2;  // 0–360
-        return { country, books, authors: countryAuthorCounts[country] || 0, x, y };
+        const x = (lon + 180) * 2;
+        const y = (90 - lat) * 2;
+        return {
+          country, books,
+          read: countryReadCounts[country] || 0,
+          authors: countryAuthorCounts[country] || 0,
+          x, y,
+        };
       })
       .filter((p): p is NonNullable<typeof p> => p !== null);
     const unmappedCountries = topCountries.filter(([c]) => !COUNTRY_LATLON[c]);
@@ -543,6 +595,7 @@ export default function StatsPage() {
       maxPagesInDay,
       daysWithActivity,
       genderBookCounts,
+      genderReadCounts,
       genderAuthorCounts,
       totalGenderBooks,
       topEthnicities,
@@ -925,36 +978,56 @@ export default function StatsPage() {
           {stats.countryMapPoints.length > 0 && (() => {
             const maxBooks = Math.max(...stats.countryMapPoints.map(p => p.books));
             const totalMapped = stats.countryMapPoints.reduce((s, p) => s + p.books, 0);
+            const totalMappedRead = stats.countryMapPoints.reduce((s, p) => s + p.read, 0);
             const totalUnmapped = stats.unmappedCountries.reduce((s, [, n]) => s + n, 0);
             return (
               <div className="bg-surface border border-border-custom rounded-xl p-5 mb-4">
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs text-muted">Countries of origin (by books owned)</p>
+                  <p className="text-xs text-muted">Countries of origin (bubble = books owned, inner = read)</p>
                   <p className="text-[10px] text-muted">
-                    {stats.countryMapPoints.length} countries · {totalMapped} books mapped
+                    {stats.countryMapPoints.length} countries · {totalMapped} books · {totalMappedRead} read
                     {totalUnmapped > 0 && ` · ${totalUnmapped} unmapped`}
                   </p>
                 </div>
-                <div className="w-full overflow-x-auto">
-                  <svg viewBox="0 0 720 360" className="w-full h-auto" style={{ maxWidth: 900, background: "var(--surface-2)" }} preserveAspectRatio="xMidYMid meet">
-                    {/* Continental silhouettes as background */}
-                    <g fill="var(--border)" opacity="0.5">
+                <div className="w-full">
+                  <svg viewBox="0 0 720 360" className="w-full h-auto rounded-lg border border-border-custom" preserveAspectRatio="xMidYMid meet" style={{ background: "#0f172a" }}>
+                    {/* Ocean background gradient */}
+                    <defs>
+                      <linearGradient id="ocean" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#0b1a2b" />
+                        <stop offset="100%" stopColor="#0f172a" />
+                      </linearGradient>
+                    </defs>
+                    <rect width="720" height="360" fill="url(#ocean)" />
+                    {/* Latitude lines */}
+                    {[60, 120, 180, 240, 300].map(y => (
+                      <line key={y} x1="0" y1={y} x2="720" y2={y} stroke="#1e293b" strokeWidth="0.5" />
+                    ))}
+                    {/* Longitude lines */}
+                    {[120, 240, 360, 480, 600].map(x => (
+                      <line key={x} x1={x} y1="0" x2={x} y2="360" stroke="#1e293b" strokeWidth="0.5" />
+                    ))}
+                    {/* Continental silhouettes */}
+                    <g fill="#334155" stroke="#475569" strokeWidth="0.5">
                       {WORLD_LAND_PATHS.map((d, i) => <path key={i} d={d} />)}
                     </g>
-                    {/* Latitude / equator hint */}
-                    <line x1="0" y1="180" x2="720" y2="180" stroke="var(--border)" strokeWidth="0.4" opacity="0.5" />
-                    {/* Country dots — sqrt scale so tiny counts stay visible */}
+                    {/* Country bubbles — outer = owned (lighter), inner = read (brighter) */}
                     {stats.countryMapPoints.map(p => {
                       const scale = Math.sqrt(p.books / maxBooks);
-                      const rMin = 3, rMax = 24;
-                      const r = rMin + scale * (rMax - rMin);
+                      const rMin = 4, rMax = 26;
+                      const rOuter = rMin + scale * (rMax - rMin);
+                      const readRatio = p.books > 0 ? p.read / p.books : 0;
+                      const rInner = rOuter * Math.sqrt(readRatio);
                       return (
                         <g key={p.country}>
-                          <circle cx={p.x} cy={p.y} r={r} fill="#10b981" fillOpacity="0.55" stroke="#065f46" strokeWidth="0.5">
-                            <title>{p.country}: {p.books} books ({p.authors} authors)</title>
+                          <circle cx={p.x} cy={p.y} r={rOuter} fill="#10b981" fillOpacity="0.35" stroke="#10b981" strokeWidth="1">
+                            <title>{p.country}: {p.books} books ({p.read} read · {p.authors} authors)</title>
                           </circle>
-                          {p.books >= Math.max(5, maxBooks * 0.1) && (
-                            <text x={p.x} y={p.y + 3} textAnchor="middle" fontSize="10" fontWeight="700" fill="#fff" pointerEvents="none">
+                          {rInner > 1 && (
+                            <circle cx={p.x} cy={p.y} r={rInner} fill="#34d399" fillOpacity="0.9" pointerEvents="none" />
+                          )}
+                          {p.books >= Math.max(5, maxBooks * 0.08) && (
+                            <text x={p.x} y={p.y + 3} textAnchor="middle" fontSize="10" fontWeight="700" fill="#0f172a" pointerEvents="none">
                               {p.books}
                             </text>
                           )}
@@ -963,75 +1036,75 @@ export default function StatsPage() {
                     })}
                   </svg>
                 </div>
-                {stats.unmappedCountries.length > 0 && (
-                  <p className="text-[10px] text-muted mt-2">
-                    Unmapped: {stats.unmappedCountries.slice(0, 5).map(([c, n]) => `${c} (${n})`).join(", ")}
-                    {stats.unmappedCountries.length > 5 && ` +${stats.unmappedCountries.length - 5} more`}
-                  </p>
-                )}
+                <div className="flex items-center justify-between mt-2">
+                  <div className="flex items-center gap-3 text-[10px] text-muted">
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full" style={{ background: "#10b981", opacity: 0.4 }} /> Owned</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full" style={{ background: "#34d399" }} /> Read (inner)</span>
+                  </div>
+                  {stats.unmappedCountries.length > 0 && (
+                    <p className="text-[10px] text-muted">
+                      Unmapped: {stats.unmappedCountries.slice(0, 4).map(([c, n]) => `${c} (${n})`).join(", ")}
+                      {stats.unmappedCountries.length > 4 && ` +${stats.unmappedCountries.length - 4}`}
+                    </p>
+                  )}
+                </div>
               </div>
             );
           })()}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Ethnicity — donut */}
+            {/* Ethnicity — stacked HBar */}
             {stats.topEthnicities.length > 0 && (
               <div className="bg-surface border border-border-custom rounded-xl p-5">
-                <DonutChart
-                  title="Ethnicity"
-                  data={stats.topEthnicities}
-                  colors={["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316", "#84cc16", "#6366f1", "#14b8a6", "#e11d48"]}
-                />
+                <StackedHBar title="Ethnicity" data={stats.topEthnicities} accent="#10b981" readAccent="#065f46" />
               </div>
             )}
 
-            {/* Denomination — donut */}
+            {/* Denomination — stacked HBar */}
             {stats.topDenominations.length > 0 && (
               <div className="bg-surface border border-border-custom rounded-xl p-5">
-                <DonutChart
-                  title="Denomination"
-                  data={stats.topDenominations.slice(0, 12)}
-                  colors={["#7c3aed", "#0ea5e9", "#22c55e", "#eab308", "#f97316", "#ef4444", "#ec4899", "#14b8a6", "#a855f7", "#0891b2", "#65a30d", "#dc2626"]}
-                />
+                <StackedHBar title="Denomination" data={stats.topDenominations.slice(0, 12)} accent="#7c3aed" readAccent="#4c1d95" />
               </div>
             )}
 
-            {/* Top countries — horizontal bar */}
+            {/* Top countries — stacked HBar */}
             {stats.topCountries.length > 0 && (
               <div className="bg-surface border border-border-custom rounded-xl p-5">
-                <HBar title="Top Countries" data={stats.topCountries.slice(0, 10)} accent="#10b981" />
+                <StackedHBar title="Top Countries" data={stats.topCountries.slice(0, 12)} accent="#0ea5e9" readAccent="#075985" />
               </div>
             )}
 
-            {/* Discipline — horizontal bar */}
+            {/* Discipline — stacked HBar */}
             {stats.topDisciplines.length > 0 && (
               <div className="bg-surface border border-border-custom rounded-xl p-5">
-                <HBar title="Discipline" data={stats.topDisciplines.slice(0, 12)} accent="#8b5cf6" />
+                <StackedHBar title="Discipline" data={stats.topDisciplines.slice(0, 12)} accent="#f59e0b" readAccent="#92400e" />
               </div>
             )}
 
-            {/* Era — vertical bar in canonical order */}
+            {/* Era — stacked VBar in canonical order */}
             {stats.eraSeries.some(([, n]) => n > 0) && (
               <div className="bg-surface border border-border-custom rounded-xl p-5">
-                <VBar title="Era" data={stats.eraSeries} accent="#f59e0b" />
+                <StackedVBar title="Era" data={stats.eraSeries} accent="#ec4899" readAccent="#831843" />
               </div>
             )}
 
             {/* Birth decade histogram */}
             {stats.decadeSeries.length > 0 && (
               <div className="bg-surface border border-border-custom rounded-xl p-5">
-                <VBar
-                  title="Birth Decade (authors of books owned)"
-                  data={stats.decadeSeries.map(([d, n]) => [`${d}s`, n] as [string, number])}
+                <StackedVBar
+                  title="Author Birth Decade"
+                  data={stats.decadeSeries.map(([d, b, r]) => [`${d}`, b, r] as [string, number, number])}
                   accent="#06b6d4"
+                  readAccent="#164e63"
+                  labelStride={"auto"}
                 />
               </div>
             )}
 
-            {/* School — only if we have any */}
+            {/* School — stacked HBar */}
             {stats.topSchools.length > 0 && (
               <div className="bg-surface border border-border-custom rounded-xl p-5 lg:col-span-2">
-                <HBar title="Intellectual School (secular)" data={stats.topSchools} accent="#ec4899" />
+                <StackedHBar title="Intellectual School (secular)" data={stats.topSchools} accent="#22c55e" readAccent="#14532d" />
               </div>
             )}
           </div>
@@ -1273,6 +1346,108 @@ function StatCard({
     <div className="bg-surface border border-border-custom rounded-xl p-4">
       <p className="text-xs text-muted mb-1">{label}</p>
       <p className={`text-2xl font-bold ${valueColor[color]}`}>{value}</p>
+    </div>
+  );
+}
+
+// Stacked horizontal bar — each row shows total (accent) with the read
+// portion overlaid (readAccent) so you can see both dimensions at once.
+function StackedHBar({
+  title,
+  data,
+  accent,
+  readAccent,
+}: {
+  title: string;
+  data: [string, number, number][]; // [label, books, read]
+  accent: string;
+  readAccent: string;
+}) {
+  if (data.length === 0) return null;
+  const max = Math.max(...data.map(([, n]) => n));
+  const totalBooks = data.reduce((s, [, n]) => s + n, 0);
+  const totalRead = data.reduce((s, [, , r]) => s + r, 0);
+  const readPct = totalBooks > 0 ? Math.round((totalRead / totalBooks) * 100) : 0;
+  return (
+    <div>
+      <div className="flex items-baseline justify-between mb-1">
+        <p className="text-xs text-muted">{title}</p>
+        <p className="text-[10px] text-muted">{totalBooks} books · {totalRead} read ({readPct}%)</p>
+      </div>
+      <div className="space-y-1.5 mt-2">
+        {data.map(([label, books, read]) => {
+          const wOwned = (books / max) * 100;
+          const wRead = books > 0 ? (read / books) * 100 : 0;
+          return (
+            <div key={label} className="flex items-center gap-2 text-xs">
+              <span className="text-foreground truncate w-32 sm:w-40 flex-shrink-0" title={label}>{label}</span>
+              <div className="flex-1 h-5 bg-surface-2 rounded-sm overflow-hidden relative">
+                <div className="h-full absolute inset-y-0 left-0 rounded-sm" style={{ width: `${wOwned}%`, backgroundColor: accent, opacity: 0.7 }} />
+                <div className="h-full absolute inset-y-0 left-0 rounded-sm" style={{ width: `${wOwned * (wRead / 100)}%`, backgroundColor: readAccent }} />
+              </div>
+              <span className="text-muted tabular-nums flex-shrink-0 w-16 text-right">
+                <span className="text-foreground font-medium">{read}</span>/{books}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Stacked vertical bar — same idea but categorical bars run top-down. Used
+// for era + decade timelines where order matters.
+function StackedVBar({
+  title,
+  data,
+  accent,
+  readAccent,
+  labelStride,
+}: {
+  title: string;
+  data: [string, number, number][];
+  accent: string;
+  readAccent: string;
+  labelStride?: number | "auto";
+}) {
+  if (data.length === 0) return null;
+  const max = Math.max(...data.map(([, n]) => n));
+  const totalBooks = data.reduce((s, [, n]) => s + n, 0);
+  const totalRead = data.reduce((s, [, , r]) => s + r, 0);
+  const readPct = totalBooks > 0 ? Math.round((totalRead / totalBooks) * 100) : 0;
+  // Auto stride: only label every Nth bar when there are many bars.
+  const stride = labelStride === "auto"
+    ? (data.length > 30 ? 5 : data.length > 15 ? 2 : 1)
+    : (labelStride ?? 1);
+  return (
+    <div>
+      <div className="flex items-baseline justify-between mb-1">
+        <p className="text-xs text-muted">{title}</p>
+        <p className="text-[10px] text-muted">{totalBooks} books · {totalRead} read ({readPct}%)</p>
+      </div>
+      <div className="flex items-end gap-[2px] h-44 mt-3">
+        {data.map(([label, books, read]) => {
+          const hOwned = max > 0 ? (books / max) * 100 : 0;
+          const hRead = books > 0 ? (read / books) * 100 : 0;
+          return (
+            <div key={label} className="flex-1 flex flex-col items-center justify-end min-w-0 h-full">
+              <span className="text-[9px] text-muted tabular-nums mb-0.5 leading-none">{books > 0 ? books : ""}</span>
+              <div className="w-full rounded-t-sm relative flex flex-col justify-end" style={{ height: `${hOwned}%`, minHeight: books > 0 ? 2 : 0 }} title={`${label}: ${books} books, ${read} read`}>
+                <div className="w-full h-full rounded-t-sm" style={{ backgroundColor: accent, opacity: 0.7 }} />
+                <div className="w-full absolute bottom-0 left-0 rounded-t-sm" style={{ height: `${hRead}%`, backgroundColor: readAccent }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex gap-[2px] mt-1">
+        {data.map(([label], i) => (
+          <div key={label} className="flex-1 text-[9px] text-muted text-center min-w-0" style={{ writingMode: data.length > 8 ? "vertical-rl" as const : undefined, transform: data.length > 8 ? "rotate(180deg)" : undefined, height: data.length > 8 ? 40 : "auto" }} title={label}>
+            {i % stride === 0 ? label : ""}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
