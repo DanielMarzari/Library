@@ -6,6 +6,40 @@ import { useEffect, useState, useMemo } from "react";
 import { api } from "@/lib/api-client";
 import { Book } from "@/types/book";
 import Link from "next/link";
+// Real world country polygons, pre-projected to viewBox 720×360.
+// Built from Natural Earth 110m via world-atlas — see scratchpad/build-world.mjs.
+import WORLD_COUNTRIES from "@/lib/worldCountries.json";
+
+// Map our free-text `country` values (from author enrichment) to the Natural
+// Earth canonical name so a country lights up on the map regardless of which
+// short-form the source used.
+const COUNTRY_NAME_ALIASES: Record<string, string> = {
+  "United States": "United States of America",
+  "USA": "United States of America",
+  "US": "United States of America",
+  "UK": "United Kingdom",
+  "England": "United Kingdom",
+  "Scotland": "United Kingdom",
+  "Wales": "United Kingdom",
+  "Northern Ireland": "United Kingdom",
+  "Kingdom of England": "United Kingdom",
+  "United Kingdom of Great Britain and Ireland": "United Kingdom",
+  "Great Britain": "United Kingdom",
+  "Kingdom of the Netherlands": "Netherlands",
+  "Republic of Ireland": "Ireland",
+  "Russian Federation": "Russia",
+  "South Korea": "South Korea",
+  "Republic of Korea": "South Korea",
+  "North Korea": "North Korea",
+  "Czechia": "Czechia",
+  "Czech Republic": "Czechia",
+  "Bohemia": "Czechia",
+  "Vatican": "Vatican",
+  "Roman Empire": "Italy",
+};
+function canonicalCountryName(name: string): string {
+  return COUNTRY_NAME_ALIASES[name] || name;
+}
 
 interface ReadingUpdate {
   id: string;
@@ -53,85 +87,6 @@ interface AuthorMeta {
   denomination: string | null;
   school: string | null;
 }
-
-// Country centroids for the world map — lat/lon of each country's rough center.
-// Used to plot dots on an equirectangular projection (viewBox 0 0 720 360).
-// Add rows here as new countries appear in your data.
-const COUNTRY_LATLON: Record<string, [number, number]> = {
-  "United States": [39.8, -98.6], "United States of America": [39.8, -98.6],
-  "Canada": [56.1, -106.3], "Mexico": [23.6, -102.6],
-  "United Kingdom": [54.0, -2.5], "England": [52.5, -1.5], "Scotland": [56.5, -4.0],
-  "Ireland": [53.1, -7.7], "France": [46.2, 2.2], "Germany": [51.2, 10.5],
-  "Italy": [41.9, 12.6], "Spain": [40.5, -3.7], "Portugal": [39.4, -8.2],
-  "Netherlands": [52.1, 5.3], "Kingdom of the Netherlands": [52.1, 5.3],
-  "Belgium": [50.5, 4.5], "Switzerland": [46.8, 8.2], "Austria": [47.5, 14.6],
-  "Denmark": [56.3, 9.5], "Sweden": [60.1, 18.6], "Norway": [60.5, 8.5],
-  "Finland": [61.9, 25.7], "Iceland": [64.9, -19.0], "Poland": [51.9, 19.1],
-  "Czech Republic": [49.8, 15.5], "Hungary": [47.2, 19.5], "Romania": [45.9, 24.9],
-  "Greece": [39.1, 21.8], "Bulgaria": [42.7, 25.5], "Ukraine": [48.4, 31.2],
-  "Russia": [61.5, 105.3], "Turkey": [38.9, 35.2], "Israel": [31.0, 34.9],
-  "Lebanon": [33.9, 35.9], "Syria": [34.8, 38.9], "Egypt": [26.8, 30.8],
-  "Ethiopia": [9.1, 40.5], "Kenya": [-0.0, 37.9], "Nigeria": [9.1, 8.7],
-  "South Africa": [-30.6, 22.9], "Ghana": [7.9, -1.0], "Uganda": [1.4, 32.3],
-  "China": [35.9, 104.2], "Japan": [36.2, 138.3], "South Korea": [35.9, 127.8],
-  "North Korea": [40.3, 127.5], "India": [20.6, 78.9], "Pakistan": [30.4, 69.3],
-  "Bangladesh": [23.7, 90.4], "Sri Lanka": [7.9, 80.8], "Vietnam": [14.1, 108.3],
-  "Thailand": [15.9, 100.9], "Indonesia": [-0.8, 113.9], "Philippines": [12.9, 121.8],
-  "Malaysia": [4.2, 101.9], "Singapore": [1.3, 103.8], "Australia": [-25.3, 133.8],
-  "New Zealand": [-40.9, 174.9], "Brazil": [-14.2, -51.9], "Argentina": [-38.4, -63.6],
-  "Chile": [-35.7, -71.5], "Colombia": [4.6, -74.3], "Peru": [-9.2, -75.0],
-  "Venezuela": [6.4, -66.6], "Cuba": [21.5, -77.8], "Jamaica": [18.1, -77.3],
-  "Iran": [32.4, 53.7], "Iraq": [33.2, 43.7], "Saudi Arabia": [23.9, 45.1],
-  "Afghanistan": [33.9, 67.7], "Kingdom of England": [52.5, -1.5],
-};
-
-// Simplified world land-mass outlines for the map background.
-// Coordinates are in equirectangular space (viewBox 720×360 covers -180…180
-// longitude and 90…-90 latitude). Continents are hand-traced with enough
-// points to be recognizable — not cartographically accurate, but legibly a
-// world map rather than a set of blobs.
-const WORLD_LAND_PATHS = [
-  // North America (Alaska → Arctic Canada → Newfoundland → US East → Florida → Central America → Baja → US West)
-  "M 20 62 L 40 48 L 70 42 L 120 34 L 160 30 L 200 34 L 232 42 L 250 62 L 246 80 L 254 88 L 240 96 L 232 108 L 224 116 L 214 120 L 206 132 L 198 148 L 192 156 L 200 166 L 186 156 L 174 144 L 166 138 L 156 126 L 150 128 L 142 132 L 134 126 L 122 122 L 116 108 L 110 96 L 106 82 L 96 72 L 74 66 L 52 68 L 34 66 Z",
-  // Central America bridge to South America
-  "M 186 156 L 200 166 L 210 176 L 200 178 L 190 168 Z",
-  // Greenland
-  "M 248 28 L 270 20 L 296 26 L 306 42 L 302 62 L 288 70 L 266 66 L 254 54 L 246 40 Z",
-  // South America (northern coast, Amazon delta, Brazil bulge, Patagonia)
-  "M 196 178 L 224 176 L 244 184 L 258 204 L 264 226 L 260 250 L 250 274 L 240 296 L 228 314 L 214 322 L 204 318 L 198 300 L 192 282 L 186 258 L 182 232 L 184 208 L 190 190 Z",
-  // Europe (Iberia, France, Scandinavia, British Isles)
-  "M 328 78 L 340 68 L 356 62 L 378 58 L 396 54 L 414 58 L 428 66 L 444 72 L 456 82 L 454 96 L 448 108 L 436 116 L 420 122 L 402 126 L 384 128 L 366 124 L 352 116 L 340 106 L 332 94 Z",
-  // British Isles island
-  "M 322 82 L 334 78 L 340 90 L 336 104 L 326 108 L 318 96 Z",
-  // Scandinavia peninsula
-  "M 388 42 L 408 40 L 420 50 L 424 62 L 414 68 L 402 62 L 394 56 Z",
-  // Africa (Mediterranean coast, Horn of Africa, Cape, west bulge)
-  "M 348 138 L 372 132 L 398 130 L 424 134 L 448 140 L 464 156 L 476 176 L 480 200 L 478 226 L 468 254 L 452 278 L 434 292 L 416 296 L 402 290 L 388 274 L 378 256 L 370 232 L 364 206 L 358 180 L 352 158 Z",
-  // Madagascar
-  "M 480 244 L 490 244 L 494 262 L 488 278 L 480 274 L 478 258 Z",
-  // Arabian peninsula
-  "M 458 148 L 484 148 L 494 168 L 490 188 L 476 194 L 464 178 L 458 164 Z",
-  // Asia mainland (huge blob — Anatolia to Kamchatka, north to south)
-  "M 444 72 L 472 60 L 508 48 L 550 40 L 594 38 L 630 42 L 660 52 L 686 68 L 704 90 L 706 116 L 694 138 L 674 154 L 646 166 L 618 172 L 590 168 L 562 162 L 538 158 L 514 154 L 498 148 L 484 138 L 470 120 L 458 100 L 448 84 Z",
-  // Indian subcontinent
-  "M 510 154 L 540 154 L 554 172 L 560 196 L 550 214 L 536 220 L 522 208 L 512 188 L 508 168 Z",
-  // Southeast Asia mainland
-  "M 590 170 L 620 168 L 638 180 L 640 196 L 626 208 L 612 208 L 598 196 L 592 184 Z",
-  // Indonesia / Malay archipelago
-  "M 588 214 L 620 210 L 654 214 L 682 220 L 690 232 L 670 236 L 640 236 L 610 232 L 590 226 Z",
-  // Philippines
-  "M 640 190 L 654 188 L 662 200 L 660 214 L 650 216 L 640 208 Z",
-  // Japan
-  "M 664 100 L 676 96 L 686 108 L 690 122 L 680 130 L 668 122 Z",
-  // Australia
-  "M 610 260 L 636 254 L 660 252 L 678 260 L 686 274 L 682 290 L 668 300 L 640 302 L 618 296 L 606 284 L 604 270 Z",
-  // Tasmania
-  "M 638 304 L 648 302 L 652 314 L 644 318 L 638 314 Z",
-  // New Zealand
-  "M 692 292 L 702 292 L 706 306 L 700 320 L 692 322 L 688 310 Z",
-  // Antarctica (thin band across bottom)
-  "M 30 348 L 120 342 L 220 340 L 320 340 L 420 342 L 520 341 L 610 344 L 690 346 L 706 352 L 640 356 L 500 358 L 320 358 L 160 356 L 40 354 Z",
-];
 
 export default function StatsPage() {
   const [books, setBooks] = useState<Book[]>([]);
@@ -536,23 +491,9 @@ export default function StatsPage() {
       }
     }
 
-    // World map — countries with book counts + coordinates.
-    const countryMapPoints = topCountries
-      .map(([country, books]) => {
-        const latlon = COUNTRY_LATLON[country];
-        if (!latlon) return null;
-        const [lat, lon] = latlon;
-        const x = (lon + 180) * 2;
-        const y = (90 - lat) * 2;
-        return {
-          country, books,
-          read: countryReadCounts[country] || 0,
-          authors: countryAuthorCounts[country] || 0,
-          x, y,
-        };
-      })
-      .filter((p): p is NonNullable<typeof p> => p !== null);
-    const unmappedCountries = topCountries.filter(([c]) => !COUNTRY_LATLON[c]);
+    // countryReadCounts + countryAuthorCounts are captured for potential
+    // future use; the choropleth map reads directly from topCountries below.
+    void countryReadCounts; void countryAuthorCounts;
 
     return {
       total,
@@ -606,8 +547,6 @@ export default function StatsPage() {
       topSchools,
       eraSeries,
       decadeSeries,
-      countryMapPoints,
-      unmappedCountries,
     };
   }, [books, readingUpdates, authorMeta]);
 
@@ -974,24 +913,56 @@ export default function StatsPage() {
             </div>
           </div>
 
-          {/* World map */}
-          {stats.countryMapPoints.length > 0 && (() => {
-            const maxBooks = Math.max(...stats.countryMapPoints.map(p => p.books));
-            const totalMapped = stats.countryMapPoints.reduce((s, p) => s + p.books, 0);
-            const totalMappedRead = stats.countryMapPoints.reduce((s, p) => s + p.read, 0);
-            const totalUnmapped = stats.unmappedCountries.reduce((s, [, n]) => s + n, 0);
+          {/* World map — real Natural Earth country polygons, choropleth-shaded by book count */}
+          {stats.topCountries.length > 0 && (() => {
+            // Build a lookup: canonical NE country name → { books, read, authors, ... }.
+            const byNE: Record<string, { books: number; read: number; authors: number; rawName: string }> = {};
+            let mapped = 0, unmapped: [string, number][] = [];
+            const NE_NAMES = new Set(WORLD_COUNTRIES.map(c => c.name));
+            stats.topCountries.forEach(([raw, books, read]) => {
+              const canon = canonicalCountryName(raw);
+              if (NE_NAMES.has(canon)) {
+                const cur = byNE[canon] || { books: 0, read: 0, authors: 0, rawName: raw };
+                cur.books += books;
+                cur.read += read;
+                byNE[canon] = cur;
+                mapped += books;
+              } else {
+                unmapped.push([raw, books]);
+              }
+            });
+            const maxBooks = Math.max(1, ...Object.values(byNE).map(v => v.books));
+            const totalMappedRead = Object.values(byNE).reduce((s, v) => s + v.read, 0);
+            const totalUnmapped = unmapped.reduce((s, [, n]) => s + n, 0);
+            // Diverging fill: light green for a few books, saturated for many.
+            const fillFor = (books: number) => {
+              if (books === 0) return "#1e293b";
+              const t = Math.sqrt(books / maxBooks); // sqrt so small values are visible
+              // Interpolate #1e293b (dark slate) → #34d399 (bright emerald)
+              const lerp = (a: number, b: number) => Math.round(a + (b - a) * t);
+              const r = lerp(0x1e, 0x34);
+              const g = lerp(0x29, 0xd3);
+              const b = lerp(0x3b, 0x99);
+              return `rgb(${r}, ${g}, ${b})`;
+            };
+            const readFor = (read: number, books: number) => {
+              if (read === 0 || books === 0) return null;
+              // Overlay a brighter emerald proportional to the read share.
+              const alpha = 0.35 + (read / books) * 0.5; // 0.35 → 0.85
+              return `rgba(52, 211, 153, ${alpha.toFixed(2)})`;
+            };
+
             return (
               <div className="bg-surface border border-border-custom rounded-xl p-5 mb-4">
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs text-muted">Countries of origin (bubble = books owned, inner = read)</p>
+                  <p className="text-xs text-muted">Countries of origin — shading = books owned, brighter = higher read share</p>
                   <p className="text-[10px] text-muted">
-                    {stats.countryMapPoints.length} countries · {totalMapped} books · {totalMappedRead} read
+                    {Object.keys(byNE).length} countries · {mapped} books · {totalMappedRead} read
                     {totalUnmapped > 0 && ` · ${totalUnmapped} unmapped`}
                   </p>
                 </div>
                 <div className="w-full">
                   <svg viewBox="0 0 720 360" className="w-full h-auto rounded-lg border border-border-custom" preserveAspectRatio="xMidYMid meet" style={{ background: "#0f172a" }}>
-                    {/* Ocean background gradient */}
                     <defs>
                       <linearGradient id="ocean" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#0b1a2b" />
@@ -999,52 +970,40 @@ export default function StatsPage() {
                       </linearGradient>
                     </defs>
                     <rect width="720" height="360" fill="url(#ocean)" />
-                    {/* Latitude lines */}
-                    {[60, 120, 180, 240, 300].map(y => (
-                      <line key={y} x1="0" y1={y} x2="720" y2={y} stroke="#1e293b" strokeWidth="0.5" />
-                    ))}
-                    {/* Longitude lines */}
-                    {[120, 240, 360, 480, 600].map(x => (
-                      <line key={x} x1={x} y1="0" x2={x} y2="360" stroke="#1e293b" strokeWidth="0.5" />
-                    ))}
-                    {/* Continental silhouettes */}
-                    <g fill="#334155" stroke="#475569" strokeWidth="0.5">
-                      {WORLD_LAND_PATHS.map((d, i) => <path key={i} d={d} />)}
-                    </g>
-                    {/* Country bubbles — outer = owned (lighter), inner = read (brighter) */}
-                    {stats.countryMapPoints.map(p => {
-                      const scale = Math.sqrt(p.books / maxBooks);
-                      const rMin = 4, rMax = 26;
-                      const rOuter = rMin + scale * (rMax - rMin);
-                      const readRatio = p.books > 0 ? p.read / p.books : 0;
-                      const rInner = rOuter * Math.sqrt(readRatio);
+                    {WORLD_COUNTRIES.map(c => {
+                      const entry = byNE[c.name];
+                      const fill = entry ? fillFor(entry.books) : "#1e293b";
+                      const readOverlayColor = entry ? readFor(entry.read, entry.books) : null;
                       return (
-                        <g key={p.country}>
-                          <circle cx={p.x} cy={p.y} r={rOuter} fill="#10b981" fillOpacity="0.35" stroke="#10b981" strokeWidth="1">
-                            <title>{p.country}: {p.books} books ({p.read} read · {p.authors} authors)</title>
-                          </circle>
-                          {rInner > 1 && (
-                            <circle cx={p.x} cy={p.y} r={rInner} fill="#34d399" fillOpacity="0.9" pointerEvents="none" />
-                          )}
-                          {p.books >= Math.max(5, maxBooks * 0.08) && (
-                            <text x={p.x} y={p.y + 3} textAnchor="middle" fontSize="10" fontWeight="700" fill="#0f172a" pointerEvents="none">
-                              {p.books}
-                            </text>
+                        <g key={c.id}>
+                          <path d={c.d} fill={fill} stroke="#0b1220" strokeWidth="0.4">
+                            <title>
+                              {c.name}
+                              {entry ? `: ${entry.books} books (${entry.read} read)` : ""}
+                            </title>
+                          </path>
+                          {readOverlayColor && (
+                            <path d={c.d} fill={readOverlayColor} stroke="none" pointerEvents="none" />
                           )}
                         </g>
                       );
                     })}
                   </svg>
                 </div>
-                <div className="flex items-center justify-between mt-2">
-                  <div className="flex items-center gap-3 text-[10px] text-muted">
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full" style={{ background: "#10b981", opacity: 0.4 }} /> Owned</span>
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full" style={{ background: "#34d399" }} /> Read (inner)</span>
+                {/* Legend + notes */}
+                <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
+                  <div className="flex items-center gap-2 text-[10px] text-muted">
+                    <span>Books owned:</span>
+                    <span className="flex items-center gap-1"><span className="w-4 h-3 rounded-sm" style={{ background: fillFor(1) }} />1</span>
+                    <span className="flex items-center gap-1"><span className="w-4 h-3 rounded-sm" style={{ background: fillFor(Math.max(1, maxBooks * 0.25)) }} />{Math.round(maxBooks * 0.25)}</span>
+                    <span className="flex items-center gap-1"><span className="w-4 h-3 rounded-sm" style={{ background: fillFor(Math.max(1, maxBooks * 0.5)) }} />{Math.round(maxBooks * 0.5)}</span>
+                    <span className="flex items-center gap-1"><span className="w-4 h-3 rounded-sm" style={{ background: fillFor(maxBooks) }} />{maxBooks}+</span>
+                    <span className="ml-3">Brighter overlay = higher % read</span>
                   </div>
-                  {stats.unmappedCountries.length > 0 && (
+                  {unmapped.length > 0 && (
                     <p className="text-[10px] text-muted">
-                      Unmapped: {stats.unmappedCountries.slice(0, 4).map(([c, n]) => `${c} (${n})`).join(", ")}
-                      {stats.unmappedCountries.length > 4 && ` +${stats.unmappedCountries.length - 4}`}
+                      Unmapped: {unmapped.slice(0, 4).map(([c, n]) => `${c} (${n})`).join(", ")}
+                      {unmapped.length > 4 && ` +${unmapped.length - 4}`}
                     </p>
                   )}
                 </div>
