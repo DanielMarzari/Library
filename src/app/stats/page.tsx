@@ -45,7 +45,68 @@ interface AuthorMeta {
   gender: string | null;
   ethnicity: string | null;
   nationality: string | null;
+  country: string | null;
+  birth_year: number | null;
+  death_year: number | null;
+  discipline: string | null;
+  era: string | null;
+  denomination: string | null;
+  school: string | null;
 }
+
+// Country centroids for the world map — lat/lon of each country's rough center.
+// Used to plot dots on an equirectangular projection (viewBox 0 0 720 360).
+// Add rows here as new countries appear in your data.
+const COUNTRY_LATLON: Record<string, [number, number]> = {
+  "United States": [39.8, -98.6], "United States of America": [39.8, -98.6],
+  "Canada": [56.1, -106.3], "Mexico": [23.6, -102.6],
+  "United Kingdom": [54.0, -2.5], "England": [52.5, -1.5], "Scotland": [56.5, -4.0],
+  "Ireland": [53.1, -7.7], "France": [46.2, 2.2], "Germany": [51.2, 10.5],
+  "Italy": [41.9, 12.6], "Spain": [40.5, -3.7], "Portugal": [39.4, -8.2],
+  "Netherlands": [52.1, 5.3], "Kingdom of the Netherlands": [52.1, 5.3],
+  "Belgium": [50.5, 4.5], "Switzerland": [46.8, 8.2], "Austria": [47.5, 14.6],
+  "Denmark": [56.3, 9.5], "Sweden": [60.1, 18.6], "Norway": [60.5, 8.5],
+  "Finland": [61.9, 25.7], "Iceland": [64.9, -19.0], "Poland": [51.9, 19.1],
+  "Czech Republic": [49.8, 15.5], "Hungary": [47.2, 19.5], "Romania": [45.9, 24.9],
+  "Greece": [39.1, 21.8], "Bulgaria": [42.7, 25.5], "Ukraine": [48.4, 31.2],
+  "Russia": [61.5, 105.3], "Turkey": [38.9, 35.2], "Israel": [31.0, 34.9],
+  "Lebanon": [33.9, 35.9], "Syria": [34.8, 38.9], "Egypt": [26.8, 30.8],
+  "Ethiopia": [9.1, 40.5], "Kenya": [-0.0, 37.9], "Nigeria": [9.1, 8.7],
+  "South Africa": [-30.6, 22.9], "Ghana": [7.9, -1.0], "Uganda": [1.4, 32.3],
+  "China": [35.9, 104.2], "Japan": [36.2, 138.3], "South Korea": [35.9, 127.8],
+  "North Korea": [40.3, 127.5], "India": [20.6, 78.9], "Pakistan": [30.4, 69.3],
+  "Bangladesh": [23.7, 90.4], "Sri Lanka": [7.9, 80.8], "Vietnam": [14.1, 108.3],
+  "Thailand": [15.9, 100.9], "Indonesia": [-0.8, 113.9], "Philippines": [12.9, 121.8],
+  "Malaysia": [4.2, 101.9], "Singapore": [1.3, 103.8], "Australia": [-25.3, 133.8],
+  "New Zealand": [-40.9, 174.9], "Brazil": [-14.2, -51.9], "Argentina": [-38.4, -63.6],
+  "Chile": [-35.7, -71.5], "Colombia": [4.6, -74.3], "Peru": [-9.2, -75.0],
+  "Venezuela": [6.4, -66.6], "Cuba": [21.5, -77.8], "Jamaica": [18.1, -77.3],
+  "Iran": [32.4, 53.7], "Iraq": [33.2, 43.7], "Saudi Arabia": [23.9, 45.1],
+  "Afghanistan": [33.9, 67.7], "Kingdom of England": [52.5, -1.5],
+};
+
+// Simplified world land-mass outline for the map background. Points are the
+// convex hulls of each continent in equirectangular space (viewBox 720×360 =
+// [-180…180, -90…90] with y flipped). Approximation only — the goal is a
+// legible shape behind the country dots, not cartographic accuracy.
+const WORLD_LAND_PATHS = [
+  // North America
+  "M 60 60 L 130 45 L 175 55 L 220 90 L 240 130 L 210 170 L 170 175 L 145 155 L 120 120 L 90 100 L 60 90 Z",
+  // South America
+  "M 200 195 L 240 195 L 260 240 L 250 290 L 230 315 L 200 305 L 190 260 L 195 220 Z",
+  // Europe
+  "M 335 65 L 400 55 L 430 70 L 445 100 L 430 125 L 400 130 L 370 120 L 340 105 Z",
+  // Africa
+  "M 355 145 L 420 140 L 445 170 L 460 230 L 435 280 L 400 285 L 375 250 L 360 200 Z",
+  // Asia
+  "M 445 55 L 560 45 L 640 70 L 670 110 L 665 155 L 610 170 L 555 165 L 500 145 L 465 120 L 445 90 Z",
+  // Indian subcontinent nub
+  "M 515 155 L 550 155 L 555 200 L 535 210 L 520 190 Z",
+  // Southeast Asia
+  "M 600 175 L 655 175 L 660 210 L 630 215 L 605 200 Z",
+  // Australia
+  "M 605 250 L 665 245 L 685 275 L 665 295 L 620 290 L 605 275 Z",
+];
 
 export default function StatsPage() {
   const [books, setBooks] = useState<Book[]>([]);
@@ -368,6 +429,16 @@ export default function StatsPage() {
     const genderAuthorCounts: Record<string, number> = { Male: 0, Female: 0, Unknown: 0 };
     const ethnicityBookCounts: Record<string, number> = {};
     const ethnicityAuthorCounts: Record<string, number> = {};
+    const countryBookCounts: Record<string, number> = {};
+    const countryAuthorCounts: Record<string, number> = {};
+    const disciplineBookCounts: Record<string, number> = {};
+    const eraBookCounts: Record<string, number> = {};
+    const denominationBookCounts: Record<string, number> = {};
+    const schoolBookCounts: Record<string, number> = {};
+    // Country → also count of dead vs living for the map opacity treatment
+    const currentYear = new Date().getFullYear();
+    // Decade of birth histogram
+    const decadeCounts: Record<number, number> = {};
 
     Object.entries(authorCounts).forEach(([name, counts]) => {
       const meta = metaByName[name];
@@ -376,16 +447,60 @@ export default function StatsPage() {
       genderBookCounts[genderKey] = (genderBookCounts[genderKey] || 0) + counts.books;
       genderAuthorCounts[genderKey] = (genderAuthorCounts[genderKey] || 0) + 1;
 
-      const ethnicity = meta?.ethnicity || null;
-      if (ethnicity) {
-        ethnicityBookCounts[ethnicity] = (ethnicityBookCounts[ethnicity] || 0) + counts.books;
-        ethnicityAuthorCounts[ethnicity] = (ethnicityAuthorCounts[ethnicity] || 0) + 1;
+      if (meta?.ethnicity) {
+        ethnicityBookCounts[meta.ethnicity] = (ethnicityBookCounts[meta.ethnicity] || 0) + counts.books;
+        ethnicityAuthorCounts[meta.ethnicity] = (ethnicityAuthorCounts[meta.ethnicity] || 0) + 1;
+      }
+      if (meta?.country) {
+        countryBookCounts[meta.country] = (countryBookCounts[meta.country] || 0) + counts.books;
+        countryAuthorCounts[meta.country] = (countryAuthorCounts[meta.country] || 0) + 1;
+      }
+      if (meta?.discipline) {
+        disciplineBookCounts[meta.discipline] = (disciplineBookCounts[meta.discipline] || 0) + counts.books;
+      }
+      if (meta?.era) {
+        eraBookCounts[meta.era] = (eraBookCounts[meta.era] || 0) + counts.books;
+      }
+      if (meta?.denomination) {
+        denominationBookCounts[meta.denomination] = (denominationBookCounts[meta.denomination] || 0) + counts.books;
+      }
+      if (meta?.school) {
+        schoolBookCounts[meta.school] = (schoolBookCounts[meta.school] || 0) + counts.books;
+      }
+      if (meta?.birth_year) {
+        const decade = Math.floor(meta.birth_year / 10) * 10;
+        decadeCounts[decade] = (decadeCounts[decade] || 0) + counts.books;
       }
     });
 
     const totalGenderBooks = genderBookCounts.Male + genderBookCounts.Female + genderBookCounts.Unknown;
-    const topEthnicities = Object.entries(ethnicityBookCounts)
-      .sort((a, b) => b[1] - a[1]);
+    const topEthnicities = Object.entries(ethnicityBookCounts).sort((a, b) => b[1] - a[1]);
+    const topCountries = Object.entries(countryBookCounts).sort((a, b) => b[1] - a[1]);
+    const topDisciplines = Object.entries(disciplineBookCounts).sort((a, b) => b[1] - a[1]);
+    const topDenominations = Object.entries(denominationBookCounts).sort((a, b) => b[1] - a[1]);
+    const topSchools = Object.entries(schoolBookCounts).sort((a, b) => b[1] - a[1]);
+
+    // Era in canonical order (not by count)
+    const ERA_ORDER = ["Ancient (pre-500)", "Medieval (500–1500)", "Reformation (1500–1700)", "Enlightenment (1700–1800)", "Modern (1800–1945)", "Contemporary (1945+)"];
+    const eraSeries = ERA_ORDER.map(e => [e, eraBookCounts[e] || 0] as [string, number]);
+
+    // Decade series in chronological order
+    const decadeSeries = Object.entries(decadeCounts)
+      .map(([d, n]) => [parseInt(d), n] as [number, number])
+      .sort((a, b) => a[0] - b[0]);
+
+    // World map: countries with book counts + coordinates
+    const countryMapPoints = topCountries
+      .map(([country, books]) => {
+        const latlon = COUNTRY_LATLON[country];
+        if (!latlon) return null;
+        const [lat, lon] = latlon;
+        const x = (lon + 180) * 2; // 0–720
+        const y = (90 - lat) * 2;  // 0–360
+        return { country, books, authors: countryAuthorCounts[country] || 0, x, y };
+      })
+      .filter((p): p is NonNullable<typeof p> => p !== null);
+    const unmappedCountries = topCountries.filter(([c]) => !COUNTRY_LATLON[c]);
 
     return {
       total,
@@ -432,6 +547,14 @@ export default function StatsPage() {
       totalGenderBooks,
       topEthnicities,
       ethnicityAuthorCounts,
+      topCountries,
+      topDisciplines,
+      topDenominations,
+      topSchools,
+      eraSeries,
+      decadeSeries,
+      countryMapPoints,
+      unmappedCountries,
     };
   }, [books, readingUpdates, authorMeta]);
 
@@ -769,103 +892,148 @@ export default function StatsPage() {
         {/* Author Diversity */}
         <section>
           <h2 className="text-lg font-semibold text-foreground mb-3">Author Diversity</h2>
-          <div className="bg-surface border border-border-custom rounded-xl p-5 space-y-5">
-            {/* Gender breakdown */}
-            <div>
-              <p className="text-xs text-muted mb-3">Gender (by books owned)</p>
-              <div className="flex gap-1 h-6 rounded-full overflow-hidden mb-3">
-                {stats.totalGenderBooks > 0 && (
-                  <>
-                    <div
-                      className="bg-blue-500 transition-all"
-                      style={{ width: `${(stats.genderBookCounts.Male / stats.totalGenderBooks) * 100}%` }}
-                    />
-                    <div
-                      className="bg-pink-500 transition-all"
-                      style={{ width: `${(stats.genderBookCounts.Female / stats.totalGenderBooks) * 100}%` }}
-                    />
-                    <div
-                      className="bg-surface-2 transition-all"
-                      style={{ width: `${(stats.genderBookCounts.Unknown / stats.totalGenderBooks) * 100}%` }}
-                    />
-                  </>
-                )}
+
+          {/* Gender + top-line numbers */}
+          <div className="bg-surface border border-border-custom rounded-xl p-5 mb-4">
+            <p className="text-xs text-muted mb-3">Gender (by books owned)</p>
+            <div className="flex gap-1 h-6 rounded-full overflow-hidden mb-3">
+              {stats.totalGenderBooks > 0 && (
+                <>
+                  <div className="bg-blue-500 transition-all" style={{ width: `${(stats.genderBookCounts.Male / stats.totalGenderBooks) * 100}%` }} />
+                  <div className="bg-pink-500 transition-all" style={{ width: `${(stats.genderBookCounts.Female / stats.totalGenderBooks) * 100}%` }} />
+                  <div className="bg-surface-2 transition-all" style={{ width: `${(stats.genderBookCounts.Unknown / stats.totalGenderBooks) * 100}%` }} />
+                </>
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div>
+                <p className="text-lg font-bold text-blue-400">{stats.genderBookCounts.Male}</p>
+                <p className="text-[10px] text-muted">Male · {stats.genderAuthorCounts.Male} authors · {stats.totalGenderBooks > 0 ? Math.round((stats.genderBookCounts.Male / stats.totalGenderBooks) * 100) : 0}%</p>
               </div>
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div>
-                  <p className="text-lg font-bold text-blue-400">{stats.genderBookCounts.Male}</p>
-                  <p className="text-[10px] text-muted">Male · {stats.genderAuthorCounts.Male} authors</p>
-                </div>
-                <div>
-                  <p className="text-lg font-bold text-pink-400">{stats.genderBookCounts.Female}</p>
-                  <p className="text-[10px] text-muted">Female · {stats.genderAuthorCounts.Female} authors</p>
-                </div>
-                <div>
-                  <p className="text-lg font-bold text-muted">{stats.genderBookCounts.Unknown}</p>
-                  <p className="text-[10px] text-muted">Unknown · {stats.genderAuthorCounts.Unknown} authors</p>
-                </div>
+              <div>
+                <p className="text-lg font-bold text-pink-400">{stats.genderBookCounts.Female}</p>
+                <p className="text-[10px] text-muted">Female · {stats.genderAuthorCounts.Female} authors · {stats.totalGenderBooks > 0 ? Math.round((stats.genderBookCounts.Female / stats.totalGenderBooks) * 100) : 0}%</p>
+              </div>
+              <div>
+                <p className="text-lg font-bold text-muted">{stats.genderBookCounts.Unknown}</p>
+                <p className="text-[10px] text-muted">Unknown · {stats.genderAuthorCounts.Unknown} authors</p>
               </div>
             </div>
+          </div>
 
-            {/* Ethnicity breakdown — pie chart */}
-            {stats.topEthnicities.length > 0 && (() => {
-              const totalEthBooks = stats.topEthnicities.reduce((s, e) => s + e[1], 0);
-              const PIE_COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316", "#84cc16", "#6366f1", "#14b8a6", "#e11d48"];
-
-              // Build pie slices
-              let cumulativeAngle = 0;
-              const slices = stats.topEthnicities.map(([ethnicity, bookCount], idx) => {
-                const pct = bookCount / totalEthBooks;
-                const startAngle = cumulativeAngle;
-                cumulativeAngle += pct * 360;
-                const endAngle = cumulativeAngle;
-                return { ethnicity, bookCount, pct, startAngle, endAngle, color: PIE_COLORS[idx % PIE_COLORS.length] };
-              });
-
-              const toRad = (deg: number) => (deg - 90) * (Math.PI / 180);
-              const cx = 100, cy = 100, r = 85;
-
-              return (
-                <div>
-                  <p className="text-xs text-muted mb-3">Ethnicity (by books owned) — {totalEthBooks} books classified</p>
-                  <div className="flex flex-col sm:flex-row items-center gap-6">
-                    <svg viewBox="0 0 200 200" className="w-48 h-48 flex-shrink-0">
-                      {slices.map((slice) => {
-                        if (slice.pct >= 0.999) {
-                          return <circle key={slice.ethnicity} cx={cx} cy={cy} r={r} fill={slice.color} />;
-                        }
-                        const startX = cx + r * Math.cos(toRad(slice.startAngle));
-                        const startY = cy + r * Math.sin(toRad(slice.startAngle));
-                        const endX = cx + r * Math.cos(toRad(slice.endAngle));
-                        const endY = cy + r * Math.sin(toRad(slice.endAngle));
-                        const largeArc = slice.endAngle - slice.startAngle > 180 ? 1 : 0;
-
-                        return (
-                          <path
-                            key={slice.ethnicity}
-                            d={`M ${cx} ${cy} L ${startX} ${startY} A ${r} ${r} 0 ${largeArc} 1 ${endX} ${endY} Z`}
-                            fill={slice.color}
-                            stroke="var(--surface)"
-                            strokeWidth="1"
-                          >
-                            <title>{slice.ethnicity}: {slice.bookCount} books ({(slice.pct * 100).toFixed(1)}%)</title>
-                          </path>
-                        );
-                      })}
-                    </svg>
-                    <div className="flex flex-col gap-1.5">
-                      {slices.map((slice) => (
-                        <div key={slice.ethnicity} className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: slice.color }} />
-                          <span className="text-xs text-foreground">{slice.ethnicity}</span>
-                          <span className="text-xs text-muted">({slice.bookCount} · {(slice.pct * 100).toFixed(0)}%)</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+          {/* World map */}
+          {stats.countryMapPoints.length > 0 && (() => {
+            const maxBooks = Math.max(...stats.countryMapPoints.map(p => p.books));
+            const totalMapped = stats.countryMapPoints.reduce((s, p) => s + p.books, 0);
+            const totalUnmapped = stats.unmappedCountries.reduce((s, [, n]) => s + n, 0);
+            return (
+              <div className="bg-surface border border-border-custom rounded-xl p-5 mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs text-muted">Countries of origin (by books owned)</p>
+                  <p className="text-[10px] text-muted">
+                    {stats.countryMapPoints.length} countries · {totalMapped} books mapped
+                    {totalUnmapped > 0 && ` · ${totalUnmapped} unmapped`}
+                  </p>
                 </div>
-              );
-            })()}
+                <div className="w-full overflow-x-auto">
+                  <svg viewBox="0 0 720 360" className="w-full h-auto" style={{ maxWidth: 900, background: "var(--surface-2)" }} preserveAspectRatio="xMidYMid meet">
+                    {/* Continental silhouettes as background */}
+                    <g fill="var(--border)" opacity="0.5">
+                      {WORLD_LAND_PATHS.map((d, i) => <path key={i} d={d} />)}
+                    </g>
+                    {/* Latitude / equator hint */}
+                    <line x1="0" y1="180" x2="720" y2="180" stroke="var(--border)" strokeWidth="0.4" opacity="0.5" />
+                    {/* Country dots — sqrt scale so tiny counts stay visible */}
+                    {stats.countryMapPoints.map(p => {
+                      const scale = Math.sqrt(p.books / maxBooks);
+                      const rMin = 3, rMax = 24;
+                      const r = rMin + scale * (rMax - rMin);
+                      return (
+                        <g key={p.country}>
+                          <circle cx={p.x} cy={p.y} r={r} fill="#10b981" fillOpacity="0.55" stroke="#065f46" strokeWidth="0.5">
+                            <title>{p.country}: {p.books} books ({p.authors} authors)</title>
+                          </circle>
+                          {p.books >= Math.max(5, maxBooks * 0.1) && (
+                            <text x={p.x} y={p.y + 3} textAnchor="middle" fontSize="10" fontWeight="700" fill="#fff" pointerEvents="none">
+                              {p.books}
+                            </text>
+                          )}
+                        </g>
+                      );
+                    })}
+                  </svg>
+                </div>
+                {stats.unmappedCountries.length > 0 && (
+                  <p className="text-[10px] text-muted mt-2">
+                    Unmapped: {stats.unmappedCountries.slice(0, 5).map(([c, n]) => `${c} (${n})`).join(", ")}
+                    {stats.unmappedCountries.length > 5 && ` +${stats.unmappedCountries.length - 5} more`}
+                  </p>
+                )}
+              </div>
+            );
+          })()}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Ethnicity — donut */}
+            {stats.topEthnicities.length > 0 && (
+              <div className="bg-surface border border-border-custom rounded-xl p-5">
+                <DonutChart
+                  title="Ethnicity"
+                  data={stats.topEthnicities}
+                  colors={["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316", "#84cc16", "#6366f1", "#14b8a6", "#e11d48"]}
+                />
+              </div>
+            )}
+
+            {/* Denomination — donut */}
+            {stats.topDenominations.length > 0 && (
+              <div className="bg-surface border border-border-custom rounded-xl p-5">
+                <DonutChart
+                  title="Denomination"
+                  data={stats.topDenominations.slice(0, 12)}
+                  colors={["#7c3aed", "#0ea5e9", "#22c55e", "#eab308", "#f97316", "#ef4444", "#ec4899", "#14b8a6", "#a855f7", "#0891b2", "#65a30d", "#dc2626"]}
+                />
+              </div>
+            )}
+
+            {/* Top countries — horizontal bar */}
+            {stats.topCountries.length > 0 && (
+              <div className="bg-surface border border-border-custom rounded-xl p-5">
+                <HBar title="Top Countries" data={stats.topCountries.slice(0, 10)} accent="#10b981" />
+              </div>
+            )}
+
+            {/* Discipline — horizontal bar */}
+            {stats.topDisciplines.length > 0 && (
+              <div className="bg-surface border border-border-custom rounded-xl p-5">
+                <HBar title="Discipline" data={stats.topDisciplines.slice(0, 12)} accent="#8b5cf6" />
+              </div>
+            )}
+
+            {/* Era — vertical bar in canonical order */}
+            {stats.eraSeries.some(([, n]) => n > 0) && (
+              <div className="bg-surface border border-border-custom rounded-xl p-5">
+                <VBar title="Era" data={stats.eraSeries} accent="#f59e0b" />
+              </div>
+            )}
+
+            {/* Birth decade histogram */}
+            {stats.decadeSeries.length > 0 && (
+              <div className="bg-surface border border-border-custom rounded-xl p-5">
+                <VBar
+                  title="Birth Decade (authors of books owned)"
+                  data={stats.decadeSeries.map(([d, n]) => [`${d}s`, n] as [string, number])}
+                  accent="#06b6d4"
+                />
+              </div>
+            )}
+
+            {/* School — only if we have any */}
+            {stats.topSchools.length > 0 && (
+              <div className="bg-surface border border-border-custom rounded-xl p-5 lg:col-span-2">
+                <HBar title="Intellectual School (secular)" data={stats.topSchools} accent="#ec4899" />
+              </div>
+            )}
           </div>
         </section>
 
@@ -1105,6 +1273,167 @@ function StatCard({
     <div className="bg-surface border border-border-custom rounded-xl p-4">
       <p className="text-xs text-muted mb-1">{label}</p>
       <p className={`text-2xl font-bold ${valueColor[color]}`}>{value}</p>
+    </div>
+  );
+}
+
+// A polished donut chart: hole in the middle with the total, thicker stroke
+// separators between slices, a labeled legend column, and hover tooltips.
+function DonutChart({
+  title,
+  data,
+  colors,
+}: {
+  title: string;
+  data: [string, number][];
+  colors: string[];
+}) {
+  const total = data.reduce((s, [, n]) => s + n, 0);
+  if (total === 0) return null;
+  let cursor = 0;
+  const cx = 100, cy = 100, r = 78, innerR = 46;
+  const toRad = (deg: number) => (deg - 90) * (Math.PI / 180);
+  const slices = data.map(([label, n], i) => {
+    const pct = n / total;
+    const start = cursor;
+    cursor += pct * 360;
+    const end = cursor;
+    return { label, n, pct, start, end, color: colors[i % colors.length] };
+  });
+  return (
+    <div>
+      <p className="text-xs text-muted mb-1">{title}</p>
+      <p className="text-[10px] text-muted mb-3">{total.toLocaleString()} books · {data.length} categories</p>
+      <div className="flex flex-col sm:flex-row items-center gap-5">
+        <svg viewBox="0 0 200 200" className="w-44 h-44 flex-shrink-0">
+          {slices.map((s) => {
+            if (s.pct >= 0.999) {
+              return (
+                <g key={s.label}>
+                  <circle cx={cx} cy={cy} r={r} fill={s.color} />
+                  <circle cx={cx} cy={cy} r={innerR} fill="var(--surface)" />
+                </g>
+              );
+            }
+            const sx1 = cx + r * Math.cos(toRad(s.start));
+            const sy1 = cy + r * Math.sin(toRad(s.start));
+            const sx2 = cx + r * Math.cos(toRad(s.end));
+            const sy2 = cy + r * Math.sin(toRad(s.end));
+            const ix1 = cx + innerR * Math.cos(toRad(s.end));
+            const iy1 = cy + innerR * Math.sin(toRad(s.end));
+            const ix2 = cx + innerR * Math.cos(toRad(s.start));
+            const iy2 = cy + innerR * Math.sin(toRad(s.start));
+            const largeArc = s.end - s.start > 180 ? 1 : 0;
+            return (
+              <path
+                key={s.label}
+                d={`M ${sx1} ${sy1} A ${r} ${r} 0 ${largeArc} 1 ${sx2} ${sy2} L ${ix1} ${iy1} A ${innerR} ${innerR} 0 ${largeArc} 0 ${ix2} ${iy2} Z`}
+                fill={s.color}
+                stroke="var(--surface)"
+                strokeWidth="2"
+              >
+                <title>{s.label}: {s.n} books ({(s.pct * 100).toFixed(1)}%)</title>
+              </path>
+            );
+          })}
+          <text x={cx} y={cy - 4} textAnchor="middle" fontSize="22" fontWeight="700" fill="var(--foreground)">
+            {total}
+          </text>
+          <text x={cx} y={cy + 14} textAnchor="middle" fontSize="10" fill="var(--muted)">
+            books
+          </text>
+        </svg>
+        <div className="flex flex-col gap-1.5 flex-1 min-w-0 self-start">
+          {slices.map((s) => (
+            <div key={s.label} className="flex items-center gap-2 min-w-0">
+              <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: s.color }} />
+              <span className="text-xs text-foreground truncate">{s.label}</span>
+              <span className="text-xs text-muted ml-auto flex-shrink-0 tabular-nums">
+                {s.n} · {(s.pct * 100).toFixed(0)}%
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Horizontal bar chart — label on left, bar fills right, count at end.
+function HBar({
+  title,
+  data,
+  accent = "#10b981",
+}: {
+  title: string;
+  data: [string, number][];
+  accent?: string;
+}) {
+  if (data.length === 0) return null;
+  const max = Math.max(...data.map(([, n]) => n));
+  const total = data.reduce((s, [, n]) => s + n, 0);
+  return (
+    <div>
+      <p className="text-xs text-muted mb-1">{title}</p>
+      <p className="text-[10px] text-muted mb-3">{total.toLocaleString()} books</p>
+      <div className="space-y-1.5">
+        {data.map(([label, n]) => {
+          const pct = (n / max) * 100;
+          return (
+            <div key={label} className="flex items-center gap-2 text-xs">
+              <span className="text-foreground truncate w-32 sm:w-40 flex-shrink-0" title={label}>{label}</span>
+              <div className="flex-1 h-4 bg-surface-2 rounded-sm overflow-hidden">
+                <div className="h-full rounded-sm transition-all" style={{ width: `${pct}%`, backgroundColor: accent, opacity: 0.85 }} />
+              </div>
+              <span className="text-muted tabular-nums flex-shrink-0 w-10 text-right">{n}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Vertical bar chart — used for era & decade series where category order matters.
+function VBar({
+  title,
+  data,
+  accent = "#10b981",
+}: {
+  title: string;
+  data: [string, number][];
+  accent?: string;
+}) {
+  const nonzero = data.filter(([, n]) => n > 0);
+  if (nonzero.length === 0) return null;
+  const max = Math.max(...data.map(([, n]) => n));
+  const total = data.reduce((s, [, n]) => s + n, 0);
+  return (
+    <div>
+      <p className="text-xs text-muted mb-1">{title}</p>
+      <p className="text-[10px] text-muted mb-3">{total.toLocaleString()} books</p>
+      <div className="flex items-end gap-1 h-40">
+        {data.map(([label, n]) => {
+          const h = max > 0 ? (n / max) * 100 : 0;
+          return (
+            <div key={label} className="flex-1 flex flex-col items-center justify-end min-w-0">
+              <span className="text-[10px] text-muted tabular-nums mb-0.5">{n > 0 ? n : ""}</span>
+              <div
+                className="w-full rounded-t-sm transition-all"
+                style={{ height: `${h}%`, minHeight: n > 0 ? 2 : 0, backgroundColor: accent, opacity: 0.85 }}
+                title={`${label}: ${n} books`}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex gap-1 mt-1">
+        {data.map(([label]) => (
+          <div key={label} className="flex-1 text-[9px] text-muted text-center truncate" title={label}>
+            {label.length > 12 ? label.slice(0, 10) + "…" : label}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
