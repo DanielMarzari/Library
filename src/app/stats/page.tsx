@@ -914,102 +914,9 @@ export default function StatsPage() {
           </div>
 
           {/* World map — real Natural Earth country polygons, choropleth-shaded by book count */}
-          {stats.topCountries.length > 0 && (() => {
-            // Build a lookup: canonical NE country name → { books, read, authors, ... }.
-            const byNE: Record<string, { books: number; read: number; authors: number; rawName: string }> = {};
-            let mapped = 0, unmapped: [string, number][] = [];
-            const NE_NAMES = new Set(WORLD_COUNTRIES.map(c => c.name));
-            stats.topCountries.forEach(([raw, books, read]) => {
-              const canon = canonicalCountryName(raw);
-              if (NE_NAMES.has(canon)) {
-                const cur = byNE[canon] || { books: 0, read: 0, authors: 0, rawName: raw };
-                cur.books += books;
-                cur.read += read;
-                byNE[canon] = cur;
-                mapped += books;
-              } else {
-                unmapped.push([raw, books]);
-              }
-            });
-            const maxBooks = Math.max(1, ...Object.values(byNE).map(v => v.books));
-            const totalMappedRead = Object.values(byNE).reduce((s, v) => s + v.read, 0);
-            const totalUnmapped = unmapped.reduce((s, [, n]) => s + n, 0);
-            // Diverging fill: light green for a few books, saturated for many.
-            const fillFor = (books: number) => {
-              if (books === 0) return "#1e293b";
-              const t = Math.sqrt(books / maxBooks); // sqrt so small values are visible
-              // Interpolate #1e293b (dark slate) → #34d399 (bright emerald)
-              const lerp = (a: number, b: number) => Math.round(a + (b - a) * t);
-              const r = lerp(0x1e, 0x34);
-              const g = lerp(0x29, 0xd3);
-              const b = lerp(0x3b, 0x99);
-              return `rgb(${r}, ${g}, ${b})`;
-            };
-            const readFor = (read: number, books: number) => {
-              if (read === 0 || books === 0) return null;
-              // Overlay a brighter emerald proportional to the read share.
-              const alpha = 0.35 + (read / books) * 0.5; // 0.35 → 0.85
-              return `rgba(52, 211, 153, ${alpha.toFixed(2)})`;
-            };
-
-            return (
-              <div className="bg-surface border border-border-custom rounded-xl p-5 mb-4">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs text-muted">Countries of origin — shading = books owned, brighter = higher read share</p>
-                  <p className="text-[10px] text-muted">
-                    {Object.keys(byNE).length} countries · {mapped} books · {totalMappedRead} read
-                    {totalUnmapped > 0 && ` · ${totalUnmapped} unmapped`}
-                  </p>
-                </div>
-                <div className="w-full">
-                  <svg viewBox="0 0 720 360" className="w-full h-auto rounded-lg border border-border-custom" preserveAspectRatio="xMidYMid meet" style={{ background: "#0f172a" }}>
-                    <defs>
-                      <linearGradient id="ocean" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#0b1a2b" />
-                        <stop offset="100%" stopColor="#0f172a" />
-                      </linearGradient>
-                    </defs>
-                    <rect width="720" height="360" fill="url(#ocean)" />
-                    {WORLD_COUNTRIES.map(c => {
-                      const entry = byNE[c.name];
-                      const fill = entry ? fillFor(entry.books) : "#1e293b";
-                      const readOverlayColor = entry ? readFor(entry.read, entry.books) : null;
-                      return (
-                        <g key={c.id}>
-                          <path d={c.d} fill={fill} stroke="#0b1220" strokeWidth="0.4">
-                            <title>
-                              {c.name}
-                              {entry ? `: ${entry.books} books (${entry.read} read)` : ""}
-                            </title>
-                          </path>
-                          {readOverlayColor && (
-                            <path d={c.d} fill={readOverlayColor} stroke="none" pointerEvents="none" />
-                          )}
-                        </g>
-                      );
-                    })}
-                  </svg>
-                </div>
-                {/* Legend + notes */}
-                <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
-                  <div className="flex items-center gap-2 text-[10px] text-muted">
-                    <span>Books owned:</span>
-                    <span className="flex items-center gap-1"><span className="w-4 h-3 rounded-sm" style={{ background: fillFor(1) }} />1</span>
-                    <span className="flex items-center gap-1"><span className="w-4 h-3 rounded-sm" style={{ background: fillFor(Math.max(1, maxBooks * 0.25)) }} />{Math.round(maxBooks * 0.25)}</span>
-                    <span className="flex items-center gap-1"><span className="w-4 h-3 rounded-sm" style={{ background: fillFor(Math.max(1, maxBooks * 0.5)) }} />{Math.round(maxBooks * 0.5)}</span>
-                    <span className="flex items-center gap-1"><span className="w-4 h-3 rounded-sm" style={{ background: fillFor(maxBooks) }} />{maxBooks}+</span>
-                    <span className="ml-3">Brighter overlay = higher % read</span>
-                  </div>
-                  {unmapped.length > 0 && (
-                    <p className="text-[10px] text-muted">
-                      Unmapped: {unmapped.slice(0, 4).map(([c, n]) => `${c} (${n})`).join(", ")}
-                      {unmapped.length > 4 && ` +${unmapped.length - 4}`}
-                    </p>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
+          {stats.topCountries.length > 0 && (
+            <WorldMap topCountries={stats.topCountries} />
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Ethnicity — stacked HBar */}
@@ -1305,6 +1212,160 @@ function StatCard({
     <div className="bg-surface border border-border-custom rounded-xl p-4">
       <p className="text-xs text-muted mb-1">{label}</p>
       <p className={`text-2xl font-bold ${valueColor[color]}`}>{value}</p>
+    </div>
+  );
+}
+
+// Choropleth world map with a cursor-following tooltip.
+function WorldMap({ topCountries }: { topCountries: [string, number, number][] }) {
+  const [hover, setHover] = useState<
+    { name: string; books: number; read: number; x: number; y: number } | null
+  >(null);
+
+  // Build a lookup keyed by Natural Earth's canonical country name.
+  const byNE: Record<string, { books: number; read: number }> = {};
+  let mapped = 0;
+  const unmapped: [string, number][] = [];
+  const NE_NAMES = new Set(WORLD_COUNTRIES.map(c => c.name));
+  topCountries.forEach(([raw, books, read]) => {
+    const canon = canonicalCountryName(raw);
+    if (NE_NAMES.has(canon)) {
+      const cur = byNE[canon] || { books: 0, read: 0 };
+      cur.books += books;
+      cur.read += read;
+      byNE[canon] = cur;
+      mapped += books;
+    } else {
+      unmapped.push([raw, books]);
+    }
+  });
+  const maxBooks = Math.max(1, ...Object.values(byNE).map(v => v.books));
+  const totalMappedRead = Object.values(byNE).reduce((s, v) => s + v.read, 0);
+  const totalUnmapped = unmapped.reduce((s, [, n]) => s + n, 0);
+
+  const fillFor = (books: number) => {
+    if (books === 0) return "#1e293b";
+    const t = Math.sqrt(books / maxBooks);
+    const lerp = (a: number, b: number) => Math.round(a + (b - a) * t);
+    return `rgb(${lerp(0x1e, 0x34)}, ${lerp(0x29, 0xd3)}, ${lerp(0x3b, 0x99)})`;
+  };
+  const readFor = (read: number, books: number) => {
+    if (read === 0 || books === 0) return null;
+    const alpha = 0.35 + (read / books) * 0.5;
+    return `rgba(52, 211, 153, ${alpha.toFixed(2)})`;
+  };
+
+  return (
+    <div className="bg-surface border border-border-custom rounded-xl p-5 mb-4">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs text-muted">Countries of origin — shading = books owned, brighter = higher read share</p>
+        <p className="text-[10px] text-muted">
+          {Object.keys(byNE).length} countries · {mapped} books · {totalMappedRead} read
+          {totalUnmapped > 0 && ` · ${totalUnmapped} unmapped`}
+        </p>
+      </div>
+      <div
+        className="w-full relative"
+        onMouseLeave={() => setHover(null)}
+      >
+        <svg
+          viewBox="0 0 720 360"
+          className="w-full h-auto rounded-lg border border-border-custom"
+          preserveAspectRatio="xMidYMid meet"
+          style={{ background: "#0f172a" }}
+        >
+          <defs>
+            <linearGradient id="ocean" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#0b1a2b" />
+              <stop offset="100%" stopColor="#0f172a" />
+            </linearGradient>
+          </defs>
+          <rect width="720" height="360" fill="url(#ocean)" pointerEvents="none" />
+          {WORLD_COUNTRIES.map(c => {
+            const entry = byNE[c.name];
+            const fill = entry ? fillFor(entry.books) : "#1e293b";
+            const readOverlayColor = entry ? readFor(entry.read, entry.books) : null;
+            const isHovered = hover?.name === c.name;
+            return (
+              <g key={c.id}>
+                <path
+                  d={c.d}
+                  fill={fill}
+                  stroke={isHovered ? "#f8fafc" : "#0b1220"}
+                  strokeWidth={isHovered ? 1.2 : 0.4}
+                  onMouseMove={(e) => {
+                    const svg = e.currentTarget.ownerSVGElement;
+                    if (!svg) return;
+                    const rect = svg.getBoundingClientRect();
+                    setHover({
+                      name: c.name,
+                      books: entry?.books || 0,
+                      read: entry?.read || 0,
+                      x: e.clientX - rect.left,
+                      y: e.clientY - rect.top,
+                    });
+                  }}
+                  style={{ cursor: entry ? "pointer" : "default" }}
+                />
+                {readOverlayColor && (
+                  <path d={c.d} fill={readOverlayColor} stroke="none" pointerEvents="none" />
+                )}
+              </g>
+            );
+          })}
+        </svg>
+
+        {/* Cursor-following tooltip */}
+        {hover && (
+          <div
+            className="absolute pointer-events-none z-10 rounded-md px-2.5 py-1.5 shadow-lg"
+            style={{
+              left: Math.min(hover.x + 12, 9999),
+              top: Math.max(hover.y - 42, 0),
+              background: "rgba(15, 23, 42, 0.95)",
+              border: "1px solid #334155",
+              color: "#f8fafc",
+              transform: "translate(0, 0)",
+              maxWidth: 240,
+              whiteSpace: "nowrap",
+            }}
+          >
+            <div className="text-xs font-semibold">{hover.name}</div>
+            {hover.books > 0 ? (
+              <div className="text-[11px] text-slate-300 tabular-nums">
+                <span className="text-emerald-400 font-medium">{hover.books}</span> books
+                <span className="mx-1 opacity-50">·</span>
+                <span className="text-emerald-300 font-medium">{hover.read}</span> read
+                {hover.books > 0 && (
+                  <span className="opacity-60 ml-1">
+                    ({Math.round((hover.read / hover.books) * 100)}%)
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div className="text-[11px] text-slate-500">no books</div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Legend + unmapped */}
+      <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
+        <div className="flex items-center gap-2 text-[10px] text-muted">
+          <span>Books owned:</span>
+          <span className="flex items-center gap-1"><span className="w-4 h-3 rounded-sm" style={{ background: fillFor(1) }} />1</span>
+          <span className="flex items-center gap-1"><span className="w-4 h-3 rounded-sm" style={{ background: fillFor(Math.max(1, maxBooks * 0.25)) }} />{Math.round(maxBooks * 0.25)}</span>
+          <span className="flex items-center gap-1"><span className="w-4 h-3 rounded-sm" style={{ background: fillFor(Math.max(1, maxBooks * 0.5)) }} />{Math.round(maxBooks * 0.5)}</span>
+          <span className="flex items-center gap-1"><span className="w-4 h-3 rounded-sm" style={{ background: fillFor(maxBooks) }} />{maxBooks}+</span>
+          <span className="ml-3">Brighter overlay = higher % read</span>
+        </div>
+        {unmapped.length > 0 && (
+          <p className="text-[10px] text-muted">
+            Unmapped: {unmapped.slice(0, 4).map(([c, n]) => `${c} (${n})`).join(", ")}
+            {unmapped.length > 4 && ` +${unmapped.length - 4}`}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
