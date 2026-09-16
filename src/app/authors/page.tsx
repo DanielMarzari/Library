@@ -21,6 +21,10 @@ interface AuthorData {
   gender: string | null;
   image_url: string | null;
   profile_url: string | null;
+  discipline: string | null;
+  era: string | null;
+  denomination: string | null;
+  school: string | null;
   id?: string;
 }
 
@@ -183,6 +187,88 @@ const RELIGIOUS_TRADITION_OPTIONS = [
   "Spiritual / Non-religious",
   "Mormon / LDS",
   "Jehovah's Witness",
+  "Other",
+];
+
+const DISCIPLINE_OPTIONS = [
+  "Biblical scholar",
+  "Systematic theologian",
+  "Historical theologian",
+  "Practical / pastoral theologian",
+  "Ethicist",
+  "Pastor / preacher",
+  "Missionary",
+  "Devotional writer",
+  "Philosopher",
+  "Historian",
+  "Psychologist / counselor",
+  "Sociologist / anthropologist",
+  "Political theorist",
+  "Scientist",
+  "Educator",
+  "Novelist",
+  "Poet",
+  "Essayist / journalist",
+  "Memoirist",
+  "Editor",
+  "Other",
+];
+
+const ERA_OPTIONS = [
+  "Ancient (pre-500)",
+  "Medieval (500–1500)",
+  "Reformation (1500–1700)",
+  "Enlightenment (1700–1800)",
+  "Modern (1800–1945)",
+  "Contemporary (1945+)",
+];
+
+const DENOMINATION_OPTIONS = [
+  "Reformed / Presbyterian",
+  "Wesleyan / Methodist",
+  "Anabaptist / Mennonite",
+  "Anglican / Episcopal",
+  "Lutheran",
+  "Baptist",
+  "Pentecostal / Charismatic",
+  "Radical Orthodoxy",
+  "Postliberal",
+  "Liberation theology",
+  "Feminist theology",
+  "Process theology",
+  "Neo-Orthodox / Barthian",
+  "Emergent / Post-evangelical",
+  "Evangelical (broad)",
+  "Roman Catholic",
+  "Eastern Orthodox",
+  "Quaker / Friends",
+  "Restorationist / Stone-Campbell",
+  "Non-denominational",
+  "Other",
+];
+
+const SCHOOL_OPTIONS = [
+  "Analytic philosophy",
+  "Continental philosophy",
+  "Existentialism",
+  "Phenomenology",
+  "Pragmatism",
+  "Structuralism / Post-structuralism",
+  "Frankfurt School / Critical theory",
+  "Postmodernism",
+  "New Criticism",
+  "Modernism (literary)",
+  "Confessional poetry",
+  "Beat generation",
+  "Harlem Renaissance",
+  "Behaviorism",
+  "Cognitive science",
+  "Systems thinking",
+  "Psychoanalytic",
+  "Feminism / gender studies",
+  "Marxist / critical",
+  "Classical liberal",
+  "Conservative",
   "Other",
 ];
 
@@ -572,6 +658,10 @@ export default function AuthorsPage() {
                   gender: null,
                   image_url: null,
                   profile_url: null,
+                  discipline: null,
+                  era: null,
+                  denomination: null,
+                  school: null,
                 });
               }
 
@@ -612,6 +702,10 @@ export default function AuthorsPage() {
               author.gender = metadata.gender ?? null;
               author.image_url = metadata.image_url ?? null;
               author.profile_url = metadata.profile_url ?? null;
+              author.discipline = metadata.discipline ?? null;
+              author.era = metadata.era ?? null;
+              author.denomination = metadata.denomination ?? null;
+              author.school = metadata.school ?? null;
               author.id = metadata.id;
             }
           });
@@ -663,7 +757,7 @@ export default function AuthorsPage() {
   }, []);
 
   const handleSaveMetadata = useCallback(
-    async (authorName: string, field: "ethnicity" | "nationality" | "religious_tradition" | "gender", value: string | null) => {
+    async (authorName: string, field: "ethnicity" | "nationality" | "religious_tradition" | "gender" | "discipline" | "era" | "denomination" | "school", value: string | null) => {
       try {
         const currentAuthor = authors.find((a) => a.name === authorName);
         const upsertData = {
@@ -675,6 +769,10 @@ export default function AuthorsPage() {
           death_year: currentAuthor?.death_year ?? null,
           religious_tradition: currentAuthor?.religious_tradition ?? null,
           gender: currentAuthor?.gender ?? null,
+          discipline: currentAuthor?.discipline ?? null,
+          era: currentAuthor?.era ?? null,
+          denomination: currentAuthor?.denomination ?? null,
+          school: currentAuthor?.school ?? null,
           image_url: currentAuthor?.image_url ?? null,
           profile_url: currentAuthor?.profile_url ?? null,
           [field]: value,
@@ -716,6 +814,10 @@ export default function AuthorsPage() {
           death_year: currentAuthor?.death_year ?? null,
           religious_tradition: currentAuthor?.religious_tradition ?? null,
           gender: currentAuthor?.gender ?? null,
+          discipline: currentAuthor?.discipline ?? null,
+          era: currentAuthor?.era ?? null,
+          denomination: currentAuthor?.denomination ?? null,
+          school: currentAuthor?.school ?? null,
           image_url: imageUrl,
           profile_url: currentAuthor?.profile_url ?? null,
         };
@@ -1008,6 +1110,10 @@ export default function AuthorsPage() {
                         <DropdownSelector value={author.ethnicity} options={ETHNICITY_OPTIONS} onSelect={(v) => handleSaveMetadata(author.name, "ethnicity", v)} onClear={() => handleSaveMetadata(author.name, "ethnicity", null)} label="Ethnicity" />
                         <DropdownSelector value={author.nationality} options={NATIONALITY_OPTIONS} onSelect={(v) => handleSaveMetadata(author.name, "nationality", v)} onClear={() => handleSaveMetadata(author.name, "nationality", null)} label="Nationality" />
                         <DropdownSelector value={author.religious_tradition} options={RELIGIOUS_TRADITION_OPTIONS} onSelect={(v) => handleSaveMetadata(author.name, "religious_tradition", v)} onClear={() => handleSaveMetadata(author.name, "religious_tradition", null)} label="Tradition" />
+                        <DropdownSelector value={author.denomination} options={DENOMINATION_OPTIONS} onSelect={(v) => handleSaveMetadata(author.name, "denomination", v)} onClear={() => handleSaveMetadata(author.name, "denomination", null)} label="Denomination" />
+                        <DropdownSelector value={author.discipline} options={DISCIPLINE_OPTIONS} onSelect={(v) => handleSaveMetadata(author.name, "discipline", v)} onClear={() => handleSaveMetadata(author.name, "discipline", null)} label="Discipline" />
+                        <DropdownSelector value={author.era} options={ERA_OPTIONS} onSelect={(v) => handleSaveMetadata(author.name, "era", v)} onClear={() => handleSaveMetadata(author.name, "era", null)} label="Era" />
+                        <DropdownSelector value={author.school} options={SCHOOL_OPTIONS} onSelect={(v) => handleSaveMetadata(author.name, "school", v)} onClear={() => handleSaveMetadata(author.name, "school", null)} label="School" />
                         <button onClick={() => handleFetchAuthorInfo(author.name)} disabled={fetchingInfo.has(author.name)} className="w-full px-2 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 rounded text-xs font-medium transition-colors disabled:opacity-50">
                           {fetchingInfo.has(author.name) ? "Fetching..." : "Fetch from Wikipedia"}
                         </button>

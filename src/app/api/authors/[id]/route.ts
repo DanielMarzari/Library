@@ -12,6 +12,10 @@ const UPDATABLE_FIELDS = [
   'gender',
   'image_url',
   'profile_url',
+  'discipline',
+  'era',
+  'denomination',
+  'school',
 ] as const;
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

@@ -198,6 +198,18 @@ function ensureAllTables(db: Database.Database) {
   addColumnSafe('authors', 'birth_year', 'INTEGER');
   addColumnSafe('authors', 'death_year', 'INTEGER');
 
+  // Additional diversity dimensions.
+  //   discipline   — role/field (biblical scholar, pastor, poet, philosopher…)
+  //   era          — historical era (Ancient / Medieval / … / Contemporary)
+  //   denomination — finer religious tradition than religious_tradition
+  //   school       — intellectual lineage for secular authors (Continental,
+  //                  Frankfurt School, Modernism, etc.); nullable when
+  //                  denomination already captures the person.
+  addColumnSafe('authors', 'discipline', 'TEXT');
+  addColumnSafe('authors', 'era', 'TEXT');
+  addColumnSafe('authors', 'denomination', 'TEXT');
+  addColumnSafe('authors', 'school', 'TEXT');
+
   // Backfill: books marked read but missing complete_date get one derived from
   // updated_at (the most recent write to the row). This is only a proxy for the
   // real "marked read" moment — the DB doesn't log status transitions — but it

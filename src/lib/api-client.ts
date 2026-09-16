@@ -14,6 +14,10 @@ export interface Author {
   gender?: string | null;
   image_url?: string | null;
   profile_url?: string | null;
+  discipline?: string | null;
+  era?: string | null;
+  denomination?: string | null;
+  school?: string | null;
   created_at: string;
   updated_at: string;
 }
