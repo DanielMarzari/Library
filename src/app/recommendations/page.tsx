@@ -8,6 +8,7 @@ import { searchBooks, enrichBook, lookupDoi, looksLikeDoi, BookSearchResult } fr
 import Link from "next/link";
 import { safeCoverUrl } from "@/lib/coverUrl";
 import { canonicalAuthor } from "@/lib/authorAliases";
+import { AppNav } from "@/components/AppNav";
 
 interface Recommendation {
   id: string;
@@ -943,26 +944,26 @@ export default function RecommendationsPage() {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border-custom">
-        <div className="max-w-screen-xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-bold tracking-tight">Recommendations</h1>
-              <p className="text-xs text-muted mt-0.5">{filteredRecs.length.toLocaleString()} books to explore</p>
+        <div className="w-full px-4 py-3">
+          <div className="flex items-center gap-3">
+            <AppNav />
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl font-bold tracking-tight truncate">Recommendations</h1>
+              <p className="text-[10px] text-muted-2">{filteredRecs.length.toLocaleString()} books to explore</p>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowAddForm(!showAddForm)}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-              >
-                + Add
-              </button>
-              <Link
-                href="/"
-                className="bg-surface-2 hover:bg-border-custom text-foreground px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-              >
-                ← Library
-              </Link>
-            </div>
+            <Link
+              href="/recommendations/preview"
+              className="text-xs text-muted hover:text-foreground transition-colors hidden sm:inline"
+              title="Preview the new shelf-style layout"
+            >
+              Shelf view
+            </Link>
+            <button
+              onClick={() => setShowAddForm(!showAddForm)}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+            >
+              + Add
+            </button>
           </div>
         </div>
       </header>

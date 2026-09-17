@@ -6,6 +6,7 @@ import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api-client";
 import { Book } from "@/types/book";
+import { AppNav } from "@/components/AppNav";
 
 // Each milestone has a unique emoji, target, pace label, and description
 const MILESTONES = [
@@ -121,18 +122,14 @@ export default function GoalsPage() {
   const { currentMilestone, thisYearCount, projectedThisYear } = stats;
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-6">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold text-emerald-500">Reading Goals</h1>
-          <Link
-            href="/"
-            className="px-4 py-2 bg-surface hover:bg-surface-2 rounded-lg text-foreground transition-colors text-sm font-medium"
-          >
-            Back to Library
-          </Link>
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
+      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border-custom">
+        <div className="w-full px-4 py-3 flex items-center gap-3">
+          <AppNav />
+          <h1 className="text-xl font-bold tracking-tight text-foreground truncate">Reading Goals</h1>
         </div>
+      </header>
+      <div className="max-w-6xl mx-auto w-full p-6">
 
         {/* Current Year — Active Goal */}
         <section className="mb-10">

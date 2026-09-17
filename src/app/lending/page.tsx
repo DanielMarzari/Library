@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { api } from '@/lib/api-client';
 import { Book } from '@/types/book';
 import { coverSrc } from '@/lib/coverUrl';
+import { AppNav } from '@/components/AppNav';
 
 interface LendingRecord {
   id: string;
@@ -199,29 +200,19 @@ export default function LendingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-white">
-      {/* Header */}
-      <div className="border-b border-border-custom bg-surface">
-        <div className="max-w-6xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link
-                href="/"
-                className="px-4 py-2 bg-surface-2 hover:bg-border-custom rounded-lg text-foreground transition-colors text-sm font-medium"
-              >
-                Back to Library
-              </Link>
-              <h1 className="text-3xl font-bold text-emerald-500">Book Lending</h1>
-            </div>
-            <button
-              onClick={() => setShowModal(true)}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition-colors"
-            >
-              + Lend a Book
-            </button>
-          </div>
+    <div className="min-h-screen bg-background text-white flex flex-col">
+      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border-custom">
+        <div className="w-full px-4 py-3 flex items-center gap-3">
+          <AppNav />
+          <h1 className="text-xl font-bold tracking-tight text-foreground flex-1 truncate">Book Lending</h1>
+          <button
+            onClick={() => setShowModal(true)}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+          >
+            + Lend a Book
+          </button>
         </div>
-      </div>
+      </header>
 
       {/* Summary Stats */}
       <div className="border-b border-border-custom bg-surface">

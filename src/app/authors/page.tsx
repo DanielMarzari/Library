@@ -6,6 +6,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api-client";
 import { Book } from "@/types/book";
+import { AppNav } from "@/components/AppNav";
 
 interface AuthorData {
   name: string;
@@ -991,31 +992,26 @@ export default function AuthorsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-6">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-4xl font-bold text-emerald-500">
-            Authors <span className="text-muted text-lg">({filteredAndSortedAuthors.length})</span>
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
+      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border-custom">
+        <div className="w-full px-4 py-3 flex items-center gap-3">
+          <AppNav />
+          <h1 className="text-xl font-bold tracking-tight text-foreground flex-1 truncate">
+            Authors <span className="text-muted text-sm font-normal">({filteredAndSortedAuthors.length})</span>
           </h1>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleBatchFetchAll}
-              disabled={batchFetching || incompleteAuthors.length === 0}
-              className="px-3 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-            >
-              {batchFetching
-                ? `Fetching ${batchProgress.done}/${batchProgress.total}...`
-                : `Fetch All (${incompleteAuthors.length})`}
-            </button>
-            <Link
-              href="/"
-              className="px-4 py-2 bg-surface hover:bg-surface-2 rounded-lg text-foreground transition-colors"
-            >
-              Back to Library
-            </Link>
-          </div>
+          <button
+            onClick={handleBatchFetchAll}
+            disabled={batchFetching || incompleteAuthors.length === 0}
+            className="px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+          >
+            {batchFetching
+              ? `Fetching ${batchProgress.done}/${batchProgress.total}...`
+              : `Fetch All (${incompleteAuthors.length})`}
+          </button>
         </div>
+      </header>
+      <div className="w-full max-w-screen-2xl mx-auto p-6">
+        <div className="mb-6">
 
         {/* Search */}
         <div className="mb-6">
@@ -1165,6 +1161,7 @@ export default function AuthorsPage() {
           onClose={() => setImageSearchAuthor(null)}
         />
       )}
+      </div>
     </div>
   );
 }

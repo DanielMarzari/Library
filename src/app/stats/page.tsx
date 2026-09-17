@@ -6,6 +6,7 @@ import { useEffect, useState, useMemo } from "react";
 import { api } from "@/lib/api-client";
 import { Book } from "@/types/book";
 import Link from "next/link";
+import { AppNav } from "@/components/AppNav";
 // Real world country polygons, pre-projected to viewBox 720×360.
 // Built from Natural Earth 110m via world-atlas — see scratchpad/build-world.mjs.
 import WORLD_COUNTRIES from "@/lib/worldCountries.json";
@@ -531,14 +532,11 @@ export default function StatsPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border-custom">
-        <div className="max-w-screen-xl mx-auto px-4 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold tracking-tight">Reading Stats</h1>
-          <Link
-            href="/"
-            className="text-muted hover:text-foreground text-sm font-medium transition-colors"
-          >
-            Back to Library
-          </Link>
+        <div className="w-full px-4 py-3 flex items-center gap-3">
+          <AppNav />
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl font-bold tracking-tight truncate">Reading Stats</h1>
+          </div>
         </div>
       </header>
 

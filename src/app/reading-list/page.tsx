@@ -7,6 +7,7 @@ import { api } from "@/lib/api-client";
 import { Book } from "@/types/book";
 import { coverSrc } from "@/lib/coverUrl";
 import Link from "next/link";
+import { AppNav } from "@/components/AppNav";
 
 interface ReadingListItem {
   id: string;
@@ -804,12 +805,10 @@ export default function ReadingListPage() {
     <div className="min-h-screen flex flex-col bg-background">
       {/* Header */}
       <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border-custom">
-        <div className="max-w-screen-xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between mb-3">
-            <h1 className="text-xl font-bold tracking-tight text-foreground">Reading List</h1>
-            <Link href="/" className="bg-surface-2 hover:bg-border-custom text-foreground px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
-              ← Library
-            </Link>
+        <div className="w-full px-4 py-3">
+          <div className="flex items-center gap-3 mb-3">
+            <AppNav />
+            <h1 className="text-xl font-bold tracking-tight text-foreground truncate">Reading List</h1>
           </div>
 
           {/* Tab switcher */}
