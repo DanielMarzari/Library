@@ -2,11 +2,11 @@
 
 export const dynamic = "force-dynamic";
 
-// Preview of a shelf-style layout for the recommendations page — cover grid
-// with cross-cutting filter chips instead of the current row list. Real data,
-// no writes. Nothing on the real /recommendations page changes.
+// Preview: the recommendations page rebuilt to match the main library shelf
+// pixel-for-pixel. Real data, read-only — the current /recommendations page
+// is untouched until you approve this.
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api-client";
 import { safeCoverUrl } from "@/lib/coverUrl";
@@ -30,42 +30,64 @@ interface Rec {
   created_at: string;
 }
 
-type GridSize = "xs" | "small" | "medium" | "large";
-type SortMode = "recent" | "alpha" | "abe_asc" | "abe_desc" | "thrift_asc" | "thrift_desc";
+type GridSize = "xs" | "small" | "medium" | "large" | "xl";
+type SortMode = "recent" | "alpha" | "abe_asc" | "thrift_asc";
+type GroupBy = "flat" | "topic" | "source";
 
+// Same grid classes as the main shelf
 const gridClasses: Record<GridSize, string> = {
-  xs:     "grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 2xl:grid-cols-14 gap-2",
-  small:  "grid-cols-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 2xl:grid-cols-12 gap-3",
+  xs:     "grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 2xl:grid-cols-14 gap-2",
+  small:  "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 2xl:grid-cols-12 gap-3",
   medium: "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-4",
   large:  "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-5",
+  xl:     "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6",
 };
+
+const navLinkCls = "block px-3 py-2 text-sm font-medium text-foreground hover:bg-surface-2 rounded-lg transition-colors";
 
 export default function RecommendationsPreview() {
   const [recs, setRecs] = useState<Rec[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const [search, setSearch] = useState("");
+  const [showNav, setShowNav] = useState(false);
   const [gridSize, setGridSize] = useState<GridSize>("medium");
+  const [search, setSearch] = useState("");
   const [sortMode, setSortMode] = useState<SortMode>("recent");
+  const [groupBy, setGroupBy] = useState<GroupBy>("flat");
   const [filterTopic, setFilterTopic] = useState<string | null>(null);
   const [filterSource, setFilterSource] = useState<string | null>(null);
   const [showTopicMenu, setShowTopicMenu] = useState(false);
   const [showSourceMenu, setShowSourceMenu] = useState(false);
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 120;
+  const navRef = useRef<HTMLDivElement>(null);
+  const PAGE_SIZE = 240;
 
+  // Load
   useEffect(() => {
     (async () => {
-      try {
-        const data = await api.recommendations.list();
-        setRecs(data as Rec[]);
-      } finally {
-        setLoading(false);
-      }
+      try { setRecs((await api.recommendations.list()) as Rec[]); }
+      finally { setLoading(false); }
     })();
   }, []);
 
-  // Aggregate topic and source counts for the filter dropdowns.
+  // Persist grid + sort locally so switching pages doesn't reset
+  useEffect(() => {
+    const g = localStorage.getItem("recs-grid-size") as GridSize | null;
+    if (g) setGridSize(g);
+    const s = localStorage.getItem("recs-sort") as SortMode | null;
+    if (s) setSortMode(s);
+  }, []);
+  useEffect(() => { localStorage.setItem("recs-grid-size", gridSize); }, [gridSize]);
+  useEffect(() => { localStorage.setItem("recs-sort", sortMode); }, [sortMode]);
+
+  // Close nav on outside click
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (navRef.current && !navRef.current.contains(e.target as Node)) setShowNav(false);
+    };
+    if (showNav) document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [showNav]);
+
   const topics = useMemo(() => {
     const counts: Record<string, number> = {};
     recs.forEach(r => { if (r.topic) counts[r.topic] = (counts[r.topic] || 0) + 1; });
@@ -83,15 +105,13 @@ export default function RecommendationsPreview() {
       if (filterTopic && r.topic !== filterTopic) return false;
       if (filterSource && r.recommended_by !== filterSource) return false;
       if (!q) return true;
-      const hay = [r.title, r.author || "", r.recommended_by || "", r.topic || "", r.notes || ""].join(" ").toLowerCase();
-      return hay.includes(q);
+      return [r.title, r.author || "", r.recommended_by || "", r.topic || "", r.notes || ""]
+        .join(" ").toLowerCase().includes(q);
     });
     switch (sortMode) {
       case "alpha": out.sort((a, b) => a.title.localeCompare(b.title)); break;
       case "abe_asc": out.sort((a, b) => (a.lowest_price ?? 9999) - (b.lowest_price ?? 9999)); break;
-      case "abe_desc": out.sort((a, b) => (b.lowest_price ?? 0) - (a.lowest_price ?? 0)); break;
       case "thrift_asc": out.sort((a, b) => (a.thriftbooks_price ?? 9999) - (b.thriftbooks_price ?? 9999)); break;
-      case "thrift_desc": out.sort((a, b) => (b.thriftbooks_price ?? 0) - (a.thriftbooks_price ?? 0)); break;
       case "recent":
       default: out.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
     }
@@ -100,38 +120,77 @@ export default function RecommendationsPreview() {
 
   const paginated = filtered.slice(0, page * PAGE_SIZE);
   const hasMore = paginated.length < filtered.length;
+  useEffect(() => { setPage(1); }, [search, filterTopic, filterSource, sortMode, groupBy]);
 
-  useEffect(() => { setPage(1); }, [search, filterTopic, filterSource, sortMode]);
+  // Section grouping when groupBy != flat
+  const sections = useMemo(() => {
+    if (groupBy === "flat") return [{ label: null as string | null, recs: paginated }];
+    const key = groupBy === "topic" ? "topic" : "recommended_by";
+    const groups: Record<string, Rec[]> = {};
+    paginated.forEach(r => {
+      const k = (r as any)[key] || "(unspecified)";
+      groups[k] = groups[k] || [];
+      groups[k].push(r);
+    });
+    return Object.entries(groups)
+      .sort((a, b) => b[1].length - a[1].length)
+      .map(([label, recs]) => ({ label, recs }));
+  }, [paginated, groupBy]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
-      {/* Header — same shape as the main library page */}
+    <div className="min-h-screen flex flex-col">
+      {/* Header — copied from the main / page for a coherent look */}
       <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border-custom">
-        <div className="max-w-screen-2xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h1 className="text-xl font-bold tracking-tight">Recommendations · Preview</h1>
-              <p className="text-[10px] text-muted-2 mt-0.5">
-                {filtered.length.toLocaleString()} of {recs.length.toLocaleString()} · shelf-style mockup
+        <div className="w-full px-4 py-3">
+          {/* Top row */}
+          <div className="flex items-center gap-3 mb-3">
+            {/* Hamburger nav */}
+            <div className="relative" ref={navRef}>
+              <button
+                onClick={() => setShowNav(v => !v)}
+                className="p-2 rounded-lg bg-surface hover:bg-surface-2 text-muted transition-colors"
+                aria-label="Menu"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+                </svg>
+              </button>
+              {showNav && (
+                <div className="absolute top-full left-0 mt-2 w-56 bg-surface border border-border-custom rounded-xl shadow-xl p-2 z-50">
+                  <p className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-2 font-semibold">Library</p>
+                  <Link href="/" className={navLinkCls} onClick={() => setShowNav(false)}>Home shelf</Link>
+
+                  <div className="border-t border-border-custom my-1.5" />
+                  <p className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-2 font-semibold">Tracking</p>
+                  <Link href="/stats" className={navLinkCls} onClick={() => setShowNav(false)}>Stats</Link>
+                  <Link href="/goals" className={navLinkCls} onClick={() => setShowNav(false)}>Goals</Link>
+                  <Link href="/reading-list" className={navLinkCls} onClick={() => setShowNav(false)}>Reading List</Link>
+                  <Link href="/wrapped" className="block px-3 py-2 text-sm font-medium bg-gradient-to-r from-purple-600/20 to-pink-600/20 text-purple-300 hover:from-purple-600/30 hover:to-pink-600/30 rounded-lg transition-colors" onClick={() => setShowNav(false)}>Wrapped</Link>
+
+                  <div className="border-t border-border-custom my-1.5" />
+                  <p className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-2 font-semibold">Discover</p>
+                  <Link href="/authors" className={navLinkCls} onClick={() => setShowNav(false)}>Authors</Link>
+                  <Link href="/expertise" className={navLinkCls} onClick={() => setShowNav(false)}>Skills</Link>
+                  <Link href="/recommendations" className={navLinkCls + " bg-surface-2"} onClick={() => setShowNav(false)}>Recommendations</Link>
+
+                  <div className="border-t border-border-custom my-1.5" />
+                  <p className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-2 font-semibold">Manage</p>
+                  <Link href="/lending" className={navLinkCls} onClick={() => setShowNav(false)}>Lending</Link>
+                  <Link href="/setup" className={navLinkCls} onClick={() => setShowNav(false)}>Setup</Link>
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl font-bold tracking-tight truncate">Recommendations</h1>
+              <p className="text-[10px] text-muted-2">
+                {filtered.length.toLocaleString()} of {recs.length.toLocaleString()} <span className="opacity-60">· preview</span>
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <Link href="/recommendations" className="text-xs text-muted hover:text-foreground">← Current view</Link>
-              <Link href="/" className="bg-surface-2 hover:bg-border-custom text-foreground px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Library</Link>
-            </div>
-          </div>
 
-          {/* Search + grid-size toggle */}
-          <div className="flex items-center gap-2 mb-2">
-            <input
-              type="text"
-              placeholder="Search title, author, source, topic, notes…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="flex-1 bg-surface border border-border-custom rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted focus:outline-none focus:ring-1 focus:ring-emerald-600"
-            />
-            <div className="flex gap-0.5 bg-surface rounded-lg p-0.5 flex-shrink-0">
-              {(["xs", "small", "medium", "large"] as GridSize[]).map(s => (
+            {/* Grid size */}
+            <div className="hidden sm:flex gap-0.5 bg-surface rounded-lg p-0.5 flex-shrink-0">
+              {(["xs", "small", "medium", "large", "xl"] as GridSize[]).map(s => (
                 <button
                   key={s}
                   onClick={() => setGridSize(s)}
@@ -143,11 +202,28 @@ export default function RecommendationsPreview() {
                 </button>
               ))}
             </div>
+
+            {/* Add — routes to the current /recommendations add flow */}
+            <Link
+              href="/recommendations"
+              className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+            >
+              + Add
+            </Link>
           </div>
 
-          {/* Filter + sort row */}
+          {/* Search */}
+          <input
+            type="text"
+            placeholder="Search title, author, source, topic, notes…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full bg-surface border border-border-custom rounded-lg px-4 py-2.5 text-sm text-foreground placeholder-muted-2 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent mb-3"
+          />
+
+          {/* Filter row */}
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Topic filter */}
+            {/* Topic */}
             <div className="relative">
               <button
                 onClick={() => { setShowTopicMenu(v => !v); setShowSourceMenu(false); }}
@@ -181,7 +257,7 @@ export default function RecommendationsPreview() {
               )}
             </div>
 
-            {/* Source filter */}
+            {/* Source */}
             <div className="relative">
               <button
                 onClick={() => { setShowSourceMenu(v => !v); setShowTopicMenu(false); }}
@@ -215,6 +291,34 @@ export default function RecommendationsPreview() {
               )}
             </div>
 
+            {(filterTopic || filterSource) && (
+              <button
+                onClick={() => { setFilterTopic(null); setFilterSource(null); }}
+                className="px-2 py-0.5 rounded text-[10px] text-red-400 hover:bg-red-500/10 transition-colors"
+              >
+                Clear
+              </button>
+            )}
+
+            {/* Group by */}
+            <div className="flex gap-0.5 bg-surface rounded-lg p-0.5 ml-2">
+              {([
+                { l: "Flat", v: "flat" as GroupBy },
+                { l: "By topic", v: "topic" as GroupBy },
+                { l: "By source", v: "source" as GroupBy },
+              ]).map(g => (
+                <button
+                  key={g.v}
+                  onClick={() => setGroupBy(g.v)}
+                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                    groupBy === g.v ? "bg-surface-2 text-foreground" : "text-muted-2 hover:text-muted"
+                  }`}
+                >
+                  {g.l}
+                </button>
+              ))}
+            </div>
+
             {/* Sort */}
             <div className="flex items-center gap-1 ml-auto">
               <span className="text-[10px] text-muted-2 uppercase tracking-wider">Sort:</span>
@@ -235,22 +339,12 @@ export default function RecommendationsPreview() {
                 </button>
               ))}
             </div>
-
-            {/* Clear filters */}
-            {(filterTopic || filterSource) && (
-              <button
-                onClick={() => { setFilterTopic(null); setFilterSource(null); }}
-                className="px-2 py-0.5 rounded text-[10px] text-red-400 hover:bg-red-500/10 transition-colors"
-              >
-                Clear
-              </button>
-            )}
           </div>
         </div>
       </header>
 
-      {/* Grid */}
-      <main className="flex-1 max-w-screen-2xl mx-auto w-full px-4 py-4">
+      {/* Shelf */}
+      <main className="flex-1 w-full px-4 py-4">
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="animate-spin rounded-full h-8 w-8 border-2 border-border-custom border-t-emerald-500" />
@@ -261,12 +355,29 @@ export default function RecommendationsPreview() {
             <p className="text-muted text-sm">No recommendations match your filters</p>
           </div>
         ) : (
-          <>
-            <div className={`grid ${gridClasses[gridSize]}`}>
-              {paginated.map(rec => <RecCover key={rec.id} rec={rec} />)}
-            </div>
+          <div className="space-y-8">
+            {sections.map(section => (
+              <section key={section.label ?? "all"}>
+                {section.label && (
+                  <div className="flex items-center gap-2 mb-4 px-1">
+                    <span className="text-lg">{groupBy === "topic" ? "📗" : "🗣️"}</span>
+                    <h2 className="text-lg font-semibold text-foreground">{section.label}</h2>
+                    <span className="text-xs text-muted bg-surface-2 px-2 py-0.5 rounded-full">
+                      {section.recs.length}
+                    </span>
+                  </div>
+                )}
+                <div className={`grid ${gridClasses[gridSize]} px-1`}>
+                  {section.recs.map(rec => <ShelfRec key={rec.id} rec={rec} />)}
+                </div>
+                {/* Wooden shelf edge — same as home */}
+                <div className="h-[6px] bg-gradient-to-b from-amber-900/40 to-amber-950/60 rounded-b-sm mt-3 mx-1" />
+                <div className="h-[2px] bg-amber-900/20 mx-2" />
+              </section>
+            ))}
+
             {hasMore && (
-              <div className="text-center mt-6">
+              <div className="text-center pt-2">
                 <button
                   onClick={() => setPage(p => p + 1)}
                   className="bg-surface-2 hover:bg-border-custom text-foreground px-6 py-2 rounded-lg text-sm font-medium transition-colors"
@@ -275,69 +386,71 @@ export default function RecommendationsPreview() {
                 </button>
               </div>
             )}
-            <p className="text-center text-[10px] text-muted mt-3">
-              Showing {paginated.length} of {filtered.length.toLocaleString()}
-            </p>
-          </>
+          </div>
         )}
       </main>
     </div>
   );
 }
 
-function RecCover({ rec }: { rec: Rec }) {
+// Exact visual language from BookShelf's ShelfBook — cover with drop shadow,
+// spine, hover lift, title+author below. Adapted for a Rec instead of a Book.
+function ShelfRec({ rec }: { rec: Rec }) {
   const cover = rec.cover_url ? safeCoverUrl(rec.cover_url) : null;
   const isArticle = rec.item_type === "article";
   return (
-    <button
-      type="button"
-      className="group relative bg-surface rounded-lg overflow-hidden border border-border-custom hover:border-emerald-500/60 transition-colors text-left flex flex-col"
-      title={`${rec.title}${rec.author ? " — " + rec.author : ""}`}
-    >
-      <div className="aspect-[2/3] bg-surface-2 relative overflow-hidden">
+    <button className="group relative focus:outline-none" title={`${rec.title}${rec.author ? " — " + rec.author : ""}`}>
+      <div className="relative aspect-[2/3] rounded-md overflow-hidden shadow-lg shadow-black/40 transition-all group-hover:scale-105 group-hover:-translate-y-1">
         {cover ? (
-          <img src={cover} alt="" className="w-full h-full object-cover" loading="lazy" />
+          <>
+            <img
+              src={cover}
+              alt={rec.title}
+              className="w-full h-full object-cover"
+              loading="lazy"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+                (e.target as HTMLImageElement).parentElement?.querySelector(".cover-fallback")?.classList.remove("hidden");
+              }}
+            />
+            <div className="cover-fallback hidden w-full h-full bg-gradient-to-br from-border-custom to-surface-2 flex flex-col items-center justify-center p-2 text-center absolute inset-0">
+              <span className="text-[10px] font-semibold text-foreground leading-tight line-clamp-3">{rec.title}</span>
+              <span className="text-[9px] text-muted mt-1 line-clamp-1">{rec.author}</span>
+            </div>
+          </>
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center">
-            <span className="text-3xl mb-1">{isArticle ? "📄" : "📖"}</span>
-            <span className="text-[10px] text-muted-2 line-clamp-3">{rec.title}</span>
+          <div className="w-full h-full bg-gradient-to-br from-border-custom to-surface-2 flex flex-col items-center justify-center p-2 text-center">
+            <span className="text-[10px] font-semibold text-foreground leading-tight line-clamp-3">{rec.title}</span>
+            <span className="text-[9px] text-muted mt-1 line-clamp-1">{rec.author}</span>
           </div>
         )}
-        {/* Article badge */}
+
+        {/* Spine shadow — same as home */}
+        <div className="absolute inset-y-0 left-0 w-[3px] bg-black/30" />
+
+        {/* Article badge in the top-left */}
         {isArticle && (
-          <span className="absolute top-1 left-1 px-1.5 py-0.5 bg-blue-500/90 text-white rounded text-[9px] font-semibold">
-            Article
-          </span>
+          <div className="absolute top-1 left-1.5 bg-blue-500/90 backdrop-blur-sm rounded px-1 py-0.5">
+            <span className="text-[8px] font-semibold text-white uppercase tracking-wider">Article</span>
+          </div>
         )}
-        {/* Price badges (bottom-right stack) */}
-        <div className="absolute bottom-1 right-1 flex flex-col gap-0.5 items-end">
-          {rec.lowest_price != null && (
-            <span className="px-1.5 py-0.5 bg-emerald-600 text-white rounded text-[9px] font-bold">A ${rec.lowest_price.toFixed(0)}</span>
-          )}
-          {rec.thriftbooks_price != null && (
-            <span className="px-1.5 py-0.5 bg-blue-600 text-white rounded text-[9px] font-bold">T ${rec.thriftbooks_price.toFixed(0)}</span>
-          )}
-        </div>
-      </div>
-      <div className="p-1.5 flex-1 flex flex-col min-w-0">
-        <p className="text-[11px] font-medium text-foreground line-clamp-2 leading-snug">{rec.title}</p>
-        {rec.author && (
-          <p className="text-[10px] text-muted line-clamp-1 mt-0.5">{rec.author}</p>
-        )}
-        {(rec.topic || rec.recommended_by) && (
-          <div className="flex flex-wrap gap-1 mt-1">
-            {rec.topic && (
-              <span className="px-1 py-0 bg-emerald-500/10 text-emerald-500 rounded text-[9px] font-medium truncate max-w-full">
-                {rec.topic}
-              </span>
+
+        {/* Price chip bottom-right (parallels rating stars on home) */}
+        {(rec.lowest_price != null || rec.thriftbooks_price != null) && (
+          <div className="absolute bottom-1 right-1 bg-black/70 backdrop-blur-sm rounded px-1 py-0.5 flex flex-col gap-px items-end">
+            {rec.lowest_price != null && (
+              <span className="text-[8px] text-emerald-300 font-bold">${rec.lowest_price.toFixed(0)}</span>
             )}
-            {rec.recommended_by && (
-              <span className="px-1 py-0 bg-blue-500/10 text-blue-400 rounded text-[9px] font-medium truncate max-w-full">
-                @{rec.recommended_by}
-              </span>
+            {rec.thriftbooks_price != null && (
+              <span className="text-[8px] text-blue-300 font-bold">${rec.thriftbooks_price.toFixed(0)}</span>
             )}
           </div>
         )}
+      </div>
+
+      <div className="mt-1.5">
+        <p className="text-[11px] font-medium text-foreground truncate">{rec.title}</p>
+        <p className="text-[10px] text-muted-2 truncate">{rec.author}</p>
       </div>
     </button>
   );
