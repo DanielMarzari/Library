@@ -501,7 +501,6 @@ function ShelfRec({
         }
       }}
       className="group relative focus:outline-none cursor-pointer"
-      title={`${rec.title}${rec.author ? " — " + rec.author : ""}`}
     >
       <div className="relative aspect-[2/3] rounded-md overflow-hidden shadow-lg shadow-black/40 transition-shadow group-hover:shadow-black/60">
         {cover ? (
