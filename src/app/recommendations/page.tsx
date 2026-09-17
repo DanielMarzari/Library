@@ -52,6 +52,7 @@ interface Rec {
   item_type?: "book" | "article";
   doi?: string;
   journal?: string;
+  url?: string;
   created_at: string;
 }
 
@@ -81,7 +82,14 @@ export default function RecommendationsPage() {
   const [showTopicMenu, setShowTopicMenu] = useState(false);
   const [showSourceMenu, setShowSourceMenu] = useState(false);
   const [page, setPage] = useState(1);
+  const [openRec, setOpenRec] = useState<Rec | null>(null);
   const PAGE_SIZE = 240;
+
+  // Remove a rec locally after a delete-or-already-own action.
+  const removeRec = (id: string) => {
+    setRecs(prev => prev.filter(r => r.id !== id));
+    if (openRec?.id === id) setOpenRec(null);
+  };
 
   // Load
   useEffect(() => {
@@ -397,7 +405,7 @@ export default function RecommendationsPage() {
                   </div>
                 )}
                 <div className={`grid ${gridClasses[gridSize]} px-1`}>
-                  {section.recs.map(rec => <ShelfRec key={rec.id} rec={rec} />)}
+                  {section.recs.map(rec => <ShelfRec key={rec.id} rec={rec} onOpen={setOpenRec} />)}
                 </div>
                 {/* Wooden shelf edge — same as home */}
                 <div className="h-[6px] bg-gradient-to-b from-amber-900/40 to-amber-950/60 rounded-b-sm mt-3 mx-1" />
@@ -418,17 +426,40 @@ export default function RecommendationsPage() {
           </div>
         )}
       </main>
+
+      {openRec && (
+        <RecDetailModal
+          rec={openRec}
+          onClose={() => setOpenRec(null)}
+          onRemove={removeRec}
+        />
+      )}
     </div>
   );
 }
 
 // Exact visual language from BookShelf's ShelfBook — cover with drop shadow,
 // spine, hover lift, title+author below. Adapted for a Rec instead of a Book.
-function ShelfRec({ rec }: { rec: Rec }) {
+function ShelfRec({ rec, onOpen }: { rec: Rec; onOpen: (rec: Rec) => void }) {
   const cover = rec.cover_url ? safeCoverUrl(rec.cover_url) : null;
   const isArticle = rec.item_type === "article";
+  // <div role="button"> instead of <button> so the nested price <a>s and any
+  // future overlay buttons are valid HTML (nesting interactive elements in a
+  // real <button> is invalid).
   return (
-    <button className="group relative focus:outline-none" title={`${rec.title}${rec.author ? " — " + rec.author : ""}`}>
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(rec)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen(rec);
+        }
+      }}
+      className="group relative focus:outline-none cursor-pointer"
+      title={`${rec.title}${rec.author ? " — " + rec.author : ""}`}
+    >
       <div className="relative aspect-[2/3] rounded-md overflow-hidden shadow-lg shadow-black/40 transition-shadow group-hover:shadow-black/60">
         {cover ? (
           <>
@@ -456,18 +487,6 @@ function ShelfRec({ rec }: { rec: Rec }) {
 
         {/* Spine shadow — same as home */}
         <div className="absolute inset-y-0 left-0 w-[3px] bg-black/30" />
-
-        {/* "+ Library" corner button (books only) — visible on hover */}
-        {!isArticle && (
-          <Link
-            href={`/?addRec=${rec.id}`}
-            onClick={(e) => e.stopPropagation()}
-            className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 bg-emerald-600 hover:bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg transition-opacity"
-            title="Add to your library"
-          >
-            + Library
-          </Link>
-        )}
 
         {/* Article badge in the top-left */}
         {isArticle && (
@@ -523,6 +542,196 @@ function ShelfRec({ rec }: { rec: Rec }) {
         <p className="text-[11px] font-medium text-foreground truncate">{rec.title}</p>
         <p className="text-[10px] text-muted-2 truncate">{rec.author}</p>
       </div>
-    </button>
+    </div>
+  );
+}
+
+// Recommendation detail sheet — opens on tap, shows cover + meta + prices +
+// buttons: + Library (routes to /?addRec=… on the home page), I already have
+// this (deletes the rec so it stops appearing here).
+function RecDetailModal({
+  rec,
+  onClose,
+  onRemove,
+}: {
+  rec: Rec;
+  onClose: () => void;
+  onRemove: (id: string) => void;
+}) {
+  const cover = rec.cover_url ? safeCoverUrl(rec.cover_url) : null;
+  const isArticle = rec.item_type === "article";
+  const [busy, setBusy] = useState(false);
+  const [confirmOwned, setConfirmOwned] = useState(false);
+
+  // Close on Escape.
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  const removeRec = async () => {
+    setBusy(true);
+    try {
+      await api.recommendations.delete(rec.id);
+      onRemove(rec.id);
+    } catch {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+      onClick={onClose}
+    >
+      <div
+        className="bg-surface border border-border-custom rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex flex-col sm:flex-row gap-4 p-5">
+          {/* Cover */}
+          <div className="flex-shrink-0 mx-auto sm:mx-0">
+            <div className="w-32 sm:w-40 aspect-[2/3] rounded-md overflow-hidden shadow-lg bg-surface-2">
+              {cover ? (
+                <img src={cover} alt={rec.title} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center p-3 text-center bg-gradient-to-br from-border-custom to-surface-2">
+                  <span className="text-xs font-semibold text-foreground line-clamp-4">{rec.title}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Meta */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div className="min-w-0">
+                <h2 className="text-lg font-bold text-foreground leading-tight">{rec.title}</h2>
+                {rec.author && <p className="text-sm text-muted mt-0.5">{rec.author}</p>}
+              </div>
+              <button
+                onClick={onClose}
+                className="p-1 -mt-1 -mr-1 text-muted-2 hover:text-foreground transition-colors flex-shrink-0"
+                aria-label="Close"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Type / year / ISBN badges */}
+            <div className="flex flex-wrap items-center gap-1.5 mb-3 text-[11px]">
+              {isArticle && (
+                <span className="px-1.5 py-0.5 bg-blue-500/15 text-blue-300 rounded font-semibold uppercase tracking-wider">Article</span>
+              )}
+              {rec.year && <span className="text-muted-2">{rec.year}</span>}
+              {rec.isbn && <span className="text-muted-2 font-mono">ISBN {rec.isbn}</span>}
+            </div>
+
+            {/* Topic / source */}
+            <div className="space-y-1 text-xs text-muted mb-3">
+              {rec.topic && (
+                <div><span className="text-muted-2">Topic:</span> <span className="text-foreground">{rec.topic}</span></div>
+              )}
+              {rec.recommended_by && (
+                <div><span className="text-muted-2">Source:</span> <span className="text-foreground">{rec.recommended_by}</span></div>
+              )}
+              {isArticle && rec.journal && (
+                <div><span className="text-muted-2">Journal:</span> <span className="text-foreground">{rec.journal}</span></div>
+              )}
+              {isArticle && rec.doi && (
+                <div className="truncate"><span className="text-muted-2">DOI:</span> <span className="text-foreground font-mono">{rec.doi}</span></div>
+              )}
+            </div>
+
+            {/* Prices (clickable → store) */}
+            {(rec.lowest_price != null || rec.thriftbooks_price != null || rec.amazon_price != null) && (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {rec.lowest_price != null && (
+                  <a href={storeUrl("abe", rec.isbn, rec.title, rec.author)} target="_blank" rel="noopener noreferrer" className="px-2 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 rounded text-[11px] font-bold transition-colors" title="Open on AbeBooks">
+                    Abe ${rec.lowest_price.toFixed(2)}
+                  </a>
+                )}
+                {rec.thriftbooks_price != null && (
+                  <a href={storeUrl("thrift", rec.isbn, rec.title, rec.author)} target="_blank" rel="noopener noreferrer" className="px-2 py-1 bg-blue-500/15 hover:bg-blue-500/25 text-blue-400 rounded text-[11px] font-bold transition-colors" title="Open on ThriftBooks">
+                    Thrift ${rec.thriftbooks_price.toFixed(2)}
+                  </a>
+                )}
+                {rec.amazon_price != null && (
+                  <a href={storeUrl("amazon", rec.isbn, rec.title, rec.author)} target="_blank" rel="noopener noreferrer" className="px-2 py-1 bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 rounded text-[11px] font-bold transition-colors" title="Open on Amazon">
+                    Amazon ${rec.amazon_price.toFixed(2)}
+                  </a>
+                )}
+              </div>
+            )}
+
+            {/* Notes */}
+            {rec.notes && (
+              <div className="text-sm text-foreground whitespace-pre-wrap mb-4 max-h-40 overflow-y-auto">
+                {rec.notes}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex flex-wrap gap-2 pt-2 border-t border-border-custom">
+              {!isArticle && (
+                <Link
+                  href={`/?addRec=${rec.id}`}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  + Add to library
+                </Link>
+              )}
+              {isArticle && rec.url && (
+                <a
+                  href={rec.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  Open article
+                </a>
+              )}
+              {confirmOwned ? (
+                <>
+                  <button
+                    onClick={removeRec}
+                    disabled={busy}
+                    className="px-3 py-1.5 bg-red-600 hover:bg-red-500 disabled:opacity-60 text-white rounded-lg text-sm font-medium transition-colors"
+                  >
+                    Yes, remove
+                  </button>
+                  <button
+                    onClick={() => setConfirmOwned(false)}
+                    disabled={busy}
+                    className="px-3 py-1.5 bg-surface-2 hover:bg-border-custom text-muted rounded-lg text-sm font-medium transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setConfirmOwned(true)}
+                  className="px-3 py-1.5 bg-surface-2 hover:bg-border-custom text-foreground rounded-lg text-sm font-medium transition-colors"
+                  title="I already own this — remove it from recommendations"
+                >
+                  I already have this
+                </button>
+              )}
+              <Link
+                href={`/recommendations/manage?edit=${rec.id}`}
+                className="ml-auto px-3 py-1.5 text-sm text-muted hover:text-foreground transition-colors self-center"
+              >
+                Edit →
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { api } from "@/lib/api-client";
 import { searchBooks, enrichBook, lookupDoi, looksLikeDoi, BookSearchResult } from "@/lib/bookLookup";
 import Link from "next/link";
@@ -310,13 +310,24 @@ export default function RecommendationsPage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingRec, setEditingRec] = useState<Recommendation | null>(null);
 
-  // If we arrived via the shelf page's "+ Add" (routes to /manage#add),
-  // open the add form on first render.
+  // If we arrived via the shelf page's "+ Add" (routes to /manage#add) or the
+  // detail modal's "Edit →" (routes to /manage?edit=<id>), respond on first
+  // render.
   useEffect(() => {
-    if (typeof window !== "undefined" && window.location.hash === "#add") {
-      setShowAddForm(true);
+    if (typeof window === "undefined") return;
+    if (window.location.hash === "#add") setShowAddForm(true);
+    const params = new URLSearchParams(window.location.search);
+    const editId = params.get("edit");
+    if (editId) {
+      // Wait for recommendations to load, then open the edit modal.
+      // (The load runs in another effect below; polling that state directly
+      // isn't clean, so we set a one-shot flag the load-effect can read.)
+      pendingEditIdRef.current = editId;
     }
   }, []);
+
+  // Ref carries a deep-link edit target from URL to the load handler below.
+  const pendingEditIdRef = useRef<string | null>(null);
 
   // -- Add-flow extensions: article support + manual fallback when nothing
   // can be found in Open Library / Crossref. The user can always save by
@@ -471,6 +482,13 @@ export default function RecommendationsPage() {
 
         setAllRecs(allRecsData);
         setRecommendations(allRecsData);
+        // Deep-link: if we were sent /manage?edit=<id>, open that rec's edit
+        // modal now that the data is loaded.
+        if (pendingEditIdRef.current) {
+          const target = allRecsData.find(r => r.id === pendingEditIdRef.current);
+          if (target) setEditingRec(target);
+          pendingEditIdRef.current = null;
+        }
         setLoading(false);
       } catch (error) {
         console.error("Error loading recommendations:", error);
