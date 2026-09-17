@@ -41,6 +41,10 @@ export async function POST(request: Request) {
     const html = await resp.text();
 
     // Extract prices from search results: SearchResultListItem-dollarAmount">14.29
+    // No fallback to a plain $X.XX regex — when the search returns nothing
+    // ThriftBooks still renders promo prices (like "$2.99 subscription") in
+    // the page shell, and grepping those produced 400+ bogus $2.99 rows in
+    // the DB. Better to return null than a promo price.
     const pricePattern = /SearchResultListItem-dollarAmount">([0-9]+\.?[0-9]*)/g;
     const prices: number[] = [];
     let match;
@@ -48,18 +52,6 @@ export async function POST(request: Request) {
       const price = parseFloat(match[1]);
       if (!isNaN(price) && price > 0) {
         prices.push(price);
-      }
-    }
-
-    // Fallback: try detail page price format (AllEditionsItem or WorkMeta)
-    if (prices.length === 0) {
-      const altPattern = /\$([0-9]+\.[0-9]{2})/g;
-      let altMatch;
-      while ((altMatch = altPattern.exec(html)) !== null) {
-        const price = parseFloat(altMatch[1]);
-        if (!isNaN(price) && price > 0 && price < 500) {
-          prices.push(price);
-        }
       }
     }
 

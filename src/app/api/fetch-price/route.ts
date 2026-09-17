@@ -47,9 +47,26 @@ export async function POST(request: Request) {
 
     const html = await resp.text();
 
-    // Parse price from the HTML
-    const priceMatch = html.match(/\$[\d,]+(?:\.\d{2})?/);
-    const price = priceMatch ? priceMatch[0] : null;
+    // Parse the first listing's TOTAL price (book + shipping). AbeBooks marks
+    // these with data-test-id anchors on the listing card. Grabbing the first
+    // "$X.XX" on the page picks up random header text — don't do that.
+    const bookAnchor = html.indexOf('data-test-id="item-price-0"');
+    let price: string | null = null;
+    if (bookAnchor >= 0) {
+      const bookM = html.slice(bookAnchor, bookAnchor + 400).match(/US\$\s?([0-9,]+\.[0-9]{2})/);
+      if (bookM) {
+        const book = parseFloat(bookM[1].replace(/,/g, ""));
+        let ship = 0;
+        const shipAnchor = html.indexOf('data-test-id="item-shipping-price-0"');
+        if (shipAnchor > 0) {
+          const shipSlice = html.slice(shipAnchor, shipAnchor + 400);
+          const shipM = shipSlice.match(/US\$\s?([0-9,]+\.[0-9]{2})/);
+          if (shipM) ship = parseFloat(shipM[1].replace(/,/g, ""));
+          else if (/free/i.test(shipSlice)) ship = 0;
+        }
+        price = `$${(Math.round((book + ship) * 100) / 100).toFixed(2)}`;
+      }
+    }
 
     return NextResponse.json({ price, url });
   } catch (error) {
