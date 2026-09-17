@@ -314,36 +314,56 @@ export default function RecommendationsPage() {
               ))}
             </div>
 
-            {/* Sort — matches the manage-view list options: Recent, A-Z, Cheapest,
-                and up/down for each of Abe / Thrift / Amazon */}
+            {/* Sort — Recent / A-Z are plain toggles; Cheapest / Abe / Thrift /
+                Amazon each cycle through neutral → ↑ → ↓ → neutral on click. */}
             <div className="flex items-center gap-1 ml-auto flex-wrap">
               <span className="text-[10px] text-muted-2 uppercase tracking-wider">Sort:</span>
               {([
-                { l: "Recent",     v: "recent"       as SortMode, tone: "neutral" },
-                { l: "A-Z",        v: "alpha"        as SortMode, tone: "neutral" },
-                { l: "Cheapest↑",  v: "cheapest_asc" as SortMode, tone: "neutral" },
-                { l: "Abe↑",       v: "abe_asc"      as SortMode, tone: "abe" },
-                { l: "Abe↓",       v: "abe_desc"     as SortMode, tone: "abe" },
-                { l: "Thrift↑",    v: "thrift_asc"   as SortMode, tone: "thrift" },
-                { l: "Thrift↓",    v: "thrift_desc"  as SortMode, tone: "thrift" },
-                { l: "Amazon↑",    v: "amazon_asc"   as SortMode, tone: "amazon" },
-                { l: "Amazon↓",    v: "amazon_desc"  as SortMode, tone: "amazon" },
-              ]).map(s => {
-                const active = sortMode === s.v;
+                { v: "recent"       as SortMode, l: "Recent" },
+                { v: "alpha"        as SortMode, l: "A-Z" },
+                { v: "cheapest_asc" as SortMode, l: "Cheapest" },
+              ]).map(({ v, l }) => (
+                <button
+                  key={v}
+                  onClick={() => setSortMode(v)}
+                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                    sortMode === v ? "bg-foreground text-background" : "bg-surface-2 text-muted hover:text-foreground"
+                  }`}
+                >
+                  {l}
+                </button>
+              ))}
+              {([
+                { label: "Abe",    key: "abe",    tone: "abe"    as const },
+                { label: "Thrift", key: "thrift", tone: "thrift" as const },
+                { label: "Amazon", key: "amazon", tone: "amazon" as const },
+              ]).map(({ label, key, tone }) => {
+                const asc  = `${key}_asc`  as SortMode;
+                const desc = `${key}_desc` as SortMode;
+                // Arrow convention: ↑ = highest first (numerical DESC),
+                // ↓ = lowest first (numerical ASC). Cycle unsorted → ↑ → ↓ → unsorted.
+                const cycle = () => {
+                  if (sortMode === desc) setSortMode(asc);
+                  else if (sortMode === asc) setSortMode("recent");
+                  else setSortMode(desc);
+                };
+                const arrow = sortMode === desc ? " ↑" : sortMode === asc ? " ↓" : "";
+                const active = sortMode === asc || sortMode === desc;
                 const activeCls =
-                  s.tone === "abe"    ? "bg-emerald-600 text-white"
-                : s.tone === "thrift" ? "bg-blue-600 text-white"
-                : s.tone === "amazon" ? "bg-amber-600 text-white"
-                :                       "bg-foreground text-background";
+                  tone === "abe"    ? "bg-emerald-600 text-white"
+                : tone === "thrift" ? "bg-blue-600 text-white"
+                : tone === "amazon" ? "bg-amber-600 text-white"
+                :                     "bg-foreground text-background";
                 return (
                   <button
-                    key={s.v}
-                    onClick={() => setSortMode(s.v)}
+                    key={key}
+                    onClick={cycle}
                     className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
                       active ? activeCls : "bg-surface-2 text-muted hover:text-foreground"
                     }`}
+                    title={`Click to sort by ${label} price — cycles ${label}, ${label} ↑, ${label} ↓`}
                   >
-                    {s.l}
+                    {label}{arrow}
                   </button>
                 );
               })}

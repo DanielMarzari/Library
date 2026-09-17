@@ -1349,38 +1349,58 @@ export default function RecommendationsPage() {
             </div>
           </div>
 
-          {/* Sort + Price row */}
+          {/* Sort + Price row — plain toggles for Recent / A-Z / Cheapest;
+              a single cycling button for each of Abe / Thrift / Amazon that
+              rotates unsorted → ↑ (highest first) → ↓ (lowest first) → unsorted. */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[10px] text-muted uppercase tracking-wider font-medium">Sort:</span>
             {([
-              { label: "Recent", value: "recent" as SortMode },
-              { label: "A-Z", value: "alpha" as SortMode },
-              { label: "Cheapest ↑", value: "cheapest_asc" as SortMode },
-              { label: "Abe ↑", value: "abe_asc" as SortMode },
-              { label: "Abe ↓", value: "abe_desc" as SortMode },
-              { label: "Thrift ↑", value: "thrift_asc" as SortMode },
-              { label: "Thrift ↓", value: "thrift_desc" as SortMode },
-              { label: "Amazon ↑", value: "amazon_asc" as SortMode },
-              { label: "Amazon ↓", value: "amazon_desc" as SortMode },
+              { value: "recent"       as SortMode, label: "Recent" },
+              { value: "alpha"        as SortMode, label: "A-Z" },
+              { value: "cheapest_asc" as SortMode, label: "Cheapest" },
             ]).map(s => (
               <button
                 key={s.value}
                 onClick={() => setSortMode(s.value)}
                 className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                  sortMode === s.value
-                    ? s.value.startsWith("abe")
-                      ? "bg-emerald-600 text-white"
-                      : s.value.startsWith("thrift")
-                      ? "bg-blue-600 text-white"
-                      : s.value.startsWith("amazon")
-                      ? "bg-amber-600 text-white"
-                      : "bg-foreground text-background"
-                    : "bg-surface-2 text-muted hover:text-foreground"
+                  sortMode === s.value ? "bg-foreground text-background" : "bg-surface-2 text-muted hover:text-foreground"
                 }`}
               >
                 {s.label}
               </button>
             ))}
+            {([
+              { label: "Abe",    key: "abe",    tone: "abe"    as const },
+              { label: "Thrift", key: "thrift", tone: "thrift" as const },
+              { label: "Amazon", key: "amazon", tone: "amazon" as const },
+            ]).map(({ label, key, tone }) => {
+              const asc  = `${key}_asc`  as SortMode;
+              const desc = `${key}_desc` as SortMode;
+              const cycle = () => {
+                if (sortMode === desc)      setSortMode(asc);
+                else if (sortMode === asc)  setSortMode("recent");
+                else                        setSortMode(desc);
+              };
+              const arrow = sortMode === desc ? " ↑" : sortMode === asc ? " ↓" : "";
+              const active = sortMode === asc || sortMode === desc;
+              const activeCls =
+                tone === "abe"    ? "bg-emerald-600 text-white"
+              : tone === "thrift" ? "bg-blue-600 text-white"
+              : tone === "amazon" ? "bg-amber-600 text-white"
+              :                     "bg-foreground text-background";
+              return (
+                <button
+                  key={key}
+                  onClick={cycle}
+                  title={`Sort by ${label} price — cycles ${label}, ${label} ↑ (highest first), ${label} ↓ (lowest first)`}
+                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                    active ? activeCls : "bg-surface-2 text-muted hover:text-foreground"
+                  }`}
+                >
+                  {label}{arrow}
+                </button>
+              );
+            })}
             <div className="ml-auto flex items-center gap-2">
               <button
                 onClick={handleExportCsv}
