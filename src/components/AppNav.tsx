@@ -64,13 +64,12 @@ export function AppNav() {
           <div className="border-t border-border-custom my-1.5" />
           <p className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-2 font-semibold">Discover</p>
           {item("/authors", "Authors")}
-          {item("/expertise", "Skills")}
+          {item("/skills", "Skills")}
           {item("/recommendations", "Recommendations")}
 
           <div className="border-t border-border-custom my-1.5" />
           <p className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-2 font-semibold">Manage</p>
           {item("/lending", "Lending")}
-          {item("/setup", "Setup")}
         </div>
       )}
     </div>

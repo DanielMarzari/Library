@@ -485,13 +485,12 @@ export default function Home() {
                   <div className="border-t border-border-custom my-1.5" />
                   <p className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-2 font-semibold">Discover</p>
                   <Link href="/authors" className={navLinkCls} onClick={() => setShowNav(false)}>Authors</Link>
-                  <Link href="/expertise" className={navLinkCls} onClick={() => setShowNav(false)}>Skills</Link>
+                  <Link href="/skills" className={navLinkCls} onClick={() => setShowNav(false)}>Skills</Link>
                   <Link href="/recommendations" className={navLinkCls} onClick={() => setShowNav(false)}>Recommendations</Link>
 
                   <div className="border-t border-border-custom my-1.5" />
                   <p className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-2 font-semibold">Manage</p>
                   <Link href="/lending" className={navLinkCls} onClick={() => setShowNav(false)}>Lending</Link>
-                  <Link href="/setup" className={navLinkCls} onClick={() => setShowNav(false)}>Setup</Link>
 
                   <div className="border-t border-border-custom my-1.5" />
                   <div className="px-3 py-2 space-y-3">

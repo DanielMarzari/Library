@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api-client';
 import { Book } from '@/types/book';
 import Link from 'next/link';
+import { AppNav } from '@/components/AppNav';
 
 interface TopicProgress {
   topic: string;
@@ -188,22 +189,16 @@ export default function SkillsPage() {
   }));
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="bg-surface border-b border-border-custom sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Skills</h1>
-            <p className="text-muted mt-1">Track your knowledge across topics</p>
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
+      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border-custom">
+        <div className="w-full px-4 py-3 flex items-center gap-3">
+          <AppNav />
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl font-bold tracking-tight truncate">Skills</h1>
+            <p className="text-[11px] text-muted hidden sm:block">Track your knowledge across topics</p>
           </div>
-          <Link
-            href="/"
-            className="px-4 py-2 bg-surface-2 hover:bg-border-custom text-foreground rounded-lg transition text-sm font-medium"
-          >
-            ← Back to Library
-          </Link>
         </div>
-      </div>
+      </header>
 
       {/* Topic Source Toggle */}
       <div className="bg-surface/50 border-b border-border-custom">
