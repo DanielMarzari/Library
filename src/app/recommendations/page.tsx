@@ -100,11 +100,14 @@ export default function RecommendationsPage() {
     setRecs(prev => prev.map(r => r.id === rec.id ? { ...r, starred: next } : r));
     if (openRec?.id === rec.id) setOpenRec({ ...rec, starred: next });
     fetch(`/api/recommendations/${rec.id}`, {
-      method: "PATCH",
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ starred: next }),
+    }).then(r => {
+      // Revert on non-OK too — silent failures were letting the star vanish
+      // on reload without any signal in the UI.
+      if (!r.ok) throw new Error(`${r.status}`);
     }).catch(() => {
-      // Revert on failure.
       setRecs(prev => prev.map(r => r.id === rec.id ? { ...r, starred: rec.starred } : r));
     });
   };
