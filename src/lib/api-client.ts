@@ -29,6 +29,20 @@ export interface Recommendation {
   source?: string;
   created_at: string;
   updated_at: string;
+  // These are the real column names in the recommendations table — kept
+  // optional so the type stays compatible with older call sites.
+  author?: string;
+  isbn?: string;
+  cover_url?: string;
+  recommended_by?: string;
+  notes?: string;
+  topic?: string;
+  interest?: string;
+  year?: number;
+  lowest_price?: number | null;
+  thriftbooks_price?: number | null;
+  amazon_price?: number | null;
+  item_type?: "book" | "article";
 }
 
 export interface LearningGoal {
