@@ -424,7 +424,7 @@ function ShelfRec({ rec }: { rec: Rec }) {
   const isArticle = rec.item_type === "article";
   return (
     <button className="group relative focus:outline-none" title={`${rec.title}${rec.author ? " — " + rec.author : ""}`}>
-      <div className="relative aspect-[2/3] rounded-md overflow-hidden shadow-lg shadow-black/40 transition-all group-hover:scale-105 group-hover:-translate-y-1">
+      <div className="relative aspect-[2/3] rounded-md overflow-hidden shadow-lg shadow-black/40 transition-shadow group-hover:shadow-black/60">
         {cover ? (
           <>
             <img
