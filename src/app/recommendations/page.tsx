@@ -53,6 +53,7 @@ interface Rec {
   doi?: string;
   journal?: string;
   url?: string;
+  starred?: number;
   created_at: string;
 }
 
@@ -83,12 +84,29 @@ export default function RecommendationsPage() {
   const [showSourceMenu, setShowSourceMenu] = useState(false);
   const [page, setPage] = useState(1);
   const [openRec, setOpenRec] = useState<Rec | null>(null);
+  const [starredOnly, setStarredOnly] = useState(false);
   const PAGE_SIZE = 240;
 
   // Remove a rec locally after a delete-or-already-own action.
   const removeRec = (id: string) => {
     setRecs(prev => prev.filter(r => r.id !== id));
     if (openRec?.id === id) setOpenRec(null);
+  };
+
+  // Star / unstar a rec. Optimistic update — the API round-trip runs in the
+  // background so the UI never feels laggy.
+  const toggleStar = (rec: Rec) => {
+    const next = rec.starred ? 0 : 1;
+    setRecs(prev => prev.map(r => r.id === rec.id ? { ...r, starred: next } : r));
+    if (openRec?.id === rec.id) setOpenRec({ ...rec, starred: next });
+    fetch(`/api/recommendations/${rec.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ starred: next }),
+    }).catch(() => {
+      // Revert on failure.
+      setRecs(prev => prev.map(r => r.id === rec.id ? { ...r, starred: rec.starred } : r));
+    });
   };
 
   // Load
@@ -123,6 +141,7 @@ export default function RecommendationsPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     let out = recs.filter(r => {
+      if (starredOnly && !r.starred) return false;
       if (filterTopic && r.topic !== filterTopic) return false;
       if (filterSource && r.recommended_by !== filterSource) return false;
       if (!q) return true;
@@ -146,11 +165,11 @@ export default function RecommendationsPage() {
       default: out.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
     }
     return out;
-  }, [recs, search, sortMode, filterTopic, filterSource]);
+  }, [recs, search, sortMode, filterTopic, filterSource, starredOnly]);
 
   const paginated = filtered.slice(0, page * PAGE_SIZE);
   const hasMore = paginated.length < filtered.length;
-  useEffect(() => { setPage(1); }, [search, filterTopic, filterSource, sortMode, groupBy]);
+  useEffect(() => { setPage(1); }, [search, filterTopic, filterSource, sortMode, groupBy, starredOnly]);
 
   // Section grouping when groupBy != flat
   const sections = useMemo(() => {
@@ -226,6 +245,18 @@ export default function RecommendationsPage() {
 
           {/* Filter row */}
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Starred filter */}
+            <button
+              onClick={() => setStarredOnly(v => !v)}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors flex items-center gap-1 ${
+                starredOnly ? "bg-yellow-500 text-black border-yellow-500" : "bg-surface-2 text-muted border-border-custom hover:text-foreground"
+              }`}
+              title={starredOnly ? "Showing starred only" : "Filter to starred only"}
+            >
+              <span aria-hidden>{starredOnly ? "★" : "☆"}</span>
+              <span>Starred{starredOnly ? "" : ` (${recs.filter(r => r.starred).length})`}</span>
+            </button>
+
             {/* Topic */}
             <div className="relative">
               <button
@@ -405,7 +436,9 @@ export default function RecommendationsPage() {
                   </div>
                 )}
                 <div className={`grid ${gridClasses[gridSize]} px-1`}>
-                  {section.recs.map(rec => <ShelfRec key={rec.id} rec={rec} onOpen={setOpenRec} />)}
+                  {section.recs.map(rec => (
+                    <ShelfRec key={rec.id} rec={rec} onOpen={setOpenRec} onToggleStar={toggleStar} />
+                  ))}
                 </div>
                 {/* Wooden shelf edge — same as home */}
                 <div className="h-[6px] bg-gradient-to-b from-amber-900/40 to-amber-950/60 rounded-b-sm mt-3 mx-1" />
@@ -432,6 +465,7 @@ export default function RecommendationsPage() {
           rec={openRec}
           onClose={() => setOpenRec(null)}
           onRemove={removeRec}
+          onToggleStar={toggleStar}
         />
       )}
     </div>
@@ -440,9 +474,18 @@ export default function RecommendationsPage() {
 
 // Exact visual language from BookShelf's ShelfBook — cover with drop shadow,
 // spine, hover lift, title+author below. Adapted for a Rec instead of a Book.
-function ShelfRec({ rec, onOpen }: { rec: Rec; onOpen: (rec: Rec) => void }) {
+function ShelfRec({
+  rec,
+  onOpen,
+  onToggleStar,
+}: {
+  rec: Rec;
+  onOpen: (rec: Rec) => void;
+  onToggleStar: (rec: Rec) => void;
+}) {
   const cover = rec.cover_url ? safeCoverUrl(rec.cover_url) : null;
   const isArticle = rec.item_type === "article";
+  const starred = !!rec.starred;
   // <div role="button"> instead of <button> so the nested price <a>s and any
   // future overlay buttons are valid HTML (nesting interactive elements in a
   // real <button> is invalid).
@@ -487,6 +530,22 @@ function ShelfRec({ rec, onOpen }: { rec: Rec; onOpen: (rec: Rec) => void }) {
 
         {/* Spine shadow — same as home */}
         <div className="absolute inset-y-0 left-0 w-[3px] bg-black/30" />
+
+        {/* Star toggle top-right — always visible when starred, revealed on
+            hover otherwise. Stops propagation so tapping it doesn't open the
+            detail modal. */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleStar(rec); }}
+          className={`absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center text-xs transition-all ${
+            starred
+              ? "bg-yellow-400/95 text-black shadow-lg"
+              : "bg-black/50 backdrop-blur-sm text-white/80 opacity-0 group-hover:opacity-100 hover:bg-black/70"
+          }`}
+          title={starred ? "Unstar" : "Star this recommendation"}
+          aria-label={starred ? "Unstar" : "Star"}
+        >
+          {starred ? "★" : "☆"}
+        </button>
 
         {/* Article badge in the top-left */}
         {isArticle && (
@@ -553,13 +612,16 @@ function RecDetailModal({
   rec,
   onClose,
   onRemove,
+  onToggleStar,
 }: {
   rec: Rec;
   onClose: () => void;
   onRemove: (id: string) => void;
+  onToggleStar: (rec: Rec) => void;
 }) {
   const cover = rec.cover_url ? safeCoverUrl(rec.cover_url) : null;
   const isArticle = rec.item_type === "article";
+  const starred = !!rec.starred;
   const [busy, setBusy] = useState(false);
   const [confirmOwned, setConfirmOwned] = useState(false);
 
@@ -612,15 +674,27 @@ function RecDetailModal({
                 <h2 className="text-lg font-bold text-foreground leading-tight">{rec.title}</h2>
                 {rec.author && <p className="text-sm text-muted mt-0.5">{rec.author}</p>}
               </div>
-              <button
-                onClick={onClose}
-                className="p-1 -mt-1 -mr-1 text-muted-2 hover:text-foreground transition-colors flex-shrink-0"
-                aria-label="Close"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
+              <div className="flex items-start gap-1 flex-shrink-0">
+                <button
+                  onClick={() => onToggleStar(rec)}
+                  className={`p-1 rounded transition-colors ${
+                    starred ? "text-yellow-400 hover:text-yellow-300" : "text-muted-2 hover:text-yellow-400"
+                  }`}
+                  title={starred ? "Unstar" : "Star this recommendation"}
+                  aria-label={starred ? "Unstar" : "Star"}
+                >
+                  <span className="text-xl leading-none">{starred ? "★" : "☆"}</span>
+                </button>
+                <button
+                  onClick={onClose}
+                  className="p-1 -mt-1 -mr-1 text-muted-2 hover:text-foreground transition-colors"
+                  aria-label="Close"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             {/* Type / year / ISBN badges */}

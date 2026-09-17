@@ -42,6 +42,7 @@ export interface Recommendation {
   lowest_price?: number | null;
   thriftbooks_price?: number | null;
   amazon_price?: number | null;
+  starred?: number;
   item_type?: "book" | "article";
 }
 

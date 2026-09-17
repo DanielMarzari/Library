@@ -158,6 +158,7 @@ function ensureAllTables(db: Database.Database) {
   addColumnSafe('books', 'cover_content_type', 'TEXT');
   addColumnSafe('recommendations', 'thriftbooks_price', 'REAL');
   addColumnSafe('recommendations', 'amazon_price', 'REAL');
+  addColumnSafe('recommendations', 'starred', 'INTEGER DEFAULT 0');
   addColumnSafe('authors', 'religious_tradition', 'TEXT');
   addColumnSafe('authors', 'profile_url', 'TEXT');
   addColumnSafe('authors', 'gender', 'TEXT');
