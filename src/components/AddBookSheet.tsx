@@ -17,6 +17,17 @@ interface AddBookSheetProps {
   onClose: () => void;
   onAdded: (optimisticBook: Partial<Book>) => void;
   recentSources: string[];
+  // Optional: pre-fill the form with a recommendation's data (jumps straight
+  // to the confirm step so the user just fills the remaining fields).
+  prefill?: {
+    recId?: string;
+    title: string;
+    author?: string;
+    isbn?: string;
+    cover_url?: string;
+    source?: string;      // maps → recommended_by
+    topic?: string;
+  };
 }
 
 type Mode =
@@ -29,7 +40,7 @@ type Mode =
   | "article"
   | "article-confirm";
 
-export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetProps) {
+export function AddBookSheet({ onClose, onAdded, recentSources, prefill }: AddBookSheetProps) {
   const [mode, setMode] = useState<Mode>("choose");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<BookSearchResult[]>([]);
@@ -108,6 +119,25 @@ export function AddBookSheet({ onClose, onAdded, recentSources }: AddBookSheetPr
     setConfirmCoverUrl(enriched.cover_url || "");
     setEnriching(false);
   };
+
+  // Pre-fill: when a recommendation was passed in, jump straight to the
+  // confirm step with its title/author/isbn/cover as the starting point.
+  // We still call enrichBook so pages/topics/etc. get filled where we can.
+  useEffect(() => {
+    if (!prefill) return;
+    const seed: BookSearchResult = {
+      title: prefill.title,
+      author: prefill.author || "",
+      isbn: prefill.isbn || "",
+      cover_url: prefill.cover_url || null,
+      description: null,
+      pages: null,
+    };
+    if (prefill.source) setSource(prefill.source);
+    if (prefill.topic) setEditTopics([prefill.topic]);
+    void selectBook(seed);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const startCamera = async () => {
     setMode("camera");

@@ -49,6 +49,48 @@ export default function Home() {
     if (c) setCountryFilter(c);
   }, []);
 
+  // Pre-fill state for the add-book form when opened from a recommendation
+  // via ?addRec=<id>. We fetch the rec, hand its fields to AddBookSheet, and
+  // remember the rec id so we can remove the recommendation on successful add.
+  const [addPrefill, setAddPrefill] = useState<{
+    recId: string;
+    title: string;
+    author?: string;
+    isbn?: string;
+    cover_url?: string;
+    source?: string;
+    topic?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const recId = params.get("addRec");
+    if (!recId) return;
+    // Clear the param immediately so a refresh doesn't reopen the sheet.
+    const url = new URL(window.location.href);
+    url.searchParams.delete("addRec");
+    window.history.replaceState({}, "", url.toString());
+    (async () => {
+      try {
+        const rows = await api.recommendations.list();
+        const rec = (rows || []).find((r: any) => r.id === recId);
+        if (!rec) return;
+        setAddPrefill({
+          recId: rec.id,
+          title: rec.title,
+          author: rec.author || undefined,
+          isbn: rec.isbn || undefined,
+          cover_url: rec.cover_url || undefined,
+          source: rec.recommended_by || undefined,
+          topic: rec.topic || undefined,
+        });
+        setShowAddSheet(true);
+      } catch {
+        // Silent: the user can always add manually.
+      }
+    })();
+  }, []);
+
   // Load author metadata once — name → canonical country — for the filter.
   useEffect(() => {
     let ignore = false;
@@ -717,13 +759,25 @@ export default function Home() {
 
       {showAddSheet && (
         <AddBookSheet
-          onClose={() => setShowAddSheet(false)}
-          onAdded={handleOptimisticAdd}
+          onClose={() => {
+            setShowAddSheet(false);
+            setAddPrefill(null);
+          }}
+          onAdded={(book) => {
+            handleOptimisticAdd(book);
+            // If this add came from a recommendation, remove the rec — the
+            // book now lives in the library, so the "recommendation" is done.
+            if (addPrefill?.recId) {
+              api.recommendations.delete(addPrefill.recId).catch(() => {});
+              setAddPrefill(null);
+            }
+          }}
           recentSources={[
             ...new Set(
               books.map((b) => b.source).filter(Boolean) as string[]
             ),
           ]}
+          prefill={addPrefill || undefined}
         />
       )}
 

@@ -23,6 +23,7 @@ interface Recommendation {
   year?: number;
   lowest_price?: number | null;
   thriftbooks_price?: number | null;
+  amazon_price?: number | null;
   source_book_id?: string | null;
   // Multiple books that recommended this item. On the wire this is a JSON
   // string (or null); the client normalizes to string[] on load.
@@ -61,7 +62,30 @@ function csvEscape(val: unknown): string {
 
 type AddMode = "book" | "article";
 
-type SortMode = "recent" | "abe_asc" | "abe_desc" | "thrift_asc" | "thrift_desc" | "alpha";
+type SortMode = "recent" | "cheapest_asc" | "abe_asc" | "abe_desc" | "thrift_asc" | "thrift_desc" | "amazon_asc" | "amazon_desc" | "alpha";
+
+// Build a search URL to a bookstore. Prefer ISBN when available; fall back to
+// title + author. sortby=17 = "Lowest Total Price" on AbeBooks.
+function storeUrl(
+  store: "abe" | "thrift" | "amazon",
+  isbn?: string,
+  title?: string,
+  author?: string,
+): string {
+  const hasIsbn = isbn && isbn.replace(/\D/g, "").length >= 10;
+  const q = hasIsbn ? isbn : [title, author].filter(Boolean).join(" ");
+  const enc = encodeURIComponent(q || "");
+  switch (store) {
+    case "abe":
+      return hasIsbn
+        ? `https://www.abebooks.com/servlet/SearchResults?isbn=${enc}&sortby=17`
+        : `https://www.abebooks.com/servlet/SearchResults?kn=${enc}&sortby=17`;
+    case "thrift":
+      return `https://www.thriftbooks.com/browse/?b.search=${enc}`;
+    case "amazon":
+      return `https://www.amazon.com/s?k=${enc}&i=stripbooks`;
+  }
+}
 
 interface LibraryBook {
   id: string;
@@ -785,6 +809,21 @@ export default function RecommendationsPage() {
       case "thrift_desc":
         filtered.sort((a, b) => (b.thriftbooks_price ?? 0) - (a.thriftbooks_price ?? 0));
         break;
+      case "amazon_asc":
+        filtered.sort((a, b) => (a.amazon_price ?? 9999) - (b.amazon_price ?? 9999));
+        break;
+      case "amazon_desc":
+        filtered.sort((a, b) => (b.amazon_price ?? 0) - (a.amazon_price ?? 0));
+        break;
+      case "cheapest_asc": {
+        const min = (r: Rec) => Math.min(
+          r.lowest_price ?? Infinity,
+          r.thriftbooks_price ?? Infinity,
+          r.amazon_price ?? Infinity,
+        );
+        filtered.sort((a, b) => (min(a) === Infinity ? 9999 : min(a)) - (min(b) === Infinity ? 9999 : min(b)));
+        break;
+      }
       case "recent":
       default:
         break;
@@ -899,6 +938,7 @@ export default function RecommendationsPage() {
       ["url", r => r.url],
       ["abebooks_price", r => r.lowest_price],
       ["thriftbooks_price", r => r.thriftbooks_price],
+      ["amazon_price", r => r.amazon_price],
       // Source books resolve to titles. Ids we can't resolve are dropped rather
       // than leaked into the export as opaque strings.
       ["referenced_in", r =>
@@ -1307,10 +1347,13 @@ export default function RecommendationsPage() {
             {([
               { label: "Recent", value: "recent" as SortMode },
               { label: "A-Z", value: "alpha" as SortMode },
+              { label: "Cheapest ↑", value: "cheapest_asc" as SortMode },
               { label: "Abe ↑", value: "abe_asc" as SortMode },
               { label: "Abe ↓", value: "abe_desc" as SortMode },
               { label: "Thrift ↑", value: "thrift_asc" as SortMode },
               { label: "Thrift ↓", value: "thrift_desc" as SortMode },
+              { label: "Amazon ↑", value: "amazon_asc" as SortMode },
+              { label: "Amazon ↓", value: "amazon_desc" as SortMode },
             ]).map(s => (
               <button
                 key={s.value}
@@ -1321,6 +1364,8 @@ export default function RecommendationsPage() {
                       ? "bg-emerald-600 text-white"
                       : s.value.startsWith("thrift")
                       ? "bg-blue-600 text-white"
+                      : s.value.startsWith("amazon")
+                      ? "bg-amber-600 text-white"
                       : "bg-foreground text-background"
                     : "bg-surface-2 text-muted hover:text-foreground"
                 }`}
@@ -1648,16 +1693,42 @@ export default function RecommendationsPage() {
                       </div>
                     </div>
 
-                    {/* Price badges (AbeBooks + ThriftBooks) */}
+                    {/* Price badges (AbeBooks + ThriftBooks + Amazon) — clickable to store */}
                     {rec.lowest_price != null && (
-                      <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-500 rounded text-[9px] font-bold flex-shrink-0">
+                      <a
+                        href={storeUrl("abe", rec.isbn, rec.title, rec.author)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="px-1.5 py-0.5 bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-500 rounded text-[9px] font-bold flex-shrink-0 transition-colors"
+                        title="Open on AbeBooks"
+                      >
                         A ${rec.lowest_price.toFixed(2)}
-                      </span>
+                      </a>
                     )}
                     {rec.thriftbooks_price != null && (
-                      <span className="px-1.5 py-0.5 bg-blue-500/10 text-blue-400 rounded text-[9px] font-bold flex-shrink-0">
+                      <a
+                        href={storeUrl("thrift", rec.isbn, rec.title, rec.author)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="px-1.5 py-0.5 bg-blue-500/10 hover:bg-blue-500/25 text-blue-400 rounded text-[9px] font-bold flex-shrink-0 transition-colors"
+                        title="Open on ThriftBooks"
+                      >
                         T ${rec.thriftbooks_price.toFixed(2)}
-                      </span>
+                      </a>
+                    )}
+                    {rec.amazon_price != null && (
+                      <a
+                        href={storeUrl("amazon", rec.isbn, rec.title, rec.author)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="px-1.5 py-0.5 bg-amber-500/10 hover:bg-amber-500/25 text-amber-400 rounded text-[9px] font-bold flex-shrink-0 transition-colors"
+                        title="Open on Amazon"
+                      >
+                        Z ${rec.amazon_price.toFixed(2)}
+                      </a>
                     )}
 
                     {/* Source badge */}
@@ -1669,6 +1740,15 @@ export default function RecommendationsPage() {
 
                     {/* Actions (visible on hover) */}
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                      {rec.item_type !== "article" && (
+                        <Link
+                          href={`/?addRec=${rec.id}`}
+                          className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[9px] font-semibold transition-colors"
+                          title="Add to your library — opens the add form pre-filled"
+                        >
+                          + Library
+                        </Link>
+                      )}
                       <button
                         onClick={() => setEditingRec(rec)}
                         className="px-2 py-1 bg-surface-2 text-muted hover:text-foreground rounded text-[9px] font-medium transition-colors"
@@ -1677,7 +1757,7 @@ export default function RecommendationsPage() {
                         Edit
                       </button>
                       <a
-                        href={`https://www.amazon.com/s?k=${encodeURIComponent(rec.title + (rec.author ? " " + rec.author : ""))}&i=stripbooks`}
+                        href={storeUrl("amazon", rec.isbn, rec.title, rec.author)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-2 py-1 bg-amber-500/10 text-amber-500 rounded text-[9px] font-medium hover:bg-amber-500/20 transition-colors"
@@ -1685,7 +1765,7 @@ export default function RecommendationsPage() {
                         Amazon
                       </a>
                       <a
-                        href={`https://www.abebooks.com/servlet/SearchResults?kn=${encodeURIComponent(rec.title + (rec.author ? " " + rec.author : ""))}`}
+                        href={storeUrl("abe", rec.isbn, rec.title, rec.author)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-2 py-1 bg-emerald-500/10 text-emerald-500 rounded text-[9px] font-medium hover:bg-emerald-500/20 transition-colors"
@@ -1693,7 +1773,7 @@ export default function RecommendationsPage() {
                         Abe
                       </a>
                       <a
-                        href={`https://www.thriftbooks.com/browse/?b.search=${encodeURIComponent(rec.title)}`}
+                        href={storeUrl("thrift", rec.isbn, rec.title, rec.author)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-2 py-1 bg-blue-500/10 text-blue-400 rounded text-[9px] font-medium hover:bg-blue-500/20 transition-colors"

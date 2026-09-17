@@ -11,6 +11,29 @@ import Link from "next/link";
 import { api } from "@/lib/api-client";
 import { safeCoverUrl } from "@/lib/coverUrl";
 
+// Build a search URL to a bookstore. Prefer ISBN when available; fall back to
+// title + author. sortby=17 = "Lowest Total Price" on AbeBooks.
+function storeUrl(
+  store: "abe" | "thrift" | "amazon",
+  isbn?: string | null,
+  title?: string | null,
+  author?: string | null,
+): string {
+  const hasIsbn = !!isbn && isbn.replace(/\D/g, "").length >= 10;
+  const q = hasIsbn ? isbn! : [title, author].filter(Boolean).join(" ");
+  const enc = encodeURIComponent(q || "");
+  switch (store) {
+    case "abe":
+      return hasIsbn
+        ? `https://www.abebooks.com/servlet/SearchResults?isbn=${enc}&sortby=17`
+        : `https://www.abebooks.com/servlet/SearchResults?kn=${enc}&sortby=17`;
+    case "thrift":
+      return `https://www.thriftbooks.com/browse/?b.search=${enc}`;
+    case "amazon":
+      return `https://www.amazon.com/s?k=${enc}&i=stripbooks`;
+  }
+}
+
 interface Rec {
   id: string;
   title: string;
@@ -24,6 +47,7 @@ interface Rec {
   year?: number;
   lowest_price?: number | null;
   thriftbooks_price?: number | null;
+  amazon_price?: number | null;
   item_type?: "book" | "article";
   doi?: string;
   journal?: string;
@@ -428,6 +452,18 @@ function ShelfRec({ rec }: { rec: Rec }) {
         {/* Spine shadow — same as home */}
         <div className="absolute inset-y-0 left-0 w-[3px] bg-black/30" />
 
+        {/* "+ Library" corner button (books only) — visible on hover */}
+        {!isArticle && (
+          <Link
+            href={`/?addRec=${rec.id}`}
+            onClick={(e) => e.stopPropagation()}
+            className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 bg-emerald-600 hover:bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg transition-opacity"
+            title="Add to your library"
+          >
+            + Library
+          </Link>
+        )}
+
         {/* Article badge in the top-left */}
         {isArticle && (
           <div className="absolute top-1 left-1.5 bg-blue-500/90 backdrop-blur-sm rounded px-1 py-0.5">
@@ -435,14 +471,44 @@ function ShelfRec({ rec }: { rec: Rec }) {
           </div>
         )}
 
-        {/* Price chip bottom-right (parallels rating stars on home) */}
-        {(rec.lowest_price != null || rec.thriftbooks_price != null) && (
+        {/* Price chips bottom-right (parallels rating stars on home) — click to open store */}
+        {(rec.lowest_price != null || rec.thriftbooks_price != null || rec.amazon_price != null) && (
           <div className="absolute bottom-1 right-1 bg-black/70 backdrop-blur-sm rounded px-1 py-0.5 flex flex-col gap-px items-end">
             {rec.lowest_price != null && (
-              <span className="text-[8px] text-emerald-300 font-bold">${rec.lowest_price.toFixed(0)}</span>
+              <a
+                href={storeUrl("abe", rec.isbn, rec.title, rec.author)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-[8px] text-emerald-300 hover:text-emerald-200 font-bold"
+                title="Open on AbeBooks"
+              >
+                A ${rec.lowest_price.toFixed(0)}
+              </a>
             )}
             {rec.thriftbooks_price != null && (
-              <span className="text-[8px] text-blue-300 font-bold">${rec.thriftbooks_price.toFixed(0)}</span>
+              <a
+                href={storeUrl("thrift", rec.isbn, rec.title, rec.author)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-[8px] text-blue-300 hover:text-blue-200 font-bold"
+                title="Open on ThriftBooks"
+              >
+                T ${rec.thriftbooks_price.toFixed(0)}
+              </a>
+            )}
+            {rec.amazon_price != null && (
+              <a
+                href={storeUrl("amazon", rec.isbn, rec.title, rec.author)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-[8px] text-amber-300 hover:text-amber-200 font-bold"
+                title="Open on Amazon"
+              >
+                Z ${rec.amazon_price.toFixed(0)}
+              </a>
             )}
           </div>
         )}
