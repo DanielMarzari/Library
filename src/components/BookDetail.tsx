@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { api } from "@/lib/api-client";
+import { api, ApiError } from "@/lib/api-client";
 import { Book, ReadingUpdate, Density } from "@/types/book";
 import { enrichBook, searchBooks } from "@/lib/bookLookup";
 import { coverSrc, safeCoverUrl } from "@/lib/coverUrl";
@@ -109,7 +109,7 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
   const [autoTopics, setAutoTopics] = useState<string[]>(book.auto_topics || []);
   const [favorite, setFavorite] = useState(book.favorite || false);
   const [showSourceSuggestions, setShowSourceSuggestions] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [refreshing, setRefreshing] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -219,8 +219,10 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
   const valuesRef = useRef({ title, author, coverUrl, pages, introPages, startPage, endPage, status, rating, density, startDate, completeDate, source, volume, lcc, ddc, editTopics, autoTopics, favorite });
   valuesRef.current = { title, author, coverUrl, pages, introPages, startPage, endPage, status, rating, density, startDate, completeDate, source, volume, lcc, ddc, editTopics, autoTopics, favorite };
 
-  // Stable doSave — reads from ref, only depends on book.id
-  const doSave = useCallback(async () => {
+  // Stable doSave — reads from ref, only depends on book.id.
+  // Resolves true on success, false on failure, so callers that need to know
+  // (the backdrop close) can act on it rather than assuming it worked.
+  const doSave = useCallback(async (): Promise<boolean> => {
     const v = valuesRef.current;
     setSaveStatus("saving");
     try {
@@ -247,9 +249,15 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
       // Tell the parent the list is stale so the main shelf re-fetches and
       // re-renders covers (in particular, picks up a swapped cover_url).
       onUpdated();
+      return true;
     } catch (error) {
+      // "idle" is what the UI shows when nothing has happened, so reporting a
+      // failed save that way made a lost write indistinguishable from a
+      // never-attempted one. The edits are still in local state here, so the
+      // user can retry — but only if we tell them.
       console.error("Save error:", error);
-      setSaveStatus("idle");
+      setSaveStatus("error");
+      return false;
     }
   }, [book.id, onUpdated]);
 
@@ -321,7 +329,23 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
       await api.books.delete(book.id);
       onDeleted();
     } catch (error) {
+      // 409 means the book has reading-log entries, goal memberships, etc.
+      // Say what they are and let the user decide, rather than failing silently.
+      if (error instanceof ApiError && error.status === 409) {
+        const detail = error.body?.message || "This book has related records.";
+        if (!confirm(`${detail}\n\nDelete anyway?`)) return;
+        try {
+          await api.books.delete(book.id, { cascade: true });
+          onDeleted();
+          return;
+        } catch (retryError) {
+          console.error("Error deleting book (cascade):", retryError);
+          alert("Could not delete this book. Nothing was changed.");
+          return;
+        }
+      }
       console.error("Error deleting book:", error);
+      alert("Could not delete this book. Nothing was changed.");
     }
   };
 
@@ -471,11 +495,17 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={() => {
-          // If an autosave is queued, flush it first so the edit isn't lost.
+        onClick={async () => {
+          // If an autosave is queued, flush it and WAIT. This used to fire
+          // doSave() unawaited and close immediately, so a pending edit raced
+          // the unmount and a failure had nowhere to surface.
           if (saveTimeoutRef.current) {
             clearTimeout(saveTimeoutRef.current);
-            doSave();
+            saveTimeoutRef.current = null;
+            // If the flush failed, stay open — doSave has already surfaced the
+            // error and the user's edits are still in local state.
+            const ok = await doSave();
+            if (!ok) return;
           }
           // doSave already calls onUpdated() on success — we still need an
           // explicit close because onUpdated no longer dismisses the panel
@@ -807,10 +837,21 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
           ) : null}
 
           {/* Save status */}
-          {saveStatus && (
+          {saveStatus !== "idle" && (
             <div className="text-xs text-muted text-center">
               {saveStatus === "saving" && <span className="text-amber-400">Saving...</span>}
               {saveStatus === "saved" && <span className="text-emerald-400">Saved</span>}
+              {saveStatus === "error" && (
+                <span className="inline-flex items-center gap-2 text-red-400">
+                  Not saved — your changes are still here.
+                  <button
+                    onClick={() => doSave()}
+                    className="underline underline-offset-2 hover:text-red-300"
+                  >
+                    Retry
+                  </button>
+                </span>
+              )}
             </div>
           )}
         </div>

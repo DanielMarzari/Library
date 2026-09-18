@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
-import { api } from "@/lib/api-client";
+import { api, ApiError } from "@/lib/api-client";
 import { Book } from "@/types/book";
 import { BookShelf } from "@/components/BookShelf";
 import { BookDetail } from "@/components/BookDetail";
@@ -373,7 +373,20 @@ export default function Home() {
       await api.books.delete(id);
       setBooks((prev) => prev.filter((b) => b.id !== id));
     } catch (error) {
-      console.error("Error deleting book:", error);
+      if (error instanceof ApiError && error.status === 409) {
+        const detail = error.body?.message || "This book has related records.";
+        if (!confirm(`${detail}\n\nDelete anyway?`)) return;
+        try {
+          await api.books.delete(id, { cascade: true });
+          setBooks((prev) => prev.filter((b) => b.id !== id));
+          return;
+        } catch (retryError) {
+          console.error("Error deleting book (cascade):", retryError);
+        }
+      } else {
+        console.error("Error deleting book:", error);
+      }
+      alert("Could not delete that book. Nothing was changed.");
     }
   };
 
@@ -411,13 +424,39 @@ export default function Home() {
 
   const handleBulkDelete = async () => {
     if (!confirm(`Delete ${selectedIds.size} book(s)?`)) return;
-    try {
-      const ids = [...selectedIds];
-      await Promise.all(ids.map(id => api.books.delete(id)));
-      setBooks((prev) => prev.filter((b) => !selectedIds.has(b.id)));
-      clearSelection();
-    } catch (error) {
-      console.error("Error bulk deleting books:", error);
+    const ids = [...selectedIds];
+    // allSettled, not all: with Promise.all a single rejection abandons the
+    // remaining deletes AND skips the state update, so books that really were
+    // deleted stayed on screen until the next refetch.
+    const results = await Promise.allSettled(ids.map((id) => api.books.delete(id)));
+
+    const blocked = ids.filter((_, i) => {
+      const r = results[i];
+      return r.status === "rejected" && r.reason instanceof ApiError && r.reason.status === 409;
+    });
+    const deleted = new Set(ids.filter((_, i) => results[i].status === "fulfilled"));
+
+    // Offer one combined confirm for everything that was blocked by related rows.
+    if (blocked.length > 0) {
+      const ok = confirm(
+        `${blocked.length} of ${ids.length} book(s) have reading-log entries or goal memberships.\n\n` +
+        `Delete them and their related records too?`
+      );
+      if (ok) {
+        const retry = await Promise.allSettled(
+          blocked.map((id) => api.books.delete(id, { cascade: true }))
+        );
+        blocked.forEach((id, i) => { if (retry[i].status === "fulfilled") deleted.add(id); });
+      }
+    }
+
+    if (deleted.size > 0) setBooks((prev) => prev.filter((b) => !deleted.has(b.id)));
+    clearSelection();
+
+    const stillFailed = ids.length - deleted.size;
+    if (stillFailed > 0) {
+      console.error("Bulk delete: some books could not be deleted", results);
+      alert(`${deleted.size} deleted. ${stillFailed} could not be deleted and were left unchanged.`);
     }
   };
 

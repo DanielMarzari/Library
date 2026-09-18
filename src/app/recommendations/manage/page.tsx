@@ -387,20 +387,18 @@ export default function RecommendationsPage() {
         (books || []).forEach(b => { bookMap[b.id] = b.title; });
         setBookIdMap(bookMap);
 
-        // Auto-delete recommendations for books already in library (exact normalized title match)
-        const ownedRecs = allRecsData.filter((r) =>
+        // Recommendations whose normalized title matches a book already owned.
+        // These used to be HARD-DELETED right here on every page load: no
+        // confirmation, no undo, no record of what went. That is far too much
+        // trust for the evidence — `normalize` truncates to 40 characters and
+        // compares titles only, with no author check, so two unrelated books
+        // sharing a title prefix collapse into one ("Prayer", "Ruth", "Job"
+        // each have five distinct authors in this library). They now feed the
+        // same review list the fuzzy matcher uses, where each one is confirmed
+        // individually.
+        const exactTitleMatches = allRecsData.filter((r) =>
           normalizedBookTitles.has(normalize(r.title))
         );
-        if (ownedRecs.length > 0) {
-          const idsToDelete = ownedRecs.map((r) => r.id);
-          // Delete in batches of 50
-          for (let i = 0; i < idsToDelete.length; i += 50) {
-            const batch = idsToDelete.slice(i, i + 50);
-            for (const id of batch) {
-              await api.recommendations.delete(id);
-            }
-          }
-        }
 
         // Detect fuzzy matches: similar author + overlapping title words
         const authorLastName = (a: string) => {
@@ -476,6 +474,20 @@ export default function RecommendationsPage() {
             }
           }
         });
+        // Fold in the exact-title matches that used to be auto-deleted, so they
+        // get reviewed rather than silently removed. The fuzzy pass is the more
+        // reliable signal (it checks author), so anything it already caught
+        // keeps its richer libraryMatch label.
+        for (const rec of exactTitleMatches) {
+          if (fuzzyMatchedIds.has(rec.id)) continue;
+          const lib = (books || []).find((b) => normalize(b.title) === normalize(rec.title));
+          fuzzyMatches.push({
+            rec,
+            libraryMatch: lib ? `${lib.title}${lib.author ? ` by ${lib.author}` : ""}` : "a book in your library",
+          });
+          fuzzyMatchedIds.add(rec.id);
+        }
+
         // Filter out previously dismissed duplicates
         const savedDismissed = (() => { try { const s = localStorage.getItem("library-dismissed-dupes"); return s ? new Set(JSON.parse(s)) : new Set(); } catch { return new Set(); } })();
         setPossibleDupes(fuzzyMatches.filter(m => !savedDismissed.has(m.rec.id)));

@@ -24,6 +24,12 @@
 .DS_Store
 *.pem
 
+# local sqlite — getDb() creates one on first run in dev. The real database
+# lives only on the server; a committed copy would be both stale and confusing.
+*.db
+*.db-wal
+*.db-shm
+
 # debug
 npm-debug.log*
 yarn-debug.log*

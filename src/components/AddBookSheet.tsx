@@ -197,18 +197,16 @@ export function AddBookSheet({ onClose, onAdded, recentSources, prefill }: AddBo
     const ep = parseInt(endPage) || null;
 
     const coverToUse = confirmCoverUrl.trim() || book.cover_url;
-    const newBook: Partial<Book> = {
-      title: book.title, author: book.author, isbn: book.isbn,
-      cover_url: coverToUse || undefined, description: book.description || undefined,
-      pages: book.pages || undefined, status,
-      source: source.trim() || undefined, volume: volume.trim() || undefined,
-      lcc: book.lcc || undefined, ddc: book.ddc || undefined,
-      topics: editTopics.length > 0 ? editTopics : undefined,
-    };
-    onAdded(newBook);
 
+    // Create FIRST, then notify the parent with the row the server actually
+    // wrote. This used to be reversed — onAdded() fired before the write, and
+    // the home page's handler deletes the source recommendation on add. So a
+    // failed create destroyed the rec (along with the recommended_by and notes
+    // provenance that never gets copied onto the book) while creating nothing.
+    // Awaiting also removes the race against the 1500ms refetch, since the
+    // parent now receives a real id instead of a placeholder.
     try {
-      await api.books.create({
+      const created = await api.books.create({
         title: book.title, author: book.author, isbn: book.isbn || undefined,
         cover_url: coverToUse, description: book.description,
         pages: book.pages, intro_pages: ip || 0, start_page: sp, end_page: ep,
@@ -216,8 +214,12 @@ export function AddBookSheet({ onClose, onAdded, recentSources, prefill }: AddBo
         lcc: book.lcc || undefined, ddc: book.ddc || undefined,
         topics: editTopics.length > 0 ? editTopics : undefined,
       });
-    } catch (error) {
-      console.error("Error saving book:", error);
+      onAdded(created);
+    } catch (err) {
+      console.error("Error saving book:", err);
+      setError("Could not save this book — nothing was changed. Try again.");
+      setSaving(false);
+      return;
     }
     setSaving(false);
   };
@@ -255,23 +257,10 @@ export function AddBookSheet({ onClose, onAdded, recentSources, prefill }: AddBo
     const sp = parseInt(startPage) || 1;
     const ep = parseInt(endPage) || null;
     const yearNum = parseInt(articleYear);
-    const newBook: Partial<Book> = {
-      title: articleTitle.trim(),
-      author: articleAuthor.trim(),
-      status,
-      item_type: "article",
-      doi: article.doi,
-      journal: articleJournal.trim() || undefined,
-      publication_year: Number.isFinite(yearNum) ? yearNum : undefined,
-      url: articleUrl.trim() || undefined,
-      pages: article.pages || (ep || undefined),
-      source: source.trim() || undefined,
-      topics: editTopics.length > 0 ? editTopics : undefined,
-    };
-    onAdded(newBook);
 
+    // Create before notifying — see the note in handleAdd.
     try {
-      await api.books.create({
+      const created = await api.books.create({
         title: articleTitle.trim(),
         author: articleAuthor.trim(),
         status,
@@ -288,8 +277,12 @@ export function AddBookSheet({ onClose, onAdded, recentSources, prefill }: AddBo
         source: source.trim() || undefined,
         topics: editTopics.length > 0 ? editTopics : undefined,
       });
+      onAdded(created);
     } catch (err) {
       console.error("Error saving article:", err);
+      setError("Could not save this article — nothing was changed. Try again.");
+      setSaving(false);
+      return;
     }
     setSaving(false);
   };
@@ -303,17 +296,10 @@ export function AddBookSheet({ onClose, onAdded, recentSources, prefill }: AddBo
     const ep = parseInt(endPage) || null;
 
     const coverToUse = manCoverUrl.trim() || null;
-    const newBook: Partial<Book> = {
-      title: manTitle.trim(), author: manAuthor.trim(), status,
-      isbn: manIsbn.trim() || undefined,
-      cover_url: coverToUse || undefined,
-      source: source.trim() || undefined, volume: volume.trim() || undefined,
-      pages: manPages ? parseInt(manPages) : undefined,
-    };
-    onAdded(newBook);
 
+    // Create before notifying — see the note in handleAdd.
     try {
-      await api.books.create({
+      const created = await api.books.create({
         title: manTitle.trim(), author: manAuthor.trim(), status,
         isbn: manIsbn.trim() || undefined,
         cover_url: coverToUse,
@@ -322,8 +308,12 @@ export function AddBookSheet({ onClose, onAdded, recentSources, prefill }: AddBo
         source: source.trim() || undefined, volume: volume.trim() || undefined,
         topics: editTopics.length > 0 ? editTopics : undefined,
       });
-    } catch (error) {
-      console.error("Error saving book:", error);
+      onAdded(created);
+    } catch (err) {
+      console.error("Error saving book:", err);
+      setError("Could not save this book — nothing was changed. Try again.");
+      setSaving(false);
+      return;
     }
     setSaving(false);
   };

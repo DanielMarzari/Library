@@ -21,7 +21,50 @@ function ensureAllTables(db: Database.Database) {
       .map(r => r.name)
   );
 
-  // Books table should already exist from initial migration — skip if present
+  // `books` is the root table and must be created here like every other one.
+  // This used to be a comment saying it "should already exist from initial
+  // migration" — but no such migration lives in this repo, so a fresh database
+  // came up with every table EXCEPT books and the app failed on first query.
+  if (!existing.has('books')) {
+    db.exec(`
+      CREATE TABLE books (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        author TEXT NOT NULL,
+        isbn TEXT,
+        cover_url TEXT,
+        description TEXT,
+        status TEXT NOT NULL,
+        rating INTEGER,
+        created_at TEXT,
+        updated_at TEXT,
+        pages INTEGER,
+        start_date TEXT,
+        complete_date TEXT,
+        source TEXT,
+        lcc TEXT,
+        ddc TEXT,
+        topics TEXT,
+        intro_pages INTEGER,
+        start_page INTEGER,
+        end_page INTEGER,
+        reading_pages INTEGER,
+        volume TEXT,
+        current_page INTEGER,
+        auto_topics TEXT,
+        favorite INTEGER DEFAULT 0,
+        original_cover_url TEXT,
+        cover_blob BLOB,
+        cover_content_type TEXT,
+        item_type TEXT NOT NULL DEFAULT 'book',
+        doi TEXT,
+        journal TEXT,
+        publication_year INTEGER,
+        url TEXT,
+        density TEXT
+      )
+    `);
+  }
 
   if (!existing.has('authors')) {
     db.exec(`
@@ -211,6 +254,19 @@ function ensureAllTables(db: Database.Database) {
   addColumnSafe('authors', 'era', 'TEXT');
   addColumnSafe('authors', 'denomination', 'TEXT');
   addColumnSafe('authors', 'school', 'TEXT');
+
+  // Indexes. These existed in production but not in code, so a rebuilt database
+  // would have come up correct-but-slow with no indication anything was missing.
+  // IF NOT EXISTS makes this a no-op on the live database.
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_books_status ON books(status);
+    CREATE INDEX IF NOT EXISTS idx_books_author ON books(author);
+    CREATE INDEX IF NOT EXISTS idx_books_title ON books(title);
+    CREATE INDEX IF NOT EXISTS idx_learning_goal_books_goal ON learning_goal_books(goal_id);
+    CREATE INDEX IF NOT EXISTS idx_learning_goal_books_book ON learning_goal_books(book_id);
+    CREATE INDEX IF NOT EXISTS idx_recommendations_topic ON recommendations(topic);
+    CREATE INDEX IF NOT EXISTS idx_recommendations_author ON recommendations(author);
+  `);
 
   // Backfill: books marked read but missing complete_date get one derived from
   // updated_at (the most recent write to the row). This is only a proxy for the

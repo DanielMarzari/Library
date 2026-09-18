@@ -104,6 +104,36 @@ async function fetchJson<T>(
   return res.json();
 }
 
+/** Carries the HTTP status and parsed body so callers can branch on them —
+ *  specifically the 409 that book deletion returns when the book has related
+ *  rows the user should be warned about. */
+export class ApiError extends Error {
+  status: number;
+  body: any;
+  constructor(status: number, body: any, message: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.body = body;
+  }
+}
+
+// DELETE endpoints go through this rather than a bare fetch(). fetch() resolves
+// normally on 4xx/5xx, so `api.books.delete(id).catch(...)` never fired and a
+// rejected delete looked exactly like a successful one: the UI dropped the row
+// optimistically and it reappeared on the next refetch. 263 books have child
+// rows and none of the foreign keys cascade, so this was reachable in normal use.
+async function deleteJson(url: string): Promise<void> {
+  const res = await fetch(url, { method: 'DELETE' });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    let body: any = text;
+    try { body = JSON.parse(text); } catch { /* keep the raw text */ }
+    const detail = (body && typeof body === 'object' && (body.message || body.error)) || text;
+    throw new ApiError(res.status, body, `API error: ${res.status} - ${detail}`);
+  }
+}
+
 export const api = {
   books: {
     list: (params?: { status?: string; search?: string; favorites?: boolean; sort?: string }) => {
@@ -118,7 +148,10 @@ export const api = {
     create: (data: Partial<Book>) => fetchJson<Book>('/api/books', { method: 'POST', body: data }),
     update: (id: string, data: Partial<Book>) =>
       fetchJson<Book>(`/api/books/${id}`, { method: 'PUT', body: data }),
-    delete: (id: string) => fetch(`/api/books/${id}`, { method: 'DELETE' }),
+    /** Throws ApiError(409) with `body.related` when the book has reading log
+     *  entries, goal memberships, etc. Pass cascade:true to delete those too. */
+    delete: (id: string, opts?: { cascade?: boolean }) =>
+      deleteJson(`/api/books/${id}${opts?.cascade ? '?cascade=true' : ''}`),
   },
 
   authors: {
@@ -127,7 +160,7 @@ export const api = {
     create: (data: Partial<Author>) => fetchJson<Author>('/api/authors', { method: 'POST', body: data }),
     update: (id: string, data: Partial<Author>) =>
       fetchJson<Author>(`/api/authors/${id}`, { method: 'PUT', body: data }),
-    delete: (id: string) => fetch(`/api/authors/${id}`, { method: 'DELETE' }),
+    delete: (id: string) => deleteJson(`/api/authors/${id}`),
   },
 
   recommendations: {
@@ -137,7 +170,7 @@ export const api = {
       fetchJson<Recommendation>('/api/recommendations', { method: 'POST', body: data }),
     update: (id: string, data: Partial<Recommendation>) =>
       fetchJson<Recommendation>(`/api/recommendations/${id}`, { method: 'PUT', body: data }),
-    delete: (id: string) => fetch(`/api/recommendations/${id}`, { method: 'DELETE' }),
+    delete: (id: string) => deleteJson(`/api/recommendations/${id}`),
   },
 
   learningGoals: {
@@ -147,7 +180,7 @@ export const api = {
       fetchJson<LearningGoal>('/api/learning-goals', { method: 'POST', body: data }),
     update: (id: string, data: Partial<LearningGoal>) =>
       fetchJson<LearningGoal>(`/api/learning-goals/${id}`, { method: 'PUT', body: data }),
-    delete: (id: string) => fetch(`/api/learning-goals/${id}`, { method: 'DELETE' }),
+    delete: (id: string) => deleteJson(`/api/learning-goals/${id}`),
   },
 
   learningGoalBooks: {
@@ -161,7 +194,7 @@ export const api = {
       fetchJson<LearningGoalBook>('/api/learning-goal-books', { method: 'POST', body: data }),
     update: (id: string, data: Partial<LearningGoalBook>) =>
       fetchJson<LearningGoalBook>(`/api/learning-goal-books/${id}`, { method: 'PUT', body: data }),
-    delete: (id: string) => fetch(`/api/learning-goal-books/${id}`, { method: 'DELETE' }),
+    delete: (id: string) => deleteJson(`/api/learning-goal-books/${id}`),
   },
 
   readingList: {
@@ -175,7 +208,7 @@ export const api = {
       fetchJson<ReadingList>('/api/reading-list', { method: 'POST', body: data }),
     update: (id: string, data: Partial<ReadingList>) =>
       fetchJson<ReadingList>(`/api/reading-list/${id}`, { method: 'PUT', body: data }),
-    delete: (id: string) => fetch(`/api/reading-list/${id}`, { method: 'DELETE' }),
+    delete: (id: string) => deleteJson(`/api/reading-list/${id}`),
   },
 
   readingGoals: {
@@ -194,7 +227,7 @@ export const api = {
     },
     create: (data: Partial<ReadingUpdate>) =>
       fetchJson<ReadingUpdate>('/api/reading-updates', { method: 'POST', body: data }),
-    delete: (id: string) => fetch(`/api/reading-updates/${id}`, { method: 'DELETE' }),
+    delete: (id: string) => deleteJson(`/api/reading-updates/${id}`),
   },
 
   lending: {
@@ -204,6 +237,6 @@ export const api = {
       fetchJson<LendingRecord>('/api/lending', { method: 'POST', body: data }),
     update: (id: string, data: Partial<LendingRecord>) =>
       fetchJson<LendingRecord>(`/api/lending/${id}`, { method: 'PUT', body: data }),
-    delete: (id: string) => fetch(`/api/lending/${id}`, { method: 'DELETE' }),
+    delete: (id: string) => deleteJson(`/api/lending/${id}`),
   },
 };

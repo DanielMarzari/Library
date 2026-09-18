@@ -224,19 +224,69 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
 }
 
+// Child tables that reference books(id). None of them declare ON DELETE CASCADE,
+// so any row here blocks the delete at the SQLite level — which previously
+// surfaced as an opaque 500. 263 of 968 books have at least one, so this was
+// reachable in ordinary use.
+const BOOK_CHILD_TABLES = [
+  { table: 'reading_updates', label: 'reading log entries' },
+  { table: 'learning_goal_books', label: 'learning goal memberships' },
+  { table: 'reading_list', label: 'reading list entries' },
+  { table: 'lending', label: 'lending records' },
+] as const;
+
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const db = getDb();
+    const cascade = new URL(request.url).searchParams.get('cascade') === 'true';
 
-    const stmt = db.prepare('DELETE FROM books WHERE id = ?');
-    const result = stmt.run(id);
-
-    if (result.changes === 0) {
+    const book = db.prepare('SELECT id, title FROM books WHERE id = ?').get(id) as
+      | { id: string; title: string }
+      | undefined;
+    if (!book) {
       return NextResponse.json({ error: 'Book not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true });
+    // Count what would be destroyed before destroying it.
+    const related: Record<string, number> = {};
+    let relatedTotal = 0;
+    for (const { table } of BOOK_CHILD_TABLES) {
+      const row = db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE book_id = ?`).get(id) as { n: number };
+      if (row.n > 0) {
+        related[table] = row.n;
+        relatedTotal += row.n;
+      }
+    }
+
+    // Refuse by default and say exactly what is attached, so the caller can ask
+    // the user rather than either failing opaquely or silently shredding data
+    // they spent real effort curating.
+    if (relatedTotal > 0 && !cascade) {
+      const parts = BOOK_CHILD_TABLES.filter(({ table }) => related[table]).map(
+        ({ table, label }) => `${related[table]} ${label}`
+      );
+      return NextResponse.json(
+        {
+          error: 'has_related_records',
+          message: `"${book.title}" has ${parts.join(', ')}. Deleting it removes those too.`,
+          related,
+        },
+        { status: 409 }
+      );
+    }
+
+    const runDelete = db.transaction(() => {
+      if (cascade) {
+        for (const { table } of BOOK_CHILD_TABLES) {
+          db.prepare(`DELETE FROM ${table} WHERE book_id = ?`).run(id);
+        }
+      }
+      db.prepare('DELETE FROM books WHERE id = ?').run(id);
+    });
+    runDelete();
+
+    return NextResponse.json({ success: true, deletedRelated: related });
   } catch (error) {
     console.error(`DELETE /api/books/[id] error:`, error);
     return NextResponse.json({ error: 'Failed to delete book' }, { status: 500 });

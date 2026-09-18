@@ -31,7 +31,14 @@ jobs:
 
       - name: Deploy
         run: |
-          rsync -avz --delete --exclude='*.db' --exclude='*.db-wal' --exclude='*.db-shm' \
+          # The production database lives in this directory. --exclude keeps it
+          # out of the transfer so a stray local .db can never overwrite it;
+          # --filter 'protect' keeps --delete from removing it. Both are
+          # deliberate belt-and-braces: this file is the whole library, and one
+          # bad glob here loses it. The single '*.db*' pattern covers the -wal
+          # and -shm sidecars too.
+          rsync -avz --delete \
+            --exclude='*.db*' --filter='protect *.db*' \
             -e "ssh -i ~/.ssh/deploy_key" \
             .next/standalone/ \
             ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/var/www/apps/library/
