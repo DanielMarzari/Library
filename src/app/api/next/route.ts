@@ -171,6 +171,34 @@ export async function GET(request: Request) {
       goalScores.set(goalId, { name: g.name, score: (engaged / owned) * 100 / runway, done, owned });
     }
 
+    // Goal progress for the page's lead section. Every goal that owns a book,
+    // ranked by how close it is to done — a goal at 10 of 15 is the one worth
+    // showing, not one at 0 of 40. Goals already finished drop off; goals with
+    // nothing owned aren't progress, they're a shopping list, and belong under
+    // Buy next instead.
+    const goalProgress = [...byGoal.entries()]
+      .map(([goalId, g]) => {
+        const owned = g.rows.length;
+        const read = g.rows.filter(r => r.status === 'read').length;
+        const reading = g.rows.filter(r => r.status === 'reading' || r.status === 'paused').length;
+        return {
+          id: goalId,
+          name: g.name,
+          owned,
+          read,
+          reading,
+          remaining: owned - read,
+          percent: owned > 0 ? Math.round((read / owned) * 100) : 0,
+        };
+      })
+      .filter(g => g.owned > 0 && g.read < g.owned)
+      .sort((a, b) => b.percent - a.percent || a.remaining - b.remaining)
+      .slice(0, 8);
+
+    const goalsComplete = [...byGoal.values()].filter(
+      g => g.rows.length > 0 && g.rows.every(r => r.status === 'read')
+    ).length;
+
     const candidates = new Map<string, any>();
     for (const [goalId, g] of byGoal) {
       const gs = goalScores.get(goalId);
@@ -343,6 +371,9 @@ export async function GET(request: Request) {
       pagesToClose,
       poolFloor,
       misShelved: { count: misShelved.length, books: misShelved.slice(0, 60) },
+      goalProgress,
+      goalsComplete,
+      goalCount: byGoal.size,
       readNext,
       buyNext: { starred, opensGoal, emptyGoalCount: emptyGoals.length },
       unrankable: unrankable.n,

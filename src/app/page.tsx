@@ -29,10 +29,6 @@ export default function Home() {
   const [sortMode, setSortMode] = useState<SortMode>("recent");
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
-  // Finish-something nudge. nudgeIndex lets "×" rotate to the next candidate
-  // rather than dismissing the idea entirely.
-  const [stalledInfo, setStalledInfo] = useState<Awaited<ReturnType<typeof api.stalled.get>> | null>(null);
-  const [nudgeIndex, setNudgeIndex] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Nav + header UI
@@ -126,31 +122,6 @@ export default function Home() {
     }).catch(() => {});
     return () => { ignore = true; };
   }, []);
-
-  // Load the stalled pile once. Refetched after a "Set aside" so the count and
-  // the suggestion both stay honest.
-  const loadStalled = useCallback(() => {
-    api.stalled.get().then(setStalledInfo).catch(() => {});
-  }, []);
-  useEffect(() => { loadStalled(); }, [loadStalled, refreshKey]);
-
-  const nudge = useMemo(() => {
-    if (!stalledInfo || stalledInfo.candidates.length === 0) return null;
-    const book = stalledInfo.candidates[nudgeIndex % stalledInfo.candidates.length];
-    return book ? { book, stalledCount: stalledInfo.stalledCount } : null;
-  }, [stalledInfo, nudgeIndex]);
-
-  const handleSetAside = async (id: string) => {
-    try {
-      // Pausing preserves current_page and start_date — see BookStatus in types.
-      await api.books.update(id, { status: "paused" });
-      setBooks((prev) => prev.map((b) => (b.id === id ? { ...b, status: "paused" } : b)));
-      loadStalled();
-    } catch (error) {
-      console.error("Error setting book aside:", error);
-      alert("Could not set that book aside. Nothing was changed.");
-    }
-  };
 
   const clearCountryFilter = () => {
     setCountryFilter(null);
@@ -828,49 +799,6 @@ export default function Home() {
 
       {/* Main content */}
       <main className="flex-1 w-full w-full px-4 py-6">
-        {/* Finish-something nudge. One book, never a list — a list of 221 is the
-            problem, not the prompt. Shows the stalled book closest to done, so
-            the suggested action is the cheapest one available. */}
-        {nudge && (
-          <div className="mb-5 flex items-center gap-3 rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3">
-            <div className="flex-1 min-w-0">
-              <p className="text-[11px] uppercase tracking-wider text-amber-500/80 font-semibold">
-                {nudge.stalledCount} books open · closest to done
-              </p>
-              <p className="text-sm text-foreground truncate mt-0.5">
-                <span className="font-medium">{nudge.book.title}</span>
-                <span className="text-muted"> — {nudge.book.pagesLeft} pages left
-                  {nudge.book.daysSince > 0 ? `, untouched ${nudge.book.daysSince} days` : ""}</span>
-              </p>
-            </div>
-            <button
-              onClick={() => {
-                const b = books.find((x) => x.id === nudge.book.id);
-                if (b) setSelectedBook(b);
-                else api.books.get(nudge.book.id).then(setSelectedBook).catch(() => {});
-              }}
-              className="flex-shrink-0 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-            >
-              Pick it up
-            </button>
-            <button
-              onClick={() => handleSetAside(nudge.book.id)}
-              className="flex-shrink-0 bg-surface-2 hover:bg-border-custom text-muted hover:text-foreground px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-              title="Mark as paused — keeps your place, stops it counting as in-progress"
-            >
-              Set aside
-            </button>
-            <button
-              onClick={() => setNudgeIndex((i) => i + 1)}
-              className="flex-shrink-0 text-muted-2 hover:text-foreground px-1 text-lg leading-none"
-              title="Show a different one"
-              aria-label="Skip"
-            >
-              ×
-            </button>
-          </div>
-        )}
-
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="animate-spin rounded-full h-8 w-8 border-2 border-zinc-700 border-t-emerald-500" />

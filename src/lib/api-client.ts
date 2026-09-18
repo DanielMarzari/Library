@@ -19,6 +19,9 @@ export interface NextPayload {
   pagesToClose: number;
   poolFloor: number;
   misShelved: { count: number; books: Array<{ id: string; title: string; author: string; currentPage: number; totalPages: number; daysSince: number }> };
+  goalProgress: Array<{ id: string; name: string; owned: number; read: number; reading: number; remaining: number; percent: number }>;
+  goalsComplete: number;
+  goalCount: number;
   readNext: Array<{ id: string; title: string; author: string; pages: number | null; score: number; goalName: string; goalDone: number; goalOwned: number }>;
   buyNext: {
     starred: Array<{ id: string; title: string; author: string; price: number }>;

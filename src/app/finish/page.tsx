@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { api, NextBook, NextPayload } from "@/lib/api-client";
+import { Book } from "@/types/book";
 import { AppNav } from "@/components/AppNav";
 
 type Band = "nearly" | "halfway" | "started" | "barely";
@@ -27,10 +28,18 @@ export default function FinishPage() {
   const [data, setData] = useState<NextPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // The mis-shelved sweep. This lives here rather than on /next because it is
+  // pile management, not a reading decision.
+  const [sweepOpen, setSweepOpen] = useState(false);
+  const [sweepSelected, setSweepSelected] = useState<Set<string>>(new Set());
+  const [sweepBusy, setSweepBusy] = useState(false);
+  const [undo, setUndo] = useState<{ previous: Array<{ id: string; status: Book["status"] }>; count: number } | null>(null);
 
   const load = useCallback(async () => {
     try {
-      setData(await api.next.get({ full: true }));
+      const d = await api.next.get({ full: true });
+      setData(d);
+      setSweepSelected(new Set(d.misShelved.books.map(b => b.id)));
     } catch (error) {
       console.error("Error loading /finish:", error);
     } finally {
@@ -39,6 +48,13 @@ export default function FinishPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Undo expires so a stale banner can't reapply an old state later.
+  useEffect(() => {
+    if (!undo) return;
+    const t = setTimeout(() => setUndo(null), 30000);
+    return () => clearTimeout(t);
+  }, [undo]);
 
   // Paused books are deliberately not being worked on, so they don't belong in
   // the bands — otherwise tapping Pause appears to do nothing, since the pool
@@ -67,15 +83,38 @@ export default function FinishPage() {
     finally { setBusyId(null); }
   };
 
-  const markFinished = (id: string) =>
-    act(id, () => api.books.update(id, {
-      status: "read",
-      complete_date: new Date().toISOString().split("T")[0],
-    }));
-
   const setAside = (id: string) => act(id, () => api.books.update(id, { status: "paused" }));
   // Resuming does not touch start_date or current_page — it's the same read.
   const resume = (id: string) => act(id, () => api.books.update(id, { status: "reading" }));
+
+  const runSweep = async (status: "not_read" | "paused") => {
+    if (!data) return;
+    const ids = data.misShelved.books.filter(b => sweepSelected.has(b.id)).map(b => b.id);
+    if (ids.length === 0) return;
+    if (!confirm(`Move ${ids.length} book${ids.length === 1 ? "" : "s"} from "reading" to "${status === "not_read" ? "Not Read" : "Paused"}"?`)) return;
+    setSweepBusy(true);
+    try {
+      const res = await api.booksBulk.setStatus(ids.map(id => ({ id, status })));
+      setUndo({ previous: res.previous, count: res.changed });
+      setSweepOpen(false);
+      await load();
+    } catch {
+      alert("Could not update those books. Nothing was changed.");
+    } finally {
+      setSweepBusy(false);
+    }
+  };
+
+  const applyUndo = async () => {
+    if (!undo) return;
+    try {
+      await api.booksBulk.setStatus(undo.previous);
+      setUndo(null);
+      await load();
+    } catch {
+      alert("Could not undo.");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
@@ -108,6 +147,12 @@ export default function FinishPage() {
           </div>
         ) : (
           <div className="space-y-8">
+            {undo && (
+              <div className="flex items-center gap-3 rounded-lg border border-border-custom bg-surface px-4 py-2.5 text-sm">
+                <span className="text-muted flex-1">Moved {undo.count} books.</span>
+                <button onClick={applyUndo} className="text-emerald-400 hover:text-emerald-300 font-medium">Undo</button>
+              </div>
+            )}
             {banded.map(band => (
               <section key={band.key}>
                 <div className="flex items-baseline gap-2 mb-1">
@@ -123,7 +168,6 @@ export default function FinishPage() {
                       key={b.id}
                       book={b}
                       busy={busyId === b.id}
-                      onFinish={() => markFinished(b.id)}
                       onSetAside={() => setAside(b.id)}
                     />
                   ))}
@@ -144,7 +188,6 @@ export default function FinishPage() {
                       key={b.id}
                       book={b}
                       busy={busyId === b.id}
-                      onFinish={() => markFinished(b.id)}
                       onSetAside={() => resume(b.id)}
                       asideLabel="Resume"
                     />
@@ -152,6 +195,59 @@ export default function FinishPage() {
                 </div>
               </section>
             )}
+
+        {/* §3 — the mis-shelved sweep */}
+        {data && data.misShelved.count >= 10 && (
+          <section>
+            <h2 className="text-[11px] uppercase tracking-wider text-muted-2 font-semibold mb-1">Never really started</h2>
+            <p className="text-sm text-muted mb-3">
+              {data.misShelved.count}{" "}books are marked &ldquo;reading&rdquo; but sit under 10% with nothing ever
+              logged, all cold for over a year. They&apos;re inflating every count on the site.
+            </p>
+            {!sweepOpen ? (
+              <button onClick={() => setSweepOpen(true)} className="bg-surface-2 hover:bg-border-custom text-foreground px-3 py-1.5 rounded-lg text-sm font-medium transition-colors">
+                Review and fix
+              </button>
+            ) : (
+              <div className="rounded-xl border border-border-custom overflow-hidden">
+                <div className="max-h-72 overflow-y-auto divide-y divide-border-custom">
+                  {data.misShelved.books.map(b => (
+                    <label key={b.id} className="flex items-center gap-3 px-4 py-2 bg-surface cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={sweepSelected.has(b.id)}
+                        onChange={e => {
+                          setSweepSelected(prev => {
+                            const n = new Set(prev);
+                            if (e.target.checked) n.add(b.id); else n.delete(b.id);
+                            return n;
+                          });
+                        }}
+                        className="accent-emerald-600"
+                      />
+                      <span className="flex-1 min-w-0 text-sm truncate">{b.title}</span>
+                      <span className="text-[11px] text-muted-2 flex-shrink-0">
+                        p.{b.currentPage}/{b.totalPages} · {b.daysSince}d
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-2 px-4 py-3 bg-surface-2 border-t border-border-custom">
+                  <span className="text-xs text-muted flex-1">{sweepSelected.size} selected</span>
+                  <button disabled={sweepBusy || sweepSelected.size === 0} onClick={() => runSweep("not_read")}
+                    className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-xs font-medium">
+                    Mark Not Read
+                  </button>
+                  <button disabled={sweepBusy || sweepSelected.size === 0} onClick={() => runSweep("paused")}
+                    className="bg-surface hover:bg-border-custom disabled:opacity-50 text-foreground px-3 py-1.5 rounded-lg text-xs font-medium">
+                    Mark Paused
+                  </button>
+                  <button onClick={() => setSweepOpen(false)} className="text-xs text-muted hover:text-foreground px-2 py-1.5">Cancel</button>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
 
             {data?.needsPageData && data.needsPageData.length > 0 && (
               <section>
@@ -280,13 +376,11 @@ function PageDataRow({
 function Row({
   book,
   busy,
-  onFinish,
   onSetAside,
   asideLabel = "Pause",
 }: {
   book: NextBook;
   busy: boolean;
-  onFinish: () => void;
   onSetAside: () => void;
   asideLabel?: string;
 }) {
@@ -307,7 +401,6 @@ function Row({
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
           <Link href={`/?open=${book.id}`} className="text-xs text-muted hover:text-foreground px-2 py-1">Log</Link>
-          <button disabled={busy} onClick={onFinish} className="text-xs text-muted hover:text-emerald-400 disabled:opacity-40 px-2 py-1">Done</button>
           <button
             disabled={busy}
             onClick={onSetAside}

@@ -34,16 +34,11 @@ export default function NextPage() {
   const [data, setData] = useState<NextPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [snoozed, setSnoozed] = useState<Record<string, number>>({});
-  const [sweepOpen, setSweepOpen] = useState(false);
-  const [sweepSelected, setSweepSelected] = useState<Set<string>>(new Set());
-  const [sweepBusy, setSweepBusy] = useState(false);
-  const [undo, setUndo] = useState<{ previous: Array<{ id: string; status: any }>; count: number } | null>(null);
 
   const load = useCallback(async () => {
     try {
       const d = await api.next.get();
       setData(d);
-      setSweepSelected(new Set(d.misShelved.books.map(b => b.id)));
     } catch (error) {
       console.error("Error loading /next:", error);
     } finally {
@@ -52,13 +47,6 @@ export default function NextPage() {
   }, []);
 
   useEffect(() => { setSnoozed(loadSnoozed()); load(); }, [load]);
-
-  // Undo expires on its own so a stale banner can't apply an old state later.
-  useEffect(() => {
-    if (!undo) return;
-    const t = setTimeout(() => setUndo(null), 30000);
-    return () => clearTimeout(t);
-  }, [undo]);
 
   const isSnoozed = (id: string) => {
     const at = snoozed[id];
@@ -84,44 +72,6 @@ export default function NextPage() {
     }
   };
 
-  const markFinished = async (id: string) => {
-    try {
-      await api.books.update(id, { status: "read", complete_date: new Date().toISOString().split("T")[0] });
-      load();
-    } catch {
-      alert("Could not mark that finished. Nothing was changed.");
-    }
-  };
-
-  const runSweep = async (status: "not_read" | "paused") => {
-    if (!data) return;
-    const ids = data.misShelved.books.filter(b => sweepSelected.has(b.id)).map(b => b.id);
-    if (ids.length === 0) return;
-    if (!confirm(`Move ${ids.length} book${ids.length === 1 ? "" : "s"} from "reading" to "${status === "not_read" ? "Not Read" : "Paused"}"?`)) return;
-    setSweepBusy(true);
-    try {
-      const res = await api.booksBulk.setStatus(ids.map(id => ({ id, status })));
-      setUndo({ previous: res.previous, count: res.changed });
-      setSweepOpen(false);
-      load();
-    } catch {
-      alert("Could not update those books. Nothing was changed.");
-    } finally {
-      setSweepBusy(false);
-    }
-  };
-
-  const applyUndo = async () => {
-    if (!undo) return;
-    try {
-      await api.booksBulk.setStatus(undo.previous);
-      setUndo(null);
-      load();
-    } catch {
-      alert("Could not undo.");
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
@@ -143,11 +93,36 @@ export default function NextPage() {
       <Header />
 
       <main className="flex-1 w-full max-w-4xl mx-auto px-4 py-6 space-y-8">
-        {undo && (
-          <div className="flex items-center gap-3 rounded-lg border border-border-custom bg-surface px-4 py-2.5 text-sm">
-            <span className="text-muted flex-1">Moved {undo.count} books.</span>
-            <button onClick={applyUndo} className="text-emerald-400 hover:text-emerald-300 font-medium">Undo</button>
-          </div>
+        {/* Goals lead the page — they're what the reading is actually for, and
+            the sections below are both answers to "what moves a goal forward". */}
+        {data.goalProgress.length > 0 && (
+          <section>
+            <div className="flex items-baseline justify-between mb-3">
+              <h2 className="text-[11px] uppercase tracking-wider text-muted-2 font-semibold">Your reading goals</h2>
+              <span className="text-[11px] text-muted-2">
+                {data.goalsComplete > 0 && <>{data.goalsComplete} complete · </>}
+                {data.goalCount} with books
+              </span>
+            </div>
+            <div className="divide-y divide-border-custom rounded-xl border border-border-custom overflow-hidden">
+              {data.goalProgress.map(g => (
+                <div key={g.id} className="bg-surface px-4 py-2.5">
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-sm flex-1 min-w-0 truncate">{g.name}</span>
+                    <span className="text-[11px] text-muted-2 flex-shrink-0">
+                      {g.read} of {g.owned} read
+                      {g.reading > 0 && <span className="text-emerald-500/80"> · {g.reading} open</span>}
+                    </span>
+                    <span className="text-xs font-semibold text-indigo-300 w-9 text-right flex-shrink-0">{g.percent}%</span>
+                  </div>
+                  <div className="mt-1.5 h-1 rounded-full bg-surface-2 overflow-hidden">
+                    <div className="h-full bg-indigo-400/70 rounded-full" style={{ width: `${g.percent}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-muted-2 mt-2">Closest to finishing first.</p>
+          </section>
         )}
 
         {/* §1 — one book, one decision */}
@@ -175,9 +150,6 @@ export default function NextPage() {
                 <Link href={`/?open=${hero.id}`} className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors">
                   Log pages
                 </Link>
-                <button onClick={() => markFinished(hero.id)} className="bg-surface-2 hover:bg-border-custom text-foreground px-3 py-1.5 rounded-lg text-sm font-medium transition-colors">
-                  Mark finished
-                </button>
                 <button
                   onClick={() => { snooze(hero.id); setSnoozed(loadSnoozed()); }}
                   className="text-muted hover:text-foreground px-3 py-1.5 rounded-lg text-sm transition-colors"
@@ -227,63 +199,9 @@ export default function NextPage() {
                     </p>
                   </div>
                   <Link href={`/?open=${b.id}`} className="flex-shrink-0 text-xs text-muted hover:text-foreground px-2 py-1">Log</Link>
-                  <button onClick={() => markFinished(b.id)} className="flex-shrink-0 text-xs text-muted hover:text-emerald-400 px-2 py-1">Done</button>
                 </div>
               ))}
             </div>
-          </section>
-        )}
-
-        {/* §3 — the mis-shelved sweep */}
-        {data.misShelved.count >= 10 && (
-          <section>
-            <h2 className="text-[11px] uppercase tracking-wider text-muted-2 font-semibold mb-1">Never really started</h2>
-            <p className="text-sm text-muted mb-3">
-              {data.misShelved.count}{" "}books are marked &ldquo;reading&rdquo; but sit under 10% with nothing ever
-              logged, all cold for over a year. They&apos;re inflating every count on the site.
-            </p>
-            {!sweepOpen ? (
-              <button onClick={() => setSweepOpen(true)} className="bg-surface-2 hover:bg-border-custom text-foreground px-3 py-1.5 rounded-lg text-sm font-medium transition-colors">
-                Review and fix
-              </button>
-            ) : (
-              <div className="rounded-xl border border-border-custom overflow-hidden">
-                <div className="max-h-72 overflow-y-auto divide-y divide-border-custom">
-                  {data.misShelved.books.map(b => (
-                    <label key={b.id} className="flex items-center gap-3 px-4 py-2 bg-surface cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={sweepSelected.has(b.id)}
-                        onChange={e => {
-                          setSweepSelected(prev => {
-                            const n = new Set(prev);
-                            if (e.target.checked) n.add(b.id); else n.delete(b.id);
-                            return n;
-                          });
-                        }}
-                        className="accent-emerald-600"
-                      />
-                      <span className="flex-1 min-w-0 text-sm truncate">{b.title}</span>
-                      <span className="text-[11px] text-muted-2 flex-shrink-0">
-                        p.{b.currentPage}/{b.totalPages} · {b.daysSince}d
-                      </span>
-                    </label>
-                  ))}
-                </div>
-                <div className="flex flex-wrap items-center gap-2 px-4 py-3 bg-surface-2 border-t border-border-custom">
-                  <span className="text-xs text-muted flex-1">{sweepSelected.size} selected</span>
-                  <button disabled={sweepBusy || sweepSelected.size === 0} onClick={() => runSweep("not_read")}
-                    className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-xs font-medium">
-                    Mark Not Read
-                  </button>
-                  <button disabled={sweepBusy || sweepSelected.size === 0} onClick={() => runSweep("paused")}
-                    className="bg-surface hover:bg-border-custom disabled:opacity-50 text-foreground px-3 py-1.5 rounded-lg text-xs font-medium">
-                    Mark Paused
-                  </button>
-                  <button onClick={() => setSweepOpen(false)} className="text-xs text-muted hover:text-foreground px-2 py-1.5">Cancel</button>
-                </div>
-              </div>
-            )}
           </section>
         )}
 
