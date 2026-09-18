@@ -3,6 +3,29 @@
 import { Book, ReadingUpdate, Density } from '@/types/book';
 import type { TierStat } from '@/lib/readingPace';
 
+export interface NextBook {
+  id: string; title: string; author: string;
+  currentPage: number; totalPages: number; pagesLeft: number;
+  percentDone: number; daysSince: number; lastReadAt: string | null;
+  pagesPerHour?: number | null; hoursLeft?: number | null;
+}
+export interface NextPayload {
+  hero: NextBook | null;
+  heroAlt: NextBook | null;
+  nearlyDone: NextBook[];
+  nearlyDoneTotal: number;
+  pagesToClose: number;
+  poolFloor: number;
+  misShelved: { count: number; books: Array<{ id: string; title: string; author: string; currentPage: number; totalPages: number; daysSince: number }> };
+  readNext: Array<{ id: string; title: string; author: string; pages: number | null; score: number; goalName: string; goalDone: number; goalOwned: number }>;
+  buyNext: {
+    starred: Array<{ id: string; title: string; author: string; price: number }>;
+    opensGoal: Array<{ id: string; title: string; author: string; price: number; opens: string[] }>;
+    emptyGoalCount: number;
+  };
+  unrankable: number;
+}
+
 export interface Author {
   id: string;
   name: string;
@@ -218,6 +241,18 @@ export const api = {
       fetchJson<ReadingGoal>('/api/reading-goals', { method: 'POST', body: data }),
     update: (id: string, data: Partial<ReadingGoal>) =>
       fetchJson<ReadingGoal>(`/api/reading-goals/${id}`, { method: 'PUT', body: data }),
+  },
+
+  next: {
+    get: () => fetchJson<NextPayload>('/api/next'),
+  },
+
+  booksBulk: {
+    setStatus: (updates: Array<{ id: string; status: Book['status'] }>) =>
+      fetchJson<{ changed: number; previous: Array<{ id: string; status: Book['status'] }> }>(
+        '/api/books/bulk-status',
+        { method: 'PATCH', body: { updates } }
+      ),
   },
 
   stalled: {

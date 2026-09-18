@@ -58,6 +58,18 @@ export default function Home() {
     if (c) setCountryFilter(c);
   }, []);
 
+  // ?open=<id> opens a book's detail directly — used by /next so "Log pages"
+  // lands on the logging form rather than making you find the book again.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const openId = params.get("open");
+    if (!openId) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("open");
+    window.history.replaceState({}, "", url.toString());
+    api.books.get(openId).then(setSelectedBook).catch(() => {});
+  }, []);
+
   // Pre-fill state for the add-book form when opened from a recommendation
   // via ?addRec=<id>. We fetch the rec, hand its fields to AddBookSheet, and
   // remember the rec id so we can remove the recommendation on successful add.

@@ -50,6 +50,7 @@ export function AppNav() {
 
           <div className="border-t border-border-custom my-1.5" />
           <p className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-2 font-semibold">Tracking</p>
+          {item("/next", "What next")}
           {item("/stats", "Stats")}
           {item("/goals", "Goals")}
           {item("/reading-list", "Reading List")}
