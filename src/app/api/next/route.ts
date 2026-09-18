@@ -30,10 +30,14 @@ function normTitle(t: string): string {
   return s.replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const db = getDb();
     const now = Date.now();
+    // /finish asks for the whole in-progress pile, not the triage summary.
+    // Same computation either way — only the cap and the floor differ.
+    const url = new URL(request.url);
+    const full = url.searchParams.get('full') === 'true';
 
     // ---- in-progress pool -------------------------------------------------
     // current_page < total drops three rows whose page number is past the end
@@ -42,6 +46,7 @@ export async function GET() {
     // otherwise dominate any "pages left" ranking with negative values.
     const inProgress = db.prepare(`
       SELECT b.id, b.title, b.author, b.current_page, b.start_date, b.updated_at, b.density,
+             b.status,
              COALESCE(b.reading_pages, b.pages) AS total,
              (SELECT MAX(created_at) FROM reading_updates u WHERE u.book_id = b.id) AS last_read_at
       FROM books b
@@ -57,7 +62,7 @@ export async function GET() {
       const percentDone = Math.round((r.current_page / r.total) * 100);
       const recency = new Date(r.last_read_at || r.start_date || r.updated_at || 0).getTime();
       return {
-        id: r.id, title: r.title, author: r.author,
+        id: r.id, title: r.title, author: r.author, status: r.status,
         currentPage: r.current_page, totalPages: r.total,
         pagesLeft, percentDone,
         daysSince: Math.floor((now - recency) / DAY),
@@ -101,8 +106,17 @@ export async function GET() {
       .sort((a, b) => b.recency - a.recency)[0] ?? null;
 
     // ---- §2 nearly done ---------------------------------------------------
-    const nearlyDone = pool.slice(0, 12).map(withHours);
+    const nearlyDone = (full ? pool : pool.slice(0, 12)).map(withHours);
     const pagesToClose = pool.reduce((s, b) => s + b.pagesLeft, 0);
+
+    // For /finish: everything in progress regardless of how far along, so the
+    // page can show the long tail behind the nearly-done books.
+    const allInProgress = full
+      ? inProgress
+          .map(enrich)
+          .sort((a, b) => a.pagesLeft - b.pagesLeft || b.percentDone - a.percentDone)
+          .map(withHours)
+      : undefined;
 
     // ---- §3 never really started -----------------------------------------
     // Marked "reading", never logged once, barely opened, cold over a year.
@@ -285,6 +299,7 @@ export async function GET() {
       heroAlt,
       nearlyDone,
       nearlyDoneTotal: pool.length,
+      allInProgress,
       pagesToClose,
       poolFloor,
       misShelved: { count: misShelved.length, books: misShelved.slice(0, 60) },

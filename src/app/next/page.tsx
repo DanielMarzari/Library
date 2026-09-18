@@ -199,7 +199,12 @@ export default function NextPage() {
         {/* §2 — bound the pile */}
         {data.nearlyDone.length > 0 && (
           <section>
-            <h2 className="text-[11px] uppercase tracking-wider text-muted-2 font-semibold mb-1">Nearly yours</h2>
+            <div className="flex items-baseline justify-between mb-1">
+              <h2 className="text-[11px] uppercase tracking-wider text-muted-2 font-semibold">Nearly yours</h2>
+              <Link href="/finish" className="text-[11px] text-muted hover:text-foreground transition-colors">
+                See all open books →
+              </Link>
+            </div>
             <p className="text-sm text-muted mb-3">
               {data.nearlyDoneTotal} books are more than {data.poolFloor}% read.{" "}
               <span className="text-foreground font-medium">{data.pagesToClose.toLocaleString()} pages closes all of them.</span>

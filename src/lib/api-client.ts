@@ -4,7 +4,7 @@ import { Book, ReadingUpdate, Density } from '@/types/book';
 import type { TierStat } from '@/lib/readingPace';
 
 export interface NextBook {
-  id: string; title: string; author: string;
+  id: string; title: string; author: string; status?: Book['status'];
   currentPage: number; totalPages: number; pagesLeft: number;
   percentDone: number; daysSince: number; lastReadAt: string | null;
   pagesPerHour?: number | null; hoursLeft?: number | null;
@@ -14,6 +14,8 @@ export interface NextPayload {
   heroAlt: NextBook | null;
   nearlyDone: NextBook[];
   nearlyDoneTotal: number;
+  /** Only present when fetched with full=true (the /finish page). */
+  allInProgress?: NextBook[];
   pagesToClose: number;
   poolFloor: number;
   misShelved: { count: number; books: Array<{ id: string; title: string; author: string; currentPage: number; totalPages: number; daysSince: number }> };
@@ -246,7 +248,9 @@ export const api = {
   },
 
   next: {
-    get: () => fetchJson<NextPayload>('/api/next'),
+    /** full=true adds allInProgress and uncaps nearlyDone — used by /finish. */
+    get: (opts?: { full?: boolean }) =>
+      fetchJson<NextPayload>(`/api/next${opts?.full ? '?full=true' : ''}`),
   },
 
   booksBulk: {
