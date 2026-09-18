@@ -11,6 +11,14 @@ export type Density = "easy" | "moderate" | "hard" | "technical" | "dense";
 export type BookStatus = "not_read" | "reading" | "paused" | "read";
 
 /**
+ * How a book is read, and therefore how progress means anything for it.
+ *   linear — front to back; progress is a position (p.176 of 240)
+ *   range  — out of order (cookbooks, devotionals, reference); progress is the
+ *            union of the page spans you've logged
+ */
+export type ReadingMode = "linear" | "range";
+
+/**
  * Every nullable column arrives from better-sqlite3 as `null`, never
  * `undefined` — and the lookup APIs that feed book creation return `null` too.
  * These fields were typed `?: string`, so assigning a real row to a Book was a
@@ -27,6 +35,8 @@ export interface Book {
   has_cover_blob?: boolean;
   description?: string | null;
   status: BookStatus;
+  /** Defaults to 'linear' for every existing book. */
+  reading_mode?: ReadingMode | null;
   rating?: number | null;
   density?: Density | null;
   volume?: string | null;
@@ -62,7 +72,10 @@ export interface ReadingUpdate {
   id: string;
   book_id: string;
   pages_read: number;
+  /** For a range log this is the span's END page. */
   current_page: number;
-  notes?: string;
+  /** Set only on range logs — its presence is what marks one. NULL means linear. */
+  range_start?: number | null;
+  notes?: string | null;
   created_at: string;
 }

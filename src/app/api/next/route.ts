@@ -52,6 +52,10 @@ export async function GET(request: Request) {
       FROM books b
       WHERE b.status IN ('reading','paused')
         AND COALESCE(b.item_type,'book') = 'book'
+        -- Range books have no position, so 'pages left' and 'closest to done'
+        -- are meaningless for them. They'd otherwise sit in the pool forever at
+        -- a percentage that never moves.
+        AND COALESCE(b.reading_mode,'linear') = 'linear'
         AND COALESCE(b.reading_pages, b.pages) > 0
         AND b.current_page > 0
         AND b.current_page < COALESCE(b.reading_pages, b.pages)
@@ -128,6 +132,7 @@ export async function GET(request: Request) {
       FROM books b
       WHERE b.status = 'reading'
         AND COALESCE(b.item_type,'book') = 'book'
+        AND COALESCE(b.reading_mode,'linear') = 'linear'
         AND COALESCE(b.reading_pages, b.pages) > 0
         AND 100.0 * b.current_page / COALESCE(b.reading_pages, b.pages) < 10
         AND (SELECT COUNT(*) FROM reading_updates u WHERE u.book_id = b.id) = 0
@@ -317,6 +322,7 @@ export async function GET(request: Request) {
     const unrankable = db.prepare(`
       SELECT COUNT(*) AS n FROM books
       WHERE status IN ('reading','paused') AND COALESCE(item_type,'book')='book'
+        AND COALESCE(reading_mode,'linear') = 'linear'
         AND (COALESCE(reading_pages, pages) IS NULL
              OR COALESCE(reading_pages, pages) = 0
              OR current_page > COALESCE(reading_pages, pages))

@@ -40,6 +40,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       cover_url,
       description,
       status,
+      reading_mode,
       rating,
       density,
       volume,
@@ -127,6 +128,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (status !== undefined) {
       updates.push('status = ?');
       values.push(status);
+    }
+    // Without this branch the reading-mode toggle would 200 and change nothing.
+    if (reading_mode !== undefined) {
+      if (reading_mode !== 'linear' && reading_mode !== 'range') {
+        return NextResponse.json({ error: "reading_mode must be 'linear' or 'range'" }, { status: 400 });
+      }
+      updates.push('reading_mode = ?');
+      values.push(reading_mode);
     }
     if (rating !== undefined) {
       updates.push('rating = ?');

@@ -4,7 +4,8 @@ import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { api, ApiError } from "@/lib/api-client";
 import { observedPace, hoursLeft, formatHours, type TierStat } from "@/lib/readingPace";
 import { GoalChips } from "@/components/GoalChips";
-import { Book, ReadingUpdate, Density } from "@/types/book";
+import { Book, ReadingUpdate, Density, ReadingMode } from "@/types/book";
+import { coverageOf, readableRange, describeIslands } from "@/lib/coverage";
 import { enrichBook, searchBooks } from "@/lib/bookLookup";
 import { coverSrc, safeCoverUrl } from "@/lib/coverUrl";
 
@@ -100,6 +101,13 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
   const [status, setStatus] = useState(book.status);
   const [rating, setRating] = useState(book.rating || 0);
   const [density, setDensity] = useState<Book["density"] | undefined>(book.density);
+  // Out-of-order books (cookbooks, devotionals, reference) log page spans.
+  const [readingMode, setReadingMode] = useState<ReadingMode>(
+    (book.reading_mode as ReadingMode) || "linear"
+  );
+  const isRange = readingMode === "range";
+  const [rangeStart, setRangeStart] = useState("");
+  const [rangeEnd, setRangeEnd] = useState("");
   const [startDate, setStartDate] = useState(book.start_date || "");
   const [completeDate, setCompleteDate] = useState(book.complete_date || "");
   const [source, setSource] = useState(book.source || "");
@@ -231,8 +239,8 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
   };
 
   // Ref always holds the latest field values so doSave can read them without re-creating
-  const valuesRef = useRef({ title, author, coverUrl, pages, introPages, startPage, endPage, status, rating, density, startDate, completeDate, source, volume, lcc, ddc, editTopics, autoTopics, favorite });
-  valuesRef.current = { title, author, coverUrl, pages, introPages, startPage, endPage, status, rating, density, startDate, completeDate, source, volume, lcc, ddc, editTopics, autoTopics, favorite };
+  const valuesRef = useRef({ title, author, coverUrl, pages, introPages, startPage, endPage, status, rating, density, startDate, completeDate, source, volume, lcc, ddc, editTopics, autoTopics, favorite, readingMode });
+  valuesRef.current = { title, author, coverUrl, pages, introPages, startPage, endPage, status, rating, density, startDate, completeDate, source, volume, lcc, ddc, editTopics, autoTopics, favorite, readingMode };
 
   // Stable doSave — reads from ref, only depends on book.id.
   // Resolves true on success, false on failure, so callers that need to know
@@ -258,6 +266,7 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
         topics: v.editTopics.length > 0 ? v.editTopics : undefined,
         auto_topics: v.autoTopics.length > 0 ? v.autoTopics : undefined,
         favorite: v.favorite,
+        reading_mode: v.readingMode,
       });
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus("idle"), 1500);
@@ -290,6 +299,47 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
     if (newStatus === "reading" && !startDate) setStartDate(new Date().toISOString().split("T")[0]);
     if (newStatus === "read" && !completeDate) setCompleteDate(new Date().toISOString().split("T")[0]);
     scheduleAutoSave();
+  };
+
+  // Coverage for range books: the union of logged spans, not their sum. See
+  // src/lib/coverage.ts for why that distinction matters.
+  const coverage = useMemo(() => {
+    if (!isRange) return null;
+    const spans = updates
+      .filter(u => u.range_start != null)
+      .map(u => ({ start: u.range_start as number, end: u.current_page }));
+    return coverageOf(spans, readableRange(book));
+  }, [isRange, updates, book]);
+
+  const handleRangeAdd = async () => {
+    const s = parseInt(rangeStart, 10);
+    const e = parseInt(rangeEnd, 10);
+    if (!Number.isFinite(s) || !Number.isFinite(e) || e < s) return;
+    try {
+      await api.readingUpdates.create({
+        book_id: book.id,
+        range_start: s,
+        current_page: e,
+        pages_read: e - s + 1,
+        notes: updateNotes.trim() || undefined,
+      });
+      // A range book's status still moves to 'reading' on its first log, but
+      // it is never auto-completed — "every page touched" is where a devotional
+      // starts its second year, not where it gets filed away.
+      if (status === "not_read" || status === "paused") {
+        await api.books.update(book.id, { status: "reading" });
+        setStatus("reading");
+      }
+      setRangeStart("");
+      setRangeEnd("");
+      setUpdateNotes("");
+      setShowAddUpdate(false);
+      await loadUpdates();
+      onUpdated();
+    } catch (error) {
+      console.error("Error logging range:", error);
+      alert(error instanceof Error ? error.message : "Could not log that range.");
+    }
   };
 
   const handleAddUpdate = async () => {
@@ -464,7 +514,12 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
   // always in the log; the previous "pg/session" figure discarded it by
   // counting calendar days, which measured how spread out the reading was
   // rather than how fast it went.
-  const pace = useMemo(() => observedPace(updates), [updates]);
+  // Range logs are spans read out of order, so the gap between two of them isn't
+  // a reading rate — same reason /api/reading-pace excludes these books.
+  const pace = useMemo(
+    () => (isRange ? null : observedPace(updates.filter(u => u.range_start == null))),
+    [isRange, updates]
+  );
 
   // Tier fallback for books with no timed reading yet: the range of rates
   // observed across other books sharing this density tag. A range, not a mean —
@@ -760,6 +815,34 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
             </div>
           </div>
 
+          {/* How this book is read. Set it here, in the book's own setup — the
+              log form and the progress display both follow from it. */}
+          <div>
+            <label className="block text-xs text-muted mb-2">How you read it</label>
+            <div className="flex flex-wrap gap-1.5">
+              {([
+                { v: "linear" as ReadingMode, label: "Front to back", hint: "Track a current page" },
+                { v: "range" as ReadingMode, label: "Out of order", hint: "Cookbooks, devotionals, reference — log page ranges" },
+              ]).map(m => (
+                <button
+                  key={m.v}
+                  onClick={() => { setReadingMode(m.v); scheduleAutoSave(); }}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                    readingMode === m.v ? "bg-indigo-600 text-white" : "bg-surface-2 text-muted hover:text-foreground"
+                  }`}
+                  title={m.hint}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            {isRange && (
+              <p className="text-[11px] text-muted-2 mt-1.5">
+                Progress counts distinct pages covered, so re-reading a page doesn&apos;t double-count.
+              </p>
+            )}
+          </div>
+
           {/* Learning goals — 76 goals and 747 memberships existed with no way to
               see or change a book's goals from the book itself. */}
           <GoalChips bookId={book.id} />
@@ -793,8 +876,102 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
             </div>
           </div>
 
-          {/* Reading Progress — always visible if book has pages */}
-          {status !== "read" && (displayPages || book.pages) ? (
+          {/* An out-of-order book has no current page — what it has is a set of
+              pages covered, so it gets its own progress display and log form.
+              See src/lib/coverage.ts. */}
+          {isRange ? (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs text-muted">Pages covered</label>
+                <button onClick={() => setShowAddUpdate(!showAddUpdate)} className="text-xs text-indigo-400 hover:text-indigo-300 font-medium">
+                  {showAddUpdate ? "Cancel" : "+ Log Pages"}
+                </button>
+              </div>
+
+              {coverage && (() => {
+                const lo = readableRange(book).lo;
+                const denom = coverage.denom;
+                return (
+                  <div className="mb-3">
+                    {/* Islands are drawn where they actually fall. A devotional
+                        you've worked straight through to March looks different
+                        from one you've dipped into all year, and it should. */}
+                    <div className="relative w-full bg-surface-2 rounded-full h-3 overflow-hidden">
+                      {denom && coverage.islands.map((s, i) => (
+                        <div
+                          key={i}
+                          className="absolute top-0 bottom-0 bg-indigo-500"
+                          style={{
+                            left: `${Math.max(((s.start - lo) / denom) * 100, 0)}%`,
+                            width: `${Math.max(((s.end - s.start + 1) / denom) * 100, 0.5)}%`,
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <div className="flex items-center justify-between gap-3 mt-1.5">
+                      {/* The percent lives here rather than inside the bar: with
+                          scattered islands there's no filled block to sit it in,
+                          and white-on-track was unreadable. */}
+                      <span className="text-xs text-muted truncate" title={describeIslands(coverage.islands, 24)}>
+                        {coverage.percent !== null && <span className="text-indigo-400 font-medium">{coverage.percent}% </span>}
+                        {denom ? `${coverage.covered} of ${denom} · ` : `${coverage.covered} pages · `}
+                        {describeIslands(coverage.islands)}
+                      </span>
+                      {coverage.revisited > 0 && (
+                        <span className="text-xs text-muted-2 shrink-0" title="Pages logged more than once. They count once toward coverage.">
+                          {coverage.revisited} revisited
+                        </span>
+                      )}
+                    </div>
+                    {!denom && (
+                      <p className="text-[11px] text-amber-500/90 mt-1.5">
+                        Fill in the start and end pages above to see how much of it you&apos;ve covered.
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {showAddUpdate && (
+                <div className="bg-surface-2 rounded-lg p-3 mb-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={rangeStart} onChange={(e) => setRangeStart(e.target.value)}
+                      placeholder="From page"
+                      className="flex-1 min-w-0 bg-surface border border-border-custom rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                      autoFocus />
+                    <span className="text-muted text-sm">–</span>
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={rangeEnd} onChange={(e) => setRangeEnd(e.target.value)}
+                      placeholder="To page"
+                      className="flex-1 min-w-0 bg-surface border border-border-custom rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600" />
+                  </div>
+                  <input type="text" value={updateNotes} onChange={(e) => setUpdateNotes(e.target.value)} placeholder="Which entry, recipe, day (optional)"
+                    className="w-full bg-surface border border-border-custom rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600" />
+                  <button onClick={handleRangeAdd} disabled={!rangeStart || !rangeEnd}
+                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-50">Log pages</button>
+                </div>
+              )}
+
+              {/* Not aggregated by day: two spans logged the same afternoon are
+                  two different parts of the book, and collapsing them would hide
+                  exactly what this log exists to record. */}
+              {updates.length > 0 && (
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {updates.slice(0, 10).map((u) => (
+                    <div key={u.id} className="flex items-center gap-2 text-xs text-muted">
+                      <span className="text-muted-2">{new Date(u.created_at).toLocaleDateString()}</span>
+                      <span>
+                        {u.range_start != null && u.range_start !== u.current_page
+                          ? `p. ${u.range_start}–${u.current_page}`
+                          : `p. ${u.current_page}`}
+                      </span>
+                      <span className="text-indigo-400">+{u.pages_read}</span>
+                      {u.notes && <span className="text-muted-2 truncate">{u.notes}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : status !== "read" && (displayPages || book.pages) ? (
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs text-muted">Reading Progress</label>

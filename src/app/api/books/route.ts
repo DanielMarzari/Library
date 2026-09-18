@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     // which is NOT the same as updated_at (that moves on any edit — a rating, a
     // topic tag). Distinguishing "actively being read" from "marked reading
     // months ago and untouched since" needs the former.
-    let query = `SELECT id, title, author, isbn, cover_url, description, status, rating, density,
+    let query = `SELECT id, title, author, isbn, cover_url, description, status, reading_mode, rating, density,
       volume, pages, intro_pages, start_page, end_page, reading_pages,
       current_page, start_date, complete_date, source, lcc, ddc,
       topics, auto_topics, favorite, created_at, updated_at,

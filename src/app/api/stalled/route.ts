@@ -27,6 +27,8 @@ export async function GET() {
              b.updated_at
       FROM books b
       WHERE b.status = 'reading' AND COALESCE(b.item_type,'book') = 'book'
+        -- A cookbook is never 'stalled'; it's consulted.
+        AND COALESCE(b.reading_mode,'linear') = 'linear'
     `).all() as Array<{
       id: string; title: string; author: string;
       current_page: number | null; start_date: string | null;

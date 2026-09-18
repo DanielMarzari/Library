@@ -202,6 +202,17 @@ function ensureAllTables(db: Database.Database) {
   addColumnSafe('recommendations', 'thriftbooks_price', 'REAL');
   addColumnSafe('recommendations', 'amazon_price', 'REAL');
   addColumnSafe('recommendations', 'starred', 'INTEGER DEFAULT 0');
+
+  // Cookbooks, devotionals and reference works are read out of order, so
+  // "I am now on page N" is meaningless for them. A 'range' book logs page
+  // SPANS instead, and its progress is the union of those spans.
+  //
+  // range_start is NULL on every existing reading_updates row, and that NULL is
+  // itself the marker for a linear log — no backfill needed. A range row still
+  // writes current_page (the span's high end) and pages_read (its length), so
+  // pace measurement and the daily history keep working untouched.
+  addColumnSafe('books', 'reading_mode', "TEXT NOT NULL DEFAULT 'linear'");
+  addColumnSafe('reading_updates', 'range_start', 'INTEGER');
   addColumnSafe('authors', 'religious_tradition', 'TEXT');
   addColumnSafe('authors', 'profile_url', 'TEXT');
   addColumnSafe('authors', 'gender', 'TEXT');

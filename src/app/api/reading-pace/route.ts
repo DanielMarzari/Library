@@ -22,6 +22,12 @@ export async function GET() {
              b.title, b.author, b.density, b.pages, b.status
       FROM reading_updates u
       JOIN books b ON b.id = u.book_id
+      -- Range logs are spans read out of order, so the gap between two of them
+      -- is not a reading rate. One back-filled cookbook would widen a whole
+      -- density tier's published range.
+      -- Also row-level, not just book-level: a book switched back to linear
+      -- would otherwise donate its old spans to the tier ranges.
+      WHERE COALESCE(b.reading_mode,'linear') = 'linear' AND u.range_start IS NULL
       ORDER BY u.book_id, u.created_at
     `).all() as Array<{
       book_id: string; pages_read: number | null; created_at: string;
