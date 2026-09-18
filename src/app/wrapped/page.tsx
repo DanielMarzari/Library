@@ -9,7 +9,8 @@ export const dynamic = 'force-dynamic';
 
 interface AuthorInfo {
   name: string;
-  image_url?: string;
+  // authors.image_url is nullable and comes back as null, not undefined.
+  image_url?: string | null;
   book_count: number;
 }
 
@@ -119,7 +120,7 @@ export default function WrappedPage() {
         const topRatedBooks = reviewYearBooks.filter((b: Book) => b.rating === maxRating).slice(0, 3);
 
         // Find favorite author
-        const authorMap: Record<string, { count: number; image_url?: string }> = {};
+        const authorMap: Record<string, { count: number; image_url?: string | null }> = {};
         reviewYearBooks.forEach((book: Book) => {
           const author = book.author || 'Unknown';
           authorMap[author] = { count: (authorMap[author]?.count || 0) + 1 };

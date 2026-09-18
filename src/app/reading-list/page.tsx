@@ -13,9 +13,11 @@ interface ReadingListItem {
   id: string;
   book_id: string;
   year: number;
-  priority: number;
+  // priority is nullable in the table (560 of 747 rows are null) and the join
+  // can miss if the referenced book was deleted, so neither is guaranteed.
+  priority?: number;
   added_at: string;
-  book: Book;
+  book: Book | null;
 }
 
 interface LearningGoal {

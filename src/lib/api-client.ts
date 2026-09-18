@@ -73,8 +73,10 @@ export interface Recommendation {
 export interface LearningGoal {
   id: string;
   name: string;
-  description?: string;
-  color?: string;
+  // Nullable columns arrive as null from better-sqlite3, and the goal editor
+  // deliberately writes null to clear a description.
+  description?: string | null;
+  color?: string | null;
   created_at: string;
 }
 

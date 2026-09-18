@@ -10,41 +10,49 @@ export type Density = "easy" | "moderate" | "hard" | "technical" | "dense";
  */
 export type BookStatus = "not_read" | "reading" | "paused" | "read";
 
+/**
+ * Every nullable column arrives from better-sqlite3 as `null`, never
+ * `undefined` — and the lookup APIs that feed book creation return `null` too.
+ * These fields were typed `?: string`, so assigning a real row to a Book was a
+ * type error at ~19 call sites. Suppressing those errors (next.config.ts had
+ * ignoreBuildErrors) was the wrong half of the fix: `| null` is simply what the
+ * data is.
+ */
 export interface Book {
   id: string;
   title: string;
   author: string;
-  isbn?: string;
-  cover_url?: string;
+  isbn?: string | null;
+  cover_url?: string | null;
   has_cover_blob?: boolean;
-  description?: string;
+  description?: string | null;
   status: BookStatus;
-  rating?: number;
-  density?: Density;
-  volume?: string;
-  pages?: number;
-  intro_pages?: number;
-  start_page?: number;
-  end_page?: number;
-  reading_pages?: number;
-  current_page?: number;
-  start_date?: string;
-  complete_date?: string;
+  rating?: number | null;
+  density?: Density | null;
+  volume?: string | null;
+  pages?: number | null;
+  intro_pages?: number | null;
+  start_page?: number | null;
+  end_page?: number | null;
+  reading_pages?: number | null;
+  current_page?: number | null;
+  start_date?: string | null;
+  complete_date?: string | null;
   /** Most recent reading_updates timestamp — set by the books list query, not
    *  a stored column. Distinct from updated_at, which moves on any edit. */
   last_read_at?: string | null;
-  source?: string;
-  lcc?: string;
-  ddc?: string;
+  source?: string | null;
+  lcc?: string | null;
+  ddc?: string | null;
   topics?: string[];
   auto_topics?: string[];
   favorite?: boolean;
   // Article-specific fields (item_type === "article")
   item_type?: ItemType;
-  doi?: string;
-  journal?: string;
-  publication_year?: number;
-  url?: string;
+  doi?: string | null;
+  journal?: string | null;
+  publication_year?: number | null;
+  url?: string | null;
   created_at: string;
   updated_at: string;
   _optimistic?: boolean;

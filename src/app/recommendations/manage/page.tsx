@@ -13,14 +13,15 @@ import { AppNav } from "@/components/AppNav";
 interface Recommendation {
   id: string;
   title: string;
-  author?: string;
-  isbn?: string;
-  cover_url?: string;
-  recommended_by?: string;
-  notes?: string;
-  topic?: string;
-  interest?: string;
-  year?: number;
+  // Nullable columns come back as null from better-sqlite3, not undefined.
+  author?: string | null;
+  isbn?: string | null;
+  cover_url?: string | null;
+  recommended_by?: string | null;
+  notes?: string | null;
+  topic?: string | null;
+  interest?: string | null;
+  year?: number | null;
   lowest_price?: number | null;
   thriftbooks_price?: number | null;
   amazon_price?: number | null;
@@ -68,9 +69,9 @@ type SortMode = "recent" | "cheapest_asc" | "abe_asc" | "abe_desc" | "thrift_asc
 // title + author. sortby=17 = "Lowest Total Price" on AbeBooks.
 function storeUrl(
   store: "abe" | "thrift" | "amazon",
-  isbn?: string,
-  title?: string,
-  author?: string,
+  isbn?: string | null,
+  title?: string | null,
+  author?: string | null,
 ): string {
   const hasIsbn = isbn && isbn.replace(/\D/g, "").length >= 10;
   const q = hasIsbn ? isbn : [title, author].filter(Boolean).join(" ");
@@ -854,7 +855,7 @@ export default function RecommendationsPage() {
         filtered.sort((a, b) => (b.amazon_price ?? 0) - (a.amazon_price ?? 0));
         break;
       case "cheapest_asc": {
-        const min = (r: Rec) => Math.min(
+        const min = (r: Recommendation) => Math.min(
           r.lowest_price ?? Infinity,
           r.thriftbooks_price ?? Infinity,
           r.amazon_price ?? Infinity,
