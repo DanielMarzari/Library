@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { api, ApiError } from "@/lib/api-client";
 import { observedPace, hoursLeft, formatHours, type TierStat } from "@/lib/readingPace";
+import { GoalChips } from "@/components/GoalChips";
 import { Book, ReadingUpdate, Density } from "@/types/book";
 import { enrichBook, searchBooks } from "@/lib/bookLookup";
 import { coverSrc, safeCoverUrl } from "@/lib/coverUrl";
@@ -758,6 +759,10 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
               ))}
             </div>
           </div>
+
+          {/* Learning goals — 76 goals and 747 memberships existed with no way to
+              see or change a book's goals from the book itself. */}
+          <GoalChips bookId={book.id} />
 
           {/* Density / technicality */}
           <div>

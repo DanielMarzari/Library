@@ -11,6 +11,7 @@ import Link from "next/link";
 import { api } from "@/lib/api-client";
 import { safeCoverUrl } from "@/lib/coverUrl";
 import { AppNav } from "@/components/AppNav";
+import { GoalChips } from "@/components/GoalChips";
 
 // Build a search URL to a bookstore. Prefer ISBN when available; fall back to
 // title + author. sortby=17 = "Lowest Total Price" on AbeBooks.
@@ -85,6 +86,12 @@ export default function RecommendationsPage() {
   const [page, setPage] = useState(1);
   const [openRec, setOpenRec] = useState<Rec | null>(null);
   const [starredOnly, setStarredOnly] = useState(false);
+  // Goal filter. recGoalIds maps rec id -> the goals it belongs to, so the
+  // shelf can narrow to "things that serve the goal I'm working on".
+  const [goals, setGoals] = useState<Array<{ id: string; name: string }>>([]);
+  const [recGoalIds, setRecGoalIds] = useState<Record<string, string[]>>({});
+  const [filterGoal, setFilterGoal] = useState<string | null>(null);
+  const [showGoalMenu, setShowGoalMenu] = useState(false);
   const PAGE_SIZE = 240;
 
   // Remove a rec locally after a delete-or-already-own action.
@@ -120,6 +127,27 @@ export default function RecommendationsPage() {
     })();
   }, []);
 
+  // Goal memberships, loaded alongside. A failure here only costs the goal
+  // filter — the shelf itself still works.
+  useEffect(() => {
+    (async () => {
+      try {
+        const [g, memberships] = await Promise.all([
+          api.learningGoals.list(),
+          api.learningGoalBooks.list(),
+        ]);
+        setGoals((g || []).map(x => ({ id: x.id, name: x.name })));
+        const map: Record<string, string[]> = {};
+        for (const m of memberships || []) {
+          const rid = (m as any).rec_id;
+          if (!rid) continue;
+          (map[rid] ||= []).push(m.goal_id);
+        }
+        setRecGoalIds(map);
+      } catch { /* goal filter simply stays empty */ }
+    })();
+  }, []);
+
   // Persist grid + sort locally so switching pages doesn't reset
   useEffect(() => {
     const g = localStorage.getItem("recs-grid-size") as GridSize | null;
@@ -145,6 +173,7 @@ export default function RecommendationsPage() {
     const q = search.trim().toLowerCase();
     let out = recs.filter(r => {
       if (starredOnly && !r.starred) return false;
+      if (filterGoal && !(recGoalIds[r.id] || []).includes(filterGoal)) return false;
       if (filterTopic && r.topic !== filterTopic) return false;
       if (filterSource && r.recommended_by !== filterSource) return false;
       if (!q) return true;
@@ -168,11 +197,11 @@ export default function RecommendationsPage() {
       default: out.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
     }
     return out;
-  }, [recs, search, sortMode, filterTopic, filterSource, starredOnly]);
+  }, [recs, search, sortMode, filterTopic, filterSource, starredOnly, filterGoal, recGoalIds]);
 
   const paginated = filtered.slice(0, page * PAGE_SIZE);
   const hasMore = paginated.length < filtered.length;
-  useEffect(() => { setPage(1); }, [search, filterTopic, filterSource, sortMode, groupBy, starredOnly]);
+  useEffect(() => { setPage(1); }, [search, filterTopic, filterSource, sortMode, groupBy, starredOnly, filterGoal]);
 
   // Section grouping when groupBy != flat
   const sections = useMemo(() => {
@@ -259,6 +288,46 @@ export default function RecommendationsPage() {
               <span aria-hidden>{starredOnly ? "★" : "☆"}</span>
               <span>Starred{starredOnly ? "" : ` (${recs.filter(r => r.starred).length})`}</span>
             </button>
+
+            {/* Goal filter — narrows the shelf to what serves one learning goal.
+                Counts come from the membership map so an empty goal is visible
+                as empty rather than just missing. */}
+            <div className="relative">
+              <button
+                onClick={() => { setShowGoalMenu(v => !v); setShowTopicMenu(false); setShowSourceMenu(false); }}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors ${
+                  filterGoal ? "bg-indigo-600 text-white border-indigo-600" : "bg-surface-2 text-muted border-border-custom hover:text-foreground"
+                }`}
+              >
+                {filterGoal ? goals.find(g => g.id === filterGoal)?.name ?? "Goal" : `Goal (${goals.length})`} ▾
+              </button>
+              {showGoalMenu && (
+                <div className="absolute top-full left-0 mt-1 bg-surface border border-border-custom rounded-lg shadow-xl z-20 min-w-[240px] max-h-72 overflow-y-auto">
+                  <button
+                    onClick={() => { setFilterGoal(null); setShowGoalMenu(false); }}
+                    className="w-full text-left px-3 py-1.5 text-xs text-muted hover:bg-surface-2"
+                  >
+                    All goals
+                  </button>
+                  {goals
+                    .map(g => ({ ...g, n: recs.filter(r => (recGoalIds[r.id] || []).includes(g.id)).length }))
+                    .filter(g => g.n > 0)
+                    .sort((a, b) => b.n - a.n)
+                    .map(g => (
+                      <button
+                        key={g.id}
+                        onClick={() => { setFilterGoal(g.id); setShowGoalMenu(false); }}
+                        className={`w-full text-left px-3 py-1.5 text-xs flex justify-between transition-colors ${
+                          filterGoal === g.id ? "bg-indigo-600/10 text-indigo-400" : "text-foreground hover:bg-surface-2"
+                        }`}
+                      >
+                        <span className="truncate">{g.name}</span>
+                        <span className="text-muted ml-2">{g.n}</span>
+                      </button>
+                    ))}
+                </div>
+              )}
+            </div>
 
             {/* Topic */}
             <div className="relative">
@@ -723,6 +792,10 @@ function RecDetailModal({
                 <div className="truncate"><span className="text-muted-2">DOI:</span> <span className="text-foreground font-mono">{rec.doi}</span></div>
               )}
             </div>
+
+            {/* Learning goals — 477 recommendations already sit in a goal, but
+                there was no way to see or set that from the recommendation. */}
+            <GoalChips recId={rec.id} className="mb-3" />
 
             {/* Prices (clickable → store) */}
             {(rec.lowest_price != null || rec.thriftbooks_price != null || rec.amazon_price != null) && (
