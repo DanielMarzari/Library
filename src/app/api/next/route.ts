@@ -294,6 +294,46 @@ export async function GET(request: Request) {
              OR current_page > COALESCE(reading_pages, pages))
     `).get() as { n: number };
 
+    // Books whose page numbers are missing or implausible. Every book is
+    // supposed to carry intro / start / end — these are entered by hand, never
+    // guessed — and without them a book is invisible to every ranking here.
+    // Eight books currently being read have no page count at all, including
+    // ones with a dozen logged sessions.
+    const needsPageData = full
+      ? (db.prepare(`
+          SELECT id, title, author, status, pages, intro_pages, start_page, end_page,
+                 current_page,
+                 (SELECT COUNT(*) FROM reading_updates u WHERE u.book_id = b.id) AS logs
+          FROM books b
+          WHERE COALESCE(item_type,'book') = 'book'
+            AND (
+              pages IS NULL OR pages < 5
+              OR intro_pages IS NULL
+              OR start_page IS NULL
+              OR end_page IS NULL
+            )
+        `).all() as Array<any>)
+          .map(r => ({
+            id: r.id, title: r.title, author: r.author, status: r.status,
+            pages: r.pages, introPages: r.intro_pages,
+            startPage: r.start_page, endPage: r.end_page,
+            currentPage: r.current_page, logs: r.logs,
+            // What's actually missing, so the UI can point at the right field.
+            missing: [
+              (r.pages == null || r.pages < 5) && 'pages',
+              r.intro_pages == null && 'intro',
+              r.start_page == null && 'start',
+              r.end_page == null && 'end',
+            ].filter(Boolean) as string[],
+          }))
+          // Books in progress first — those are the ones being actively
+          // blocked — then by how much reading is already logged against them.
+          .sort((a, b) => {
+            const rank = (s: string) => (s === 'reading' ? 0 : s === 'paused' ? 1 : 2);
+            return rank(a.status) - rank(b.status) || b.logs - a.logs;
+          })
+      : undefined;
+
     return NextResponse.json({
       hero,
       heroAlt,
@@ -306,6 +346,7 @@ export async function GET(request: Request) {
       readNext,
       buyNext: { starred, opensGoal, emptyGoalCount: emptyGoals.length },
       unrankable: unrankable.n,
+      needsPageData,
     });
   } catch (error) {
     console.error('GET /api/next error:', error);

@@ -26,6 +26,14 @@ export interface NextPayload {
     emptyGoalCount: number;
   };
   unrankable: number;
+  /** Only present with full=true. Books missing hand-entered page numbers. */
+  needsPageData?: Array<{
+    id: string; title: string; author: string; status: Book['status'];
+    pages: number | null; introPages: number | null;
+    startPage: number | null; endPage: number | null;
+    currentPage: number | null; logs: number;
+    missing: string[];
+  }>;
 }
 
 export interface Author {
