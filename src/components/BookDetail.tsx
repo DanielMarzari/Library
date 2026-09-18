@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { api, ApiError } from "@/lib/api-client";
+import { observedPace, hoursLeft, formatHours, type TierStat } from "@/lib/readingPace";
 import { Book, ReadingUpdate, Density } from "@/types/book";
 import { enrichBook, searchBooks } from "@/lib/bookLookup";
 import { coverSrc, safeCoverUrl } from "@/lib/coverUrl";
@@ -114,6 +115,9 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [updates, setUpdates] = useState<ReadingUpdate[]>([]);
+  // Library-wide pace-per-density calibration, used only to estimate books that
+  // have no timed reading of their own yet.
+  const [paceTiers, setPaceTiers] = useState<Record<string, TierStat> | null>(null);
   const [showAddUpdate, setShowAddUpdate] = useState(false);
   const [currentPage, setCurrentPage] = useState("");
   const [updateNotes, setUpdateNotes] = useState("");
@@ -146,6 +150,16 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
       console.error("Error loading updates:", error);
     }
   };
+
+  // Tier calibration is only consulted when this book has no measured rate, so
+  // a failure here just means no estimate is offered — never a wrong one.
+  useEffect(() => {
+    let ignore = false;
+    api.readingPace.get()
+      .then(r => { if (!ignore) setPaceTiers(r.tiers); })
+      .catch(() => {});
+    return () => { ignore = true; };
+  }, []);
 
   const computedReadingPages = (() => {
     const ep = parseInt(endPage) || 0;
@@ -444,17 +458,20 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
   // Reading rate = pages-per-session, where a "session" is a distinct calendar
   // date you logged reading on. Gaps between sessions don't dilute the rate:
   // 20 pages on Mon + 30 pages on Fri = 25 pg/session, not 10 pg/day.
-  const readingSpeed = (() => {
-    if (updates.length === 0) return null;
-    const sessions = new Set<string>();
-    let totalPages = 0;
-    updates.forEach((u) => {
-      sessions.add(new Date(u.created_at).toLocaleDateString());
-      totalPages += u.pages_read || 0;
-    });
-    if (sessions.size === 0 || totalPages <= 0) return null;
-    return Math.round(totalPages / sessions.size);
-  })();
+  // Observed pages-per-hour for THIS book, measured from the gaps between
+  // consecutive log entries. See src/lib/readingPace.ts — the elapsed time was
+  // always in the log; the previous "pg/session" figure discarded it by
+  // counting calendar days, which measured how spread out the reading was
+  // rather than how fast it went.
+  const pace = useMemo(() => observedPace(updates), [updates]);
+
+  // Tier fallback for books with no timed reading yet: the range of rates
+  // observed across other books sharing this density tag. A range, not a mean —
+  // with a few books per tier an average would overstate the precision.
+  const tierEstimate = useMemo(() => {
+    if (pace || !density) return null;
+    return paceTiers?.[density] ?? null;
+  }, [pace, density, paceTiers]);
 
   // Aggregate updates by day: sum pages_read, take max current_page, join notes
   const dailyUpdates = useMemo(() => {
@@ -480,18 +497,8 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
     return days;
   }, [updates]);
 
-  // Estimated reading sessions left until done, at THIS book's observed
-  // pages-per-session rate.
-  //
-  // There used to be a fallback to avgPagesPerDay — a library-wide average
-  // derived from shelf time, which mostly measures how long books sit unread
-  // rather than how fast they're read. With 939 of 968 books having no logged
-  // history, that fallback was what nearly every "sessions left" number on the
-  // site was actually made of, and it read as a real per-book estimate. A blank
-  // is more honest than a number built from abandonment.
-  const estimatedSessions = (() => {
-    const pace = readingSpeed;
-    if (!pace || pace <= 0) return null;
+  // Pages still to read, shared by the hours-left calculations below.
+  const pagesRemaining = (() => {
     const totalPgs = book.reading_pages || computedReadingPages || book.pages;
     if (!totalPgs) return null;
     const currentPg = updates.length > 0 ? updates[0].current_page : (book.current_page || 0);
@@ -500,9 +507,14 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
     const mainPagesRead = currentPg > 0 ? Math.max(currentPg - sp + 1, 0) : 0;
     const actualPagesRead = mainPagesRead + (currentPg > 0 ? ip : 0);
     const remaining = totalPgs - actualPagesRead;
-    if (remaining <= 0) return null;
-    return Math.ceil(remaining / pace);
+    return remaining > 0 ? remaining : null;
   })();
+
+  // Hours left at this book's own measured rate. Only ever shown when the rate
+  // is real — there is deliberately no library-wide fallback, because the old
+  // one was derived from shelf time and so mostly measured abandonment.
+  const paceHoursLeft =
+    pace && pagesRemaining ? hoursLeft(pagesRemaining, pace.pagesPerHour) : null;
 
   const displayPages = book.reading_pages || computedReadingPages || book.pages;
   const inputCls = "w-full bg-surface-2 border border-border-custom rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600";
@@ -750,6 +762,15 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
           {/* Density / technicality */}
           <div>
             <label className="block text-xs text-muted mb-2">Density</label>
+            {/* A book with a measured rate but no tag is the only kind that can
+                sharpen the tier estimates — its rate is real but unattributed.
+                Say so here, where the fix is one tap away. */}
+            {pace && !density && (
+              <p className="text-[11px] text-amber-500/90 mb-2">
+                You read this at ~{pace.pagesPerHour} pg/hr. Tagging its density
+                teaches the estimate for books you haven&apos;t started.
+              </p>
+            )}
             <div className="flex flex-wrap gap-1.5">
               {(Object.entries(densityLabels) as [Density, string][]).map(([key, label]) => {
                 const active = density === key;
@@ -801,8 +822,23 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
                           : `p. ${currentPg} of ${totalPgs}`}
                       </span>
                       <div className="flex items-center gap-3 text-xs text-muted">
-                        {readingSpeed && <span>~{readingSpeed} pg/session</span>}
-                        {estimatedSessions && <span className="text-emerald-500">Est. {estimatedSessions} {estimatedSessions === 1 ? "session" : "sessions"} left</span>}
+                        {pace ? (
+                          <>
+                            <span title={`Measured across ${pace.pairs} timed stretches totalling ${pace.observedMinutes} min of reading`}>
+                              ~{pace.pagesPerHour} pg/hr
+                            </span>
+                            {paceHoursLeft !== null && (
+                              <span className="text-emerald-500">{formatHours(paceHoursLeft)} left</span>
+                            )}
+                          </>
+                        ) : tierEstimate ? (
+                          <span
+                            className="text-amber-500/90"
+                            title={`Estimated from ${tierEstimate.books} other ${tierEstimate.density} books you've read`}
+                          >
+                            est. {tierEstimate.minPagesPerHour}–{tierEstimate.maxPagesPerHour} pg/hr
+                          </span>
+                        ) : null}
                       </div>
                     </div>
                   </div>

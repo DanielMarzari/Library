@@ -1,6 +1,7 @@
 'use client';
 
-import { Book, ReadingUpdate } from '@/types/book';
+import { Book, ReadingUpdate, Density } from '@/types/book';
+import type { TierStat } from '@/lib/readingPace';
 
 export interface Author {
   id: string;
@@ -217,6 +218,15 @@ export const api = {
       fetchJson<ReadingGoal>('/api/reading-goals', { method: 'POST', body: data }),
     update: (id: string, data: Partial<ReadingGoal>) =>
       fetchJson<ReadingGoal>(`/api/reading-goals/${id}`, { method: 'PUT', body: data }),
+  },
+
+  readingPace: {
+    get: () => fetchJson<{
+      perBook: Record<string, { title: string; author: string; density: Density | null; pagesPerHour: number; pairs: number; observedMinutes: number }>;
+      tiers: Record<string, TierStat>;
+      needsTag: Array<{ id: string; title: string; author: string; pagesPerHour: number; pairs: number }>;
+      meta: { booksMeasured: number; tiersCalibrated: number; minBooksPerTier: number };
+    }>('/api/reading-pace'),
   },
 
   readingUpdates: {
