@@ -11,7 +11,12 @@ import { AddBookSheet } from "@/components/AddBookSheet";
 import Link from "next/link";
 import { canonicalCountryName } from "@/lib/countryAliases";
 
-type FilterStatus = "all" | "not_read" | "reading" | "read" | "exclude_read" | "favorites" | "on_reading_list";
+type FilterStatus = "all" | "not_read" | "reading" | "paused" | "read" | "exclude_read" | "favorites" | "on_reading_list" | "stalled";
+
+/** A book still marked "reading" with nothing logged against it for this long
+ *  counts as stalled. Six weeks is long enough not to nag about a book you
+ *  picked up last month, short enough to catch the ones that quietly died. */
+const STALE_AFTER_DAYS = 42;
 type SortMode = "recent" | "last" | "alpha" | "rating" | "lcc" | "ddc" | "pages_asc" | "pages_desc";
 type HeaderTab = "filter" | "sort";
 type GridSize = "xs" | "small" | "medium" | "large" | "xl";
@@ -210,6 +215,11 @@ export default function Home() {
           params.favorites = true;
         } else if (filter === "exclude_read") {
           // No server-side filter — we'll filter client-side
+        } else if (filter === "stalled") {
+          // Stalled is a subset of "reading" narrowed by recency client-side,
+          // so fetch the reading set rather than sending a status the DB has
+          // never heard of.
+          params.status = "reading";
         } else if (filter !== "all" && filter !== "on_reading_list") {
           params.status = filter;
         }
@@ -257,6 +267,19 @@ export default function Home() {
     // Exclude read books
     if (filter === "exclude_read") {
       sorted = sorted.filter(b => b.status !== "read");
+    }
+
+    // Stalled: marked "reading" but nothing logged against it in STALE_AFTER_DAYS.
+    // Books that were never logged at all fall back to when they were marked,
+    // which is the honest reading of "started and untouched". Sorted coldest
+    // first so the most abandoned surface at the top.
+    if (filter === "stalled") {
+      const cutoff = Date.now() - STALE_AFTER_DAYS * 86400000;
+      const lastTouch = (b: Book) =>
+        new Date(b.last_read_at || b.start_date || b.updated_at || b.created_at || 0).getTime();
+      sorted = sorted
+        .filter(b => b.status === "reading" && lastTouch(b) < cutoff)
+        .sort((a, b) => lastTouch(a) - lastTouch(b));
     }
 
     // Country filter — any of the book's authors (comma-split) must have a
@@ -478,6 +501,8 @@ export default function Home() {
     { label: "Favorites", value: "favorites" },
     { label: "Not Read", value: "not_read" },
     { label: "Reading", value: "reading" },
+    { label: "Stalled", value: "stalled" },
+    { label: "Paused", value: "paused" },
     { label: "Read", value: "read" },
     { label: "On List", value: "on_reading_list" },
   ];
@@ -837,7 +862,6 @@ export default function Home() {
               books.map((b) => b.source).filter(Boolean) as string[]
             ),
           ]}
-          avgPagesPerDay={avgPagesPerDay}
         />
       )}
     </div>

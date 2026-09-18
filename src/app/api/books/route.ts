@@ -12,12 +12,18 @@ export async function GET(request: NextRequest) {
 
     // Exclude cover_blob from list queries — it can be huge
     // We include has_cover_blob flag via CASE instead
+    //
+    // last_read_at is the most recent reading_updates timestamp for the book,
+    // which is NOT the same as updated_at (that moves on any edit — a rating, a
+    // topic tag). Distinguishing "actively being read" from "marked reading
+    // months ago and untouched since" needs the former.
     let query = `SELECT id, title, author, isbn, cover_url, description, status, rating, density,
       volume, pages, intro_pages, start_page, end_page, reading_pages,
       current_page, start_date, complete_date, source, lcc, ddc,
       topics, auto_topics, favorite, created_at, updated_at,
       item_type, doi, journal, publication_year, url,
-      CASE WHEN cover_blob IS NOT NULL AND length(cover_blob) > 0 THEN 1 ELSE 0 END as has_cover_blob
+      CASE WHEN cover_blob IS NOT NULL AND length(cover_blob) > 0 THEN 1 ELSE 0 END as has_cover_blob,
+      (SELECT MAX(created_at) FROM reading_updates WHERE reading_updates.book_id = books.id) AS last_read_at
       FROM books WHERE 1=1`;
     const params: any[] = [];
 
@@ -38,7 +44,21 @@ export async function GET(request: NextRequest) {
       params.push(searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
-    query += ` ORDER BY ${sort}`;
+    // `sort` is interpolated, not bound — SQLite can't parameterize ORDER BY.
+    // Allowlist it rather than trusting the caller: this is the one place in
+    // the route where a query string reaches the SQL text directly.
+    const SORTS: Record<string, string> = {
+      'created_at DESC': 'created_at DESC',
+      'created_at ASC': 'created_at ASC',
+      'updated_at DESC': 'updated_at DESC',
+      'title ASC': 'title ASC',
+      'author ASC': 'author ASC',
+      'rating DESC': 'rating DESC',
+      'pages ASC': 'pages ASC',
+      'pages DESC': 'pages DESC',
+      'last_read_at DESC': 'last_read_at DESC',
+    };
+    query += ` ORDER BY ${SORTS[sort] ?? 'created_at DESC'}`;
 
     const stmt = db.prepare(query);
     const rows = stmt.all(...params) as any[];

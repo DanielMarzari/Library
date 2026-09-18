@@ -12,12 +12,12 @@ interface BookDetailProps {
   onUpdated: () => void;
   onDeleted: () => void;
   recentSources?: string[];
-  avgPagesPerDay?: number | null;
 }
 
 const statusLabels: Record<Book["status"], string> = {
   not_read: "Not Read",
   reading: "Reading",
+  paused: "Paused",
   read: "Read",
 };
 
@@ -83,7 +83,7 @@ function ConfettiOverlay() {
   );
 }
 
-export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources = [], avgPagesPerDay }: BookDetailProps) {
+export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources = [] }: BookDetailProps) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(book.title);
   const [author, setAuthor] = useState(book.author);
@@ -269,6 +269,9 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
 
   const handleStatusChange = (newStatus: Book["status"]) => {
     setStatus(newStatus);
+    // Pausing and resuming both preserve start_date and current_page — the
+    // whole point is that the book keeps its place. Only "reading" stamps a
+    // start date (and only the first time), and only "read" stamps completion.
     if (newStatus === "reading" && !startDate) setStartDate(new Date().toISOString().split("T")[0]);
     if (newStatus === "read" && !completeDate) setCompleteDate(new Date().toISOString().split("T")[0]);
     scheduleAutoSave();
@@ -295,6 +298,13 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
         const today = new Date().toISOString().split("T")[0];
         bookUpdate.start_date = today;
         setStartDate(today);
+      } else if (status === "paused") {
+        // Logging pages on a paused book means you picked it back up. Resume it
+        // without touching start_date — this is the same read continuing, not a
+        // new one. (The isFirstLog branches above can't cover this: a paused
+        // book has prior logs by definition.)
+        bookUpdate.status = "reading";
+        setStatus("reading");
       }
 
       // Auto-complete when the reading percentage reaches 100 — mirrors the
@@ -470,10 +480,17 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
     return days;
   }, [updates]);
 
-  // Estimated reading sessions left until done, at the current pages-per-session
-  // rate. Falls back to avgPagesPerDay if there's no per-book history yet.
+  // Estimated reading sessions left until done, at THIS book's observed
+  // pages-per-session rate.
+  //
+  // There used to be a fallback to avgPagesPerDay — a library-wide average
+  // derived from shelf time, which mostly measures how long books sit unread
+  // rather than how fast they're read. With 939 of 968 books having no logged
+  // history, that fallback was what nearly every "sessions left" number on the
+  // site was actually made of, and it read as a real per-book estimate. A blank
+  // is more honest than a number built from abandonment.
   const estimatedSessions = (() => {
-    const pace = readingSpeed || avgPagesPerDay;
+    const pace = readingSpeed;
     if (!pace || pace <= 0) return null;
     const totalPgs = book.reading_pages || computedReadingPages || book.pages;
     if (!totalPgs) return null;

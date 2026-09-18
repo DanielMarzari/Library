@@ -30,12 +30,14 @@ const gridClasses: Record<GridSize, string> = {
 const statusLabels: Record<Book["status"], string> = {
   not_read: "Not Read",
   reading: "Currently Reading",
+  paused: "Paused",
   read: "Read",
 };
 
 const statusEmoji: Record<Book["status"], string> = {
   reading: "📖",
   not_read: "📋",
+  paused: "⏸️",
   read: "✅",
 };
 
