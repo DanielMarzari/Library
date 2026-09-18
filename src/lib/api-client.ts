@@ -220,6 +220,18 @@ export const api = {
       fetchJson<ReadingGoal>(`/api/reading-goals/${id}`, { method: 'PUT', body: data }),
   },
 
+  stalled: {
+    get: () => fetchJson<{
+      stalledCount: number;
+      readingCount: number;
+      candidates: Array<{
+        id: string; title: string; author: string;
+        currentPage: number; totalPages: number; pagesLeft: number;
+        percentDone: number; lastReadAt: string | null; daysSince: number;
+      }>;
+    }>('/api/stalled'),
+  },
+
   readingPace: {
     get: () => fetchJson<{
       perBook: Record<string, { title: string; author: string; density: Density | null; pagesPerHour: number; pairs: number; observedMinutes: number }>;
