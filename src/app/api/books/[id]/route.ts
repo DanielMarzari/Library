@@ -64,6 +64,28 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       url,
     } = body;
 
+    // Reject a current_page past the end of the book. Three rows in the
+    // library already carry one (The Problem of Pain at page 560 of 98), which
+    // breaks every pages-left calculation and had to be special-cased in
+    // /api/next. Validating on write is what stops the fourth.
+    if (current_page !== undefined && current_page !== null) {
+      const existing = db.prepare(
+        'SELECT COALESCE(reading_pages, pages) AS total FROM books WHERE id = ?'
+      ).get(id) as { total: number | null } | undefined;
+      // A pages value in this same request wins — the caller may be correcting
+      // both at once.
+      const total = (reading_pages ?? pages ?? existing?.total) || null;
+      if (typeof current_page !== 'number' || current_page < 0) {
+        return NextResponse.json({ error: 'current_page must be a non-negative number' }, { status: 400 });
+      }
+      if (total && current_page > total) {
+        return NextResponse.json(
+          { error: `current_page ${current_page} is past the end of this book (${total} pages)` },
+          { status: 400 }
+        );
+      }
+    }
+
     const now = new Date().toISOString();
 
     const updates: string[] = [];

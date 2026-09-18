@@ -93,8 +93,9 @@ export default function Home() {
     window.history.replaceState({}, "", url.toString());
     (async () => {
       try {
-        const rows = await api.recommendations.list();
-        const rec = (rows || []).find((r: any) => r.id === recId);
+        // Fetch the one recommendation, not all 1,845 of them to find it —
+        // this path runs on the most common way into the add form.
+        const rec = await api.recommendations.get(recId);
         if (!rec) return;
         setAddPrefill({
           recId: rec.id,

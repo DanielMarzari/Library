@@ -33,7 +33,18 @@ export default function WrappedPage() {
   const [activeSlide, setActiveSlide] = useState(0);
 
   const currentYear = new Date().getFullYear();
-  const reviewYear = currentYear - 1;
+
+  // Which year to show. This was hardcoded to currentYear - 1, so the page
+  // could only ever display the previous year — it has never once shown the
+  // year in progress, which is the one you'd most want to look at. ?year=
+  // overrides; the default is still last year until you've finished enough
+  // this year for the recap to be worth reading.
+  const [reviewYear, setReviewYear] = useState(currentYear - 1);
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get("year");
+    const y = p ? parseInt(p, 10) : NaN;
+    if (Number.isFinite(y) && y >= 1900 && y <= currentYear) setReviewYear(y);
+  }, [currentYear]);
 
   useEffect(() => {
     const fetchWrappedData = async () => {
@@ -241,6 +252,26 @@ export default function WrappedPage() {
             Your {reviewYear}
           </h1>
           <p className="text-5xl font-bold text-white drop-shadow-lg">Reading Wrapped</p>
+          {/* Year switcher — without this the page can only ever be the
+              previous year, and the year you're actually in is unreachable. */}
+          <div className="flex items-center gap-4 mt-10">
+            <button
+              onClick={() => setReviewYear(y => y - 1)}
+              className="text-white/70 hover:text-white text-3xl leading-none px-3"
+              aria-label="Previous year"
+            >
+              ‹
+            </button>
+            <span className="text-white/70 text-sm uppercase tracking-wider">{reviewYear}</span>
+            <button
+              onClick={() => setReviewYear(y => Math.min(y + 1, currentYear))}
+              disabled={reviewYear >= currentYear}
+              className="text-white/70 hover:text-white disabled:opacity-25 text-3xl leading-none px-3"
+              aria-label="Next year"
+            >
+              ›
+            </button>
+          </div>
         </div>
       ),
     },

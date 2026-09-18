@@ -143,8 +143,14 @@ export default function SkillsPage() {
         });
       });
 
+      // Gate on books READ, not books owned. The filter used to be
+      // `stats.total >= 2` — books on the shelf — while the tier was computed
+      // from books read, and getTierForBooks falls back to TIERS[0] when
+      // nothing matches. So a topic where you owned two books and had read
+      // none still rendered as "Familiar". 388 of 821 topics have zero read
+      // books; owning a shelf on a subject isn't the same as knowing it.
       const processedTopics: TopicProgress[] = Array.from(topicMap.entries())
-        .filter(([, stats]) => stats.total >= 2)
+        .filter(([, stats]) => stats.read >= TIERS[0].minBooks)
         .map(([topic, stats]) => {
           const tier = getTierForBooks(stats.read);
           const nextTierThreshold = getNextTierThreshold(stats.read);

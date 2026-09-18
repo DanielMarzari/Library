@@ -131,6 +131,12 @@ function ShelfBook({
             <img
               src={coverSrc(book)}
               alt={book.title}
+              // The shelf renders every book at once — 902 have covers, so a
+              // cold load without this fires 902 image requests up front for a
+              // few screens' worth of visible shelf. The recommendations shelf
+              // already lazy-loads; this brings the home shelf in line.
+              loading="lazy"
+              decoding="async"
               className="w-full h-full object-cover"
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement?.querySelector('.cover-fallback')?.classList.remove('hidden'); }}
             />

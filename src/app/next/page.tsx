@@ -73,6 +73,17 @@ export default function NextPage() {
         : data.nearlyDone.find(b => !isSnoozed(b.id)) ?? null)
     : null;
 
+  // Correcting a page changes the ranking, so reload rather than patching
+  // local state — the hero itself may no longer be the right book.
+  const setCurrentPage = async (id: string, page: number) => {
+    try {
+      await api.books.update(id, { current_page: page });
+      await load();
+    } catch {
+      alert("Could not save that page number.");
+    }
+  };
+
   const markFinished = async (id: string) => {
     try {
       await api.books.update(id, { status: "read", complete_date: new Date().toISOString().split("T")[0] });
@@ -148,7 +159,11 @@ export default function NextPage() {
               <p className="text-sm text-muted mt-0.5">{hero.author}</p>
               <p className="text-sm mt-3">
                 <span className="text-emerald-400 font-semibold">{hero.pagesLeft} pages left</span>
-                <span className="text-muted"> · {hero.percentDone}% done · p.{hero.currentPage} of {hero.totalPages}</span>
+                <span className="text-muted">
+                  {" "}· {hero.percentDone}% done · p.
+                  <InlinePage value={hero.currentPage} total={hero.totalPages} onSave={(n) => setCurrentPage(hero.id, n)} />
+                  {" "}of {hero.totalPages}
+                </span>
               </p>
               <p className="text-xs text-muted-2 mt-1">
                 {hero.hoursLeft != null && hero.pagesPerHour
@@ -200,7 +215,9 @@ export default function NextPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm truncate">{b.title}</p>
                     <p className="text-[11px] text-muted-2 truncate">
-                      {b.percentDone}% · {b.author}
+                      {b.percentDone}% · p.
+                      <InlinePage value={b.currentPage} total={b.totalPages} onSave={(n) => setCurrentPage(b.id, n)} />
+                      {" "}of {b.totalPages} · {b.author}
                       {b.hoursLeft != null && <> · ~{b.hoursLeft}h at your pace</>}
                     </p>
                   </div>
@@ -349,6 +366,70 @@ export default function NextPage() {
         )}
       </main>
     </div>
+  );
+}
+
+/**
+ * Editable current-page.
+ *
+ * 183 of 229 in-progress books have never been logged against — their page
+ * numbers are hand-typed claims, and every ranking on this page is computed
+ * from them. Correcting one had meant opening the book's detail panel, so the
+ * numbers driving the page were the numbers least likely to get fixed.
+ * Commits on Enter or blur; Escape reverts.
+ */
+function InlinePage({
+  value,
+  total,
+  onSave,
+}: {
+  value: number;
+  total: number;
+  onSave: (next: number) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(value));
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { setDraft(String(value)); }, [value]);
+
+  const commit = async () => {
+    const n = parseInt(draft, 10);
+    setEditing(false);
+    if (!Number.isFinite(n) || n === value) { setDraft(String(value)); return; }
+    // Refuse impossible values rather than writing them — three books in the
+    // library already have a current page past their last page.
+    if (n < 0 || n > total) { setDraft(String(value)); return; }
+    setSaving(true);
+    try { await onSave(n); } finally { setSaving(false); }
+  };
+
+  if (!editing) {
+    return (
+      <button
+        onClick={() => setEditing(true)}
+        disabled={saving}
+        className="underline decoration-dotted decoration-muted-2 underline-offset-2 hover:text-foreground disabled:opacity-50"
+        title="Correct the page number"
+      >
+        {saving ? "…" : value}
+      </button>
+    );
+  }
+  return (
+    <input
+      autoFocus
+      type="text"
+      inputMode="numeric"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value.replace(/[^0-9]/g, ""))}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") commit();
+        if (e.key === "Escape") { setDraft(String(value)); setEditing(false); }
+      }}
+      className="w-14 bg-surface-2 border border-border-custom rounded px-1 py-0.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-600"
+    />
   );
 }
 

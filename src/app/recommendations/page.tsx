@@ -36,6 +36,21 @@ function storeUrl(
   }
 }
 
+// The same person is recorded under several spellings — "Tim Mackie" has 60
+// recommendations and "Tim Mackie (BibleProject)" has 1,527. Exact matching
+// meant picking either one hid the rest. Compare on the name with any
+// parenthetical qualifier stripped, so the variants collapse together.
+function sourceKey(s?: string | null): string {
+  return (s || "")
+    .toLowerCase()
+    .replace(/\s*\([^)]*\)/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+function sourceMatches(recSource: string | undefined, filter: string): boolean {
+  return sourceKey(recSource) === sourceKey(filter);
+}
+
 interface Rec {
   id: string;
   title: string;
@@ -163,10 +178,23 @@ export default function RecommendationsPage() {
     recs.forEach(r => { if (r.topic) counts[r.topic] = (counts[r.topic] || 0) + 1; });
     return Object.entries(counts).sort((a, b) => b[1] - a[1]);
   }, [recs]);
+  // Group name variants under one entry, so the dropdown shows "Tim Mackie
+  // 1,587" once rather than two entries that each hide the other's results.
+  // The longest spelling wins as the display label since it carries the most
+  // information ("Tim Mackie (BibleProject)" over "Tim Mackie").
   const sources = useMemo(() => {
-    const counts: Record<string, number> = {};
-    recs.forEach(r => { if (r.recommended_by) counts[r.recommended_by] = (counts[r.recommended_by] || 0) + 1; });
-    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    const byKey: Record<string, { label: string; n: number }> = {};
+    recs.forEach(r => {
+      if (!r.recommended_by) return;
+      const key = sourceKey(r.recommended_by);
+      if (!key) return;
+      const entry = (byKey[key] ||= { label: r.recommended_by, n: 0 });
+      entry.n++;
+      if (r.recommended_by.length > entry.label.length) entry.label = r.recommended_by;
+    });
+    return Object.values(byKey)
+      .map(e => [e.label, e.n] as [string, number])
+      .sort((a, b) => b[1] - a[1]);
   }, [recs]);
 
   const filtered = useMemo(() => {
@@ -175,7 +203,7 @@ export default function RecommendationsPage() {
       if (starredOnly && !r.starred) return false;
       if (filterGoal && !(recGoalIds[r.id] || []).includes(filterGoal)) return false;
       if (filterTopic && r.topic !== filterTopic) return false;
-      if (filterSource && r.recommended_by !== filterSource) return false;
+      if (filterSource && !sourceMatches(r.recommended_by, filterSource)) return false;
       if (!q) return true;
       return [r.title, r.author || "", r.recommended_by || "", r.topic || "", r.notes || ""]
         .join(" ").toLowerCase().includes(q);
