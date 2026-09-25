@@ -203,6 +203,16 @@ function ensureAllTables(db: Database.Database) {
   addColumnSafe('recommendations', 'amazon_price', 'REAL');
   addColumnSafe('recommendations', 'starred', 'INTEGER DEFAULT 0');
 
+  // A NULL price used to mean two different things — "we never looked" and "no
+  // copy is for sale" — and the shelf rendered both as a missing chip. These
+  // stamps separate them: price NULL + checked_at set is a real "unavailable"
+  // ($- on the shelf), price NULL + checked_at NULL is simply not looked up yet.
+  // Without the distinction a scraper run can't tell what it still owes, and a
+  // blocked request looks identical to an out-of-print book.
+  addColumnSafe('recommendations', 'abe_checked_at', 'TEXT');
+  addColumnSafe('recommendations', 'thrift_checked_at', 'TEXT');
+  addColumnSafe('recommendations', 'amazon_checked_at', 'TEXT');
+
   // Cookbooks, devotionals and reference works are read out of order, so
   // "I am now on page N" is meaningless for them. A 'range' book logs page
   // SPANS instead, and its progress is the union of those spans.

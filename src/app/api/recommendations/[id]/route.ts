@@ -33,6 +33,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       'title', 'author', 'isbn', 'cover_url',
       'recommended_by', 'notes', 'topic', 'interest', 'year',
       'lowest_price', 'thriftbooks_price', 'amazon_price', 'starred', 'source_book_id', 'source_book_ids',
+      'abe_checked_at', 'thrift_checked_at', 'amazon_checked_at',
       'item_type', 'doi', 'journal', 'url',
     ];
     for (const field of fields) {

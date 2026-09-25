@@ -79,6 +79,10 @@ export interface Recommendation {
   lowest_price?: number | null;
   thriftbooks_price?: number | null;
   amazon_price?: number | null;
+  /** When each store was last searched. NULL price + a stamp means "nobody has it". */
+  abe_checked_at?: string | null;
+  thrift_checked_at?: string | null;
+  amazon_checked_at?: string | null;
   starred?: number;
   item_type?: "book" | "article";
 }

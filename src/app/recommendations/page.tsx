@@ -65,6 +65,10 @@ interface Rec {
   lowest_price?: number | null;
   thriftbooks_price?: number | null;
   amazon_price?: number | null;
+  /** Set once a store has actually been searched — see src/lib/db.ts. */
+  abe_checked_at?: string | null;
+  thrift_checked_at?: string | null;
+  amazon_checked_at?: string | null;
   item_type?: "book" | "article";
   doi?: string;
   journal?: string;
@@ -653,46 +657,39 @@ function ShelfRec({
           </div>
         )}
 
-        {/* Price chips bottom-right (parallels rating stars on home) — click to open store */}
-        {(rec.lowest_price != null || rec.thriftbooks_price != null || rec.amazon_price != null) && (
-          <div className="absolute bottom-1 right-1 bg-black/70 backdrop-blur-sm rounded px-1 py-0.5 flex flex-col gap-px items-end">
-            {rec.lowest_price != null && (
-              <a
-                href={storeUrl("abe", rec.isbn, rec.title, rec.author)}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="text-[8px] text-emerald-300 hover:text-emerald-200 font-bold"
-                title="Open on AbeBooks"
-              >
-                A ${rec.lowest_price.toFixed(0)}
-              </a>
-            )}
-            {rec.thriftbooks_price != null && (
-              <a
-                href={storeUrl("thrift", rec.isbn, rec.title, rec.author)}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="text-[8px] text-blue-300 hover:text-blue-200 font-bold"
-                title="Open on ThriftBooks"
-              >
-                T ${rec.thriftbooks_price.toFixed(0)}
-              </a>
-            )}
-            {rec.amazon_price != null && (
-              <a
-                href={storeUrl("amazon", rec.isbn, rec.title, rec.author)}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="text-[8px] text-amber-300 hover:text-amber-200 font-bold"
-                title="Open on Amazon"
-              >
-                Z ${rec.amazon_price.toFixed(0)}
-              </a>
-            )}
-          </div>
+        {/* Price chips bottom-right (parallels rating stars on home) — click to
+            open store. All three stores always show. A store with no price
+            reads "$-", because "we checked and nobody has it" is information
+            the shelf should carry; hiding the row made an unavailable book look
+            identical to one nobody had priced yet. */}
+        {/* Articles aren't sold by any of these stores, so three "$-" rows would
+            be noise rather than information. */}
+        {!isArticle && (
+        <div className="absolute bottom-1 right-1 bg-black/70 backdrop-blur-sm rounded px-1 py-0.5 flex flex-col gap-px items-end">
+          {([
+            { store: "abe" as const,    letter: "A", price: rec.lowest_price,      checked: rec.abe_checked_at,    name: "AbeBooks",    tone: "text-emerald-300 hover:text-emerald-200" },
+            { store: "thrift" as const, letter: "T", price: rec.thriftbooks_price, checked: rec.thrift_checked_at, name: "ThriftBooks", tone: "text-blue-300 hover:text-blue-200" },
+            { store: "amazon" as const, letter: "Z", price: rec.amazon_price,      checked: rec.amazon_checked_at, name: "Amazon",      tone: "text-amber-300 hover:text-amber-200" },
+          ]).map(({ store, letter, price, checked, name, tone }) => (
+            <a
+              key={store}
+              href={storeUrl(store, rec.isbn, rec.title, rec.author)}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className={`text-[8px] font-bold ${price != null ? tone : "text-muted-2 hover:text-muted"}`}
+              title={
+                price != null
+                  ? `Open on ${name}`
+                  : checked
+                    ? `No copy found on ${name} (checked ${checked.slice(0, 10)}) — open to look yourself`
+                    : `Not looked up on ${name} yet — open to look yourself`
+              }
+            >
+              {letter} {price != null ? `$${price.toFixed(0)}` : "$-"}
+            </a>
+          ))}
+        </div>
         )}
       </div>
 

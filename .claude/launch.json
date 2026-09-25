@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "library-dev",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd /Users/dmarzari/Server-Sites/Library && AUTH_PASSWORD=test DATABASE_PATH=/private/tmp/claude-501/-Users-dmarzari-Server-Sites-Library/87e16461-3ee7-45b6-9f1d-379b142b4a90/scratchpad/dev.db npm run dev -- -p 3077"],
+      "port": 3077
+    }
+  ]
+}

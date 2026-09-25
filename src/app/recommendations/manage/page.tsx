@@ -25,6 +25,9 @@ interface Recommendation {
   lowest_price?: number | null;
   thriftbooks_price?: number | null;
   amazon_price?: number | null;
+  abe_checked_at?: string | null;
+  thrift_checked_at?: string | null;
+  amazon_checked_at?: string | null;
   source_book_id?: string | null;
   // Multiple books that recommended this item. On the wire this is a JSON
   // string (or null); the client normalizes to string[] on load.
@@ -1752,43 +1755,34 @@ export default function RecommendationsPage() {
                       </div>
                     </div>
 
-                    {/* Price badges (AbeBooks + ThriftBooks + Amazon) — clickable to store */}
-                    {rec.lowest_price != null && (
+                    {/* Price badges (AbeBooks + ThriftBooks + Amazon) — always
+                        all three, so a store with no copy reads "$-" instead of
+                        silently vanishing. Same rule as the shelf. */}
+                    {([
+                      { store: "abe" as const,    letter: "A", price: rec.lowest_price,      checked: rec.abe_checked_at,    name: "AbeBooks",    tone: "bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-500" },
+                      { store: "thrift" as const, letter: "T", price: rec.thriftbooks_price, checked: rec.thrift_checked_at, name: "ThriftBooks", tone: "bg-blue-500/10 hover:bg-blue-500/25 text-blue-400" },
+                      { store: "amazon" as const, letter: "Z", price: rec.amazon_price,      checked: rec.amazon_checked_at, name: "Amazon",      tone: "bg-amber-500/10 hover:bg-amber-500/25 text-amber-400" },
+                    ]).map(({ store, letter, price, checked, name, tone }) => (
                       <a
-                        href={storeUrl("abe", rec.isbn, rec.title, rec.author)}
+                        key={store}
+                        href={storeUrl(store, rec.isbn, rec.title, rec.author)}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="px-1.5 py-0.5 bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-500 rounded text-[9px] font-bold flex-shrink-0 transition-colors"
-                        title="Open on AbeBooks"
+                        className={`px-1.5 py-0.5 rounded text-[9px] font-bold flex-shrink-0 transition-colors ${
+                          price != null ? tone : "bg-surface-2 text-muted-2 hover:text-muted"
+                        }`}
+                        title={
+                          price != null
+                            ? `Open on ${name}`
+                            : checked
+                              ? `No copy found on ${name} (checked ${checked.slice(0, 10)}) — open to look yourself`
+                              : `Not looked up on ${name} yet — open to look yourself`
+                        }
                       >
-                        A ${rec.lowest_price.toFixed(2)}
+                        {letter} {price != null ? `$${price.toFixed(2)}` : "$-"}
                       </a>
-                    )}
-                    {rec.thriftbooks_price != null && (
-                      <a
-                        href={storeUrl("thrift", rec.isbn, rec.title, rec.author)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="px-1.5 py-0.5 bg-blue-500/10 hover:bg-blue-500/25 text-blue-400 rounded text-[9px] font-bold flex-shrink-0 transition-colors"
-                        title="Open on ThriftBooks"
-                      >
-                        T ${rec.thriftbooks_price.toFixed(2)}
-                      </a>
-                    )}
-                    {rec.amazon_price != null && (
-                      <a
-                        href={storeUrl("amazon", rec.isbn, rec.title, rec.author)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="px-1.5 py-0.5 bg-amber-500/10 hover:bg-amber-500/25 text-amber-400 rounded text-[9px] font-bold flex-shrink-0 transition-colors"
-                        title="Open on Amazon"
-                      >
-                        Z ${rec.amazon_price.toFixed(2)}
-                      </a>
-                    )}
+                    ))}
 
                     {/* Source badge */}
                     {rec.recommended_by && (
