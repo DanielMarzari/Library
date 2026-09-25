@@ -45,3 +45,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Price-refresh working files (queue, logs, scraped results)
+.prices/
