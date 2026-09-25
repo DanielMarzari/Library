@@ -1758,7 +1758,7 @@ export default function RecommendationsPage() {
                     {/* Price badges (AbeBooks + ThriftBooks + Amazon) — always
                         all three, so a store with no copy reads "$-" instead of
                         silently vanishing. Same rule as the shelf. */}
-                    {([
+                    {rec.item_type !== "article" && ([
                       { store: "abe" as const,    letter: "A", price: rec.lowest_price,      checked: rec.abe_checked_at,    name: "AbeBooks",    tone: "bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-500" },
                       { store: "thrift" as const, letter: "T", price: rec.thriftbooks_price, checked: rec.thrift_checked_at, name: "ThriftBooks", tone: "bg-blue-500/10 hover:bg-blue-500/25 text-blue-400" },
                       { store: "amazon" as const, letter: "Z", price: rec.amazon_price,      checked: rec.amazon_checked_at, name: "Amazon",      tone: "bg-amber-500/10 hover:bg-amber-500/25 text-amber-400" },
