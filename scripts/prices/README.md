@@ -46,6 +46,34 @@ the Refresh Prices button uses — so the field allowlist applies and no shell
 access to the server is needed. `apply.mjs` emits the equivalent SQL instead,
 for when you'd rather apply it by hand.
 
+## The recurring refresh, start to finish
+
+Prices move and the library changes, so both want re-running together:
+
+```bash
+# 1. a read-only copy of the live DB to build the queue from
+scp -i ~/Documents/Server/main-server/dan-server.key \
+    ubuntu@129.80.157.41:/var/www/apps/library/library.db .prices/library.db
+
+# 2. re-price (‑‑refresh re-checks rows that already have a price)
+PRICES_DIR=.prices LIBRARY_DB=.prices/library.db \
+  node scripts/prices/run.mjs thrift --refresh --delay 1700
+
+# 3. write it back, then re-rank
+node scripts/prices/apply-api.mjs thrift
+curl -X POST https://library.danmarzari.com/api/recommendations/score \
+     -H 'Cookie: session_token=…'
+```
+
+Apply as each store finishes rather than at the end. A whole run's results once
+sat unapplied in a temp directory that got cleaned up between sessions, and
+several hundred prices were simply lost — which is why `PRICES_DIR` defaults to
+`.prices/` inside the repo now.
+
+Step 3's rescore matters as much as the prices: the score is built from what
+you've read, rated and set down, so it's stale the moment you finish a book.
+The Rescore button on the recommendations page does the same thing.
+
 ## What each store needs
 
 - **AbeBooks** — plain fetch. ISBN search, falling back to title+author. The
