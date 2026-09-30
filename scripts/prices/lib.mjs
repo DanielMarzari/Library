@@ -27,14 +27,22 @@ export const COL = {
   amazon: { price: 'amazon_price',      checked: 'amazon_checked_at' },
 };
 
-/** Rows still owing a price for `store`, cheapest-to-verify first (ISBN rows lead). */
-export function queue(store, dbPath = process.env.LIBRARY_DB || path.join(SP, 'library.db')) {
-  const db = new Database(dbPath, { readonly: true });
+/**
+ * Rows to look up for `store`, ISBN rows first (they're the cheap, certain path).
+ *
+ * Default is gap-filling: only rows never checked. `refresh` re-queues
+ * everything, because prices move — a figure scraped weeks ago is a guess about
+ * today, and the whole point of the cheapest-first sort is that the numbers are
+ * comparable with each other right now.
+ */
+export function queue(store, { refresh = false, dbPath } = {}) {
+  const db = new Database(dbPath || process.env.LIBRARY_DB || path.join(SP, 'library.db'), { readonly: true });
   const { price, checked } = COL[store];
+  const pending = refresh ? '1=1' : `${price} IS NULL AND ${checked} IS NULL`;
   const rows = db.prepare(`
     SELECT id, title, author, isbn
     FROM recommendations
-    WHERE ${price} IS NULL AND ${checked} IS NULL
+    WHERE ${pending}
       AND COALESCE(item_type,'book') = 'book'
     ORDER BY (isbn IS NULL OR trim(isbn)=''), title
   `).all();

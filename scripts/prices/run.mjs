@@ -16,6 +16,7 @@ const arg = (k, d) => { const i = process.argv.indexOf(k); return i === -1 ? d :
 const LIMIT = Number(arg('--limit', 0));
 const DELAY = Number(arg('--delay', 0));
 const ISBN_ONLY = process.argv.includes('--isbn-only');
+const REFRESH = process.argv.includes('--refresh');
 
 const ADAPTERS = {
   abe: {
@@ -64,13 +65,14 @@ if (!A) { console.error(`unknown store: ${store}`); process.exit(1); }
 const delay = DELAY || A.defaultDelay;
 const mod = await A.load();
 
-const all = queue(store);
-const already = done(store);
+const all = queue(store, { refresh: REFRESH });
+// On a refresh the point is to re-check, so a prior result is not "done".
+const already = REFRESH ? new Map() : done(store);
 let todo = all.filter(r => !already.has(r.id));
 if (ISBN_ONLY) todo = todo.filter(r => r.isbn && r.isbn.replace(/\D/g, '').length >= 10);
 const work = LIMIT ? todo.slice(0, LIMIT) : todo;
 
-console.log(`[${store}] ${all.length} owing · ${already.size} already recorded · ${work.length} this pass · ${delay}ms pacing`);
+console.log(`[${store}] ${all.length} ${REFRESH ? 'to refresh' : 'owing'} · ${already.size} already recorded · ${work.length} this pass · ${delay}ms pacing`);
 
 const tally = { ok: 0, no_result: 0, blocked: 0, error: 0 };
 let blocks = 0;

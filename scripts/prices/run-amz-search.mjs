@@ -9,8 +9,9 @@ const arg = (k, d) => { const i = process.argv.indexOf(k); return i === -1 ? d :
 const LIMIT = Number(arg('--limit', 0));
 const DELAY = Number(arg('--delay', 20000));
 
-const all = queue('amazon');
-const already = done('amazon');
+const REFRESH = process.argv.includes('--refresh');
+const all = queue('amazon', { refresh: REFRESH });
+const already = REFRESH ? new Map() : done('amazon');
 let todo = all.filter(r => !already.has(r.id) && !(r.isbn && r.isbn.replace(/\D/g, '').length >= 10));
 const work = LIMIT ? todo.slice(0, LIMIT) : todo;
 console.log(`[amazon-search] ${todo.length} no-ISBN rows owing · ${work.length} this pass · ${DELAY}ms pacing`);

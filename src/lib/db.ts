@@ -209,6 +209,14 @@ function ensureAllTables(db: Database.Database) {
   // ($- on the shelf), price NULL + checked_at NULL is simply not looked up yet.
   // Without the distinction a scraper run can't tell what it still owes, and a
   // blocked request looks identical to an out-of-print book.
+  // How much this reader would actually want the book, recomputed from the
+  // library on demand (see src/lib/recScore.ts). Stored rather than computed
+  // per request because the shelf sorts and filters on it, and because keeping
+  // the reasons alongside the number is what makes the ranking arguable.
+  addColumnSafe('recommendations', 'score', 'REAL');
+  addColumnSafe('recommendations', 'score_reasons', 'TEXT');
+  addColumnSafe('recommendations', 'scored_at', 'TEXT');
+
   addColumnSafe('recommendations', 'abe_checked_at', 'TEXT');
   addColumnSafe('recommendations', 'thrift_checked_at', 'TEXT');
   addColumnSafe('recommendations', 'amazon_checked_at', 'TEXT');

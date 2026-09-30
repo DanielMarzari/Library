@@ -79,6 +79,11 @@ export interface Recommendation {
   lowest_price?: number | null;
   thriftbooks_price?: number | null;
   amazon_price?: number | null;
+  /** How much you'd want it, recomputed from the library — see src/lib/recScore.ts. */
+  score?: number | null;
+  /** JSON array of {label, points}: why it scored what it scored. */
+  score_reasons?: string | null;
+  scored_at?: string | null;
   /** When each store was last searched. NULL price + a stamp means "nobody has it". */
   abe_checked_at?: string | null;
   thrift_checked_at?: string | null;
@@ -214,6 +219,11 @@ export const api = {
     update: (id: string, data: Partial<Recommendation>) =>
       fetchJson<Recommendation>(`/api/recommendations/${id}`, { method: 'PUT', body: data }),
     delete: (id: string) => deleteJson(`/api/recommendations/${id}`),
+    /** Recompute every score from the current library. Cheap: no network, just arithmetic. */
+    rescore: () => fetchJson<{
+      scored: number; scoredAt: string; booksConsidered: number; goalsConsidered: number;
+      distribution: { min: number; p25: number; median: number; p75: number; p90: number; max: number };
+    }>('/api/recommendations/score', { method: 'POST' }),
   },
 
   learningGoals: {

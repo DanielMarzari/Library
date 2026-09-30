@@ -36,6 +36,26 @@ function storeUrl(
   }
 }
 
+/**
+ * The cheapest of the three stores, or null when no store has a price.
+ * Null is not "free" and not "expensive" — it's unknown, and the price filter
+ * has to treat it as such rather than silently ranking it at either end.
+ */
+function cheapestOf(r: Rec): number | null {
+  const vals = [r.lowest_price, r.thriftbooks_price, r.amazon_price]
+    .filter((v): v is number => typeof v === "number" && v > 0);
+  return vals.length ? Math.min(...vals) : null;
+}
+
+/** Parsed score reasons, newest-first by weight, for the card and the modal. */
+function scoreReasons(r: Rec): Array<{ label: string; points: number }> {
+  if (!r.score_reasons) return [];
+  try {
+    const a = JSON.parse(r.score_reasons);
+    return Array.isArray(a) ? a.slice().sort((x, y) => Math.abs(y.points) - Math.abs(x.points)) : [];
+  } catch { return []; }
+}
+
 // The same person is recorded under several spellings — "Tim Mackie" has 60
 // recommendations and "Tim Mackie (BibleProject)" has 1,527. Exact matching
 // meant picking either one hid the rest. Compare on the name with any
@@ -69,6 +89,9 @@ interface Rec {
   abe_checked_at?: string | null;
   thrift_checked_at?: string | null;
   amazon_checked_at?: string | null;
+  score?: number | null;
+  score_reasons?: string | null;
+  scored_at?: string | null;
   item_type?: "book" | "article";
   doi?: string;
   journal?: string;
@@ -78,7 +101,7 @@ interface Rec {
 }
 
 type GridSize = "xs" | "small" | "medium" | "large" | "xl";
-type SortMode = "recent" | "alpha" | "cheapest_asc"
+type SortMode = "recent" | "alpha" | "cheapest_asc" | "score_desc" | "score_asc"
   | "abe_asc" | "abe_desc" | "thrift_asc" | "thrift_desc" | "amazon_asc" | "amazon_desc";
 type GroupBy = "flat" | "topic" | "source";
 
@@ -104,6 +127,10 @@ export default function RecommendationsPage() {
   const [showSourceMenu, setShowSourceMenu] = useState(false);
   const [page, setPage] = useState(1);
   const [openRec, setOpenRec] = useState<Rec | null>(null);
+  // "Show me only what I can get for under $X" — measured on the cheapest of
+  // the three stores, since that's the price you'd actually pay.
+  const [maxPrice, setMaxPrice] = useState<number | null>(null);
+  const [rescoring, setRescoring] = useState(false);
   const [starredOnly, setStarredOnly] = useState(false);
   // Goal filter. recGoalIds maps rec id -> the goals it belongs to, so the
   // shelf can narrow to "things that serve the goal I'm working on".
@@ -208,6 +235,12 @@ export default function RecommendationsPage() {
       if (filterGoal && !(recGoalIds[r.id] || []).includes(filterGoal)) return false;
       if (filterTopic && r.topic !== filterTopic) return false;
       if (filterSource && !sourceMatches(r.recommended_by, filterSource)) return false;
+      if (maxPrice != null) {
+        const c = cheapestOf(r);
+        // A book with no known price can't be shown to be under the cap, so it
+        // isn't. Claiming otherwise would put unpriced books in a budget list.
+        if (c == null || c > maxPrice) return false;
+      }
       if (!q) return true;
       return [r.title, r.author || "", r.recommended_by || "", r.topic || "", r.notes || ""]
         .join(" ").toLowerCase().includes(q);
@@ -219,6 +252,9 @@ export default function RecommendationsPage() {
         out.sort((a, b) => (m(a) === Infinity ? 9999 : m(a)) - (m(b) === Infinity ? 9999 : m(b)));
         break;
       }
+      // Unscored rows sort to the bottom either way rather than pretending to be 0.
+      case "score_desc":  out.sort((a, b) => (b.score ?? -Infinity) - (a.score ?? -Infinity)); break;
+      case "score_asc":   out.sort((a, b) => (a.score ??  Infinity) - (b.score ??  Infinity)); break;
       case "abe_asc":     out.sort((a, b) => (a.lowest_price      ?? 9999) - (b.lowest_price      ?? 9999)); break;
       case "abe_desc":    out.sort((a, b) => (b.lowest_price      ?? 0)    - (a.lowest_price      ?? 0)); break;
       case "thrift_asc":  out.sort((a, b) => (a.thriftbooks_price ?? 9999) - (b.thriftbooks_price ?? 9999)); break;
@@ -229,7 +265,7 @@ export default function RecommendationsPage() {
       default: out.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
     }
     return out;
-  }, [recs, search, sortMode, filterTopic, filterSource, starredOnly, filterGoal, recGoalIds]);
+  }, [recs, search, sortMode, filterTopic, filterSource, starredOnly, filterGoal, recGoalIds, maxPrice]);
 
   const paginated = filtered.slice(0, page * PAGE_SIZE);
   const hasMore = paginated.length < filtered.length;
@@ -280,6 +316,32 @@ export default function RecommendationsPage() {
                 </button>
               ))}
             </div>
+
+            {/* Rescore. Cheap — no network, just the library and arithmetic —
+                so it's worth re-running whenever you finish, rate or set down a
+                book, because that's exactly what the score is made of. */}
+            <button
+              onClick={async () => {
+                setRescoring(true);
+                try {
+                  const res = await api.recommendations.rescore();
+                  const fresh = await api.recommendations.list();
+                  setRecs(fresh);
+                  setSortMode("score_desc");
+                  console.log("rescored", res);
+                } catch (e) {
+                  console.error("rescore failed", e);
+                  alert("Could not refresh the scores.");
+                } finally {
+                  setRescoring(false);
+                }
+              }}
+              disabled={rescoring}
+              className="hidden sm:inline-block bg-violet-600/15 hover:bg-violet-600/30 text-violet-300 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+              title="Recompute every score from your current library"
+            >
+              {rescoring ? "Scoring…" : "Rescore"}
+            </button>
 
             {/* Manage — full list view with add/edit/refresh */}
             <Link
@@ -429,6 +491,45 @@ export default function RecommendationsPage() {
               )}
             </div>
 
+            {/* Price cap, measured on the cheapest of the three stores. Books
+                with no known price are excluded while a cap is set — an unknown
+                price can't be shown to be under it. */}
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-muted-2 uppercase tracking-wider">Under</span>
+              {([10, 20, 30, 50]).map(v => (
+                <button
+                  key={v}
+                  onClick={() => setMaxPrice(maxPrice === v ? null : v)}
+                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                    maxPrice === v ? "bg-emerald-600 text-white" : "bg-surface-2 text-muted hover:text-foreground"
+                  }`}
+                >
+                  ${v}
+                </button>
+              ))}
+              <input
+                type="text"
+                inputMode="decimal"
+                value={maxPrice != null && ![10, 20, 30, 50].includes(maxPrice) ? String(maxPrice) : ""}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value);
+                  setMaxPrice(Number.isFinite(v) && v > 0 ? v : null);
+                }}
+                placeholder="$…"
+                aria-label="Custom maximum price"
+                className="w-14 bg-surface-2 border border-border-custom rounded px-1.5 py-0.5 text-[10px] text-foreground placeholder:text-muted-2 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+              />
+              {maxPrice != null && (
+                <button
+                  onClick={() => setMaxPrice(null)}
+                  className="px-1.5 py-0.5 rounded text-[10px] text-red-400 hover:bg-red-500/10 transition-colors"
+                  aria-label="Clear price cap"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+
             {(filterTopic || filterSource) && (
               <button
                 onClick={() => { setFilterTopic(null); setFilterSource(null); }}
@@ -476,6 +577,29 @@ export default function RecommendationsPage() {
                   {l}
                 </button>
               ))}
+              {/* Best-for-you. Its own button rather than a plain sort toggle
+                  because it cycles the same way the price sorts do, and because
+                  the ranking is arguable — every card carries its reasons. */}
+              {(() => {
+                const cycle = () => {
+                  if (sortMode === "score_desc") setSortMode("score_asc");
+                  else if (sortMode === "score_asc") setSortMode("recent");
+                  else setSortMode("score_desc");
+                };
+                const arrow = sortMode === "score_desc" ? " \u2191" : sortMode === "score_asc" ? " \u2193" : "";
+                const active = sortMode === "score_desc" || sortMode === "score_asc";
+                return (
+                  <button
+                    onClick={cycle}
+                    className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                      active ? "bg-violet-600 text-white" : "bg-surface-2 text-muted hover:text-foreground"
+                    }`}
+                    title="Sort by how much you'd want it, worked out from what you've read, rated, set down and set as goals. Tap any book to see why it scored what it did."
+                  >
+                    For you{arrow}
+                  </button>
+                );
+              })()}
               {([
                 { label: "Abe",    key: "abe",    tone: "abe"    as const },
                 { label: "Thrift", key: "thrift", tone: "thrift" as const },
@@ -541,7 +665,13 @@ export default function RecommendationsPage() {
                 )}
                 <div className={`grid ${gridClasses[gridSize]} px-1`}>
                   {section.recs.map(rec => (
-                    <ShelfRec key={rec.id} rec={rec} onOpen={setOpenRec} onToggleStar={toggleStar} />
+                    <ShelfRec
+                      key={rec.id}
+                      rec={rec}
+                      onOpen={setOpenRec}
+                      onToggleStar={toggleStar}
+                      showScore={sortMode === "score_desc" || sortMode === "score_asc"}
+                    />
                   ))}
                 </div>
                 {/* Wooden shelf edge — same as home */}
@@ -582,10 +712,12 @@ function ShelfRec({
   rec,
   onOpen,
   onToggleStar,
+  showScore = false,
 }: {
   rec: Rec;
   onOpen: (rec: Rec) => void;
   onToggleStar: (rec: Rec) => void;
+  showScore?: boolean;
 }) {
   const cover = rec.cover_url ? safeCoverUrl(rec.cover_url) : null;
   const isArticle = rec.item_type === "article";
@@ -649,6 +781,20 @@ function ShelfRec({
         >
           {starred ? "★" : "☆"}
         </button>
+
+        {/* Score pip, bottom-left. Only when sorting by it — otherwise it's a
+            number competing for attention with the thing you actually came for,
+            which is the book. */}
+        {showScore && typeof rec.score === "number" && (
+          <div
+            className={`absolute bottom-1 left-1 rounded px-1 py-0.5 backdrop-blur-sm ${
+              rec.score >= 40 ? "bg-violet-600/90" : rec.score >= 20 ? "bg-violet-700/75" : "bg-black/60"
+            }`}
+            title={scoreReasons(rec).map(r => `${r.points > 0 ? "+" : ""}${r.points}  ${r.label}`).join("\n") || "No signals yet"}
+          >
+            <span className="text-[8px] font-bold text-white">{Math.round(rec.score)}</span>
+          </div>
+        )}
 
         {/* Article badge in the top-left */}
         {isArticle && (
@@ -801,6 +947,35 @@ function RecDetailModal({
               {rec.year && <span className="text-muted-2">{rec.year}</span>}
               {rec.isbn && <span className="text-muted-2 font-mono">ISBN {rec.isbn}</span>}
             </div>
+
+            {/* Why it scored what it did. The whole point of keeping the
+                reasons alongside the number: a ranking you can't interrogate is
+                one you shouldn't trust, least of all one you spend money from. */}
+            {typeof rec.score === "number" && scoreReasons(rec).length > 0 && (
+              <div className="mb-3 rounded-lg border border-border-custom bg-surface-2/60 p-2.5">
+                <div className="flex items-baseline justify-between mb-1.5">
+                  <span className="text-[11px] font-semibold text-foreground">Why this is ranked for you</span>
+                  <span className={`text-sm font-bold ${rec.score >= 40 ? "text-violet-400" : rec.score >= 20 ? "text-violet-300" : "text-muted"}`}>
+                    {Math.round(rec.score)}
+                  </span>
+                </div>
+                <ul className="space-y-0.5">
+                  {scoreReasons(rec).map((sig, i) => (
+                    <li key={i} className="flex items-start gap-2 text-[11px]">
+                      <span className={`font-mono tabular-nums shrink-0 ${sig.points >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                        {sig.points > 0 ? "+" : ""}{sig.points}
+                      </span>
+                      <span className="text-muted">{sig.label}</span>
+                    </li>
+                  ))}
+                </ul>
+                {rec.scored_at && (
+                  <p className="text-[10px] text-muted-2 mt-1.5">
+                    Worked out from your library on {rec.scored_at.slice(0, 10)}
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Topic / source */}
             <div className="space-y-1 text-xs text-muted mb-3">
