@@ -36,15 +36,31 @@ function storeUrl(
   }
 }
 
+/** Which store's price the "under $X" cap is measured against. */
+type PriceStore = "cheapest" | "abe" | "thrift" | "amazon";
+
 /**
- * The cheapest of the three stores, or null when no store has a price.
- * Null is not "free" and not "expensive" — it's unknown, and the price filter
- * has to treat it as such rather than silently ranking it at either end.
+ * The price this reader would pay at a given store, or null when that store
+ * has no price for it.
+ *
+ * Null is not "free" and not "expensive" — it's unknown, and the price cap has
+ * to treat it as such rather than silently ranking it at either end. Which
+ * store you're asking about matters: a book ThriftBooks sells for $7 may be $40
+ * on Abe, so "under $10" is a different set depending on where you'd buy it.
  */
-function cheapestOf(r: Rec): number | null {
-  const vals = [r.lowest_price, r.thriftbooks_price, r.amazon_price]
-    .filter((v): v is number => typeof v === "number" && v > 0);
-  return vals.length ? Math.min(...vals) : null;
+function priceAt(r: Rec, store: PriceStore): number | null {
+  const one = (v: unknown) => (typeof v === "number" && v > 0 ? v : null);
+  switch (store) {
+    case "abe":    return one(r.lowest_price);
+    case "thrift": return one(r.thriftbooks_price);
+    case "amazon": return one(r.amazon_price);
+    case "cheapest":
+    default: {
+      const vals = [r.lowest_price, r.thriftbooks_price, r.amazon_price]
+        .filter((v): v is number => typeof v === "number" && v > 0);
+      return vals.length ? Math.min(...vals) : null;
+    }
+  }
 }
 
 /** Parsed score reasons, newest-first by weight, for the card and the modal. */
@@ -130,6 +146,7 @@ export default function RecommendationsPage() {
   // "Show me only what I can get for under $X" — measured on the cheapest of
   // the three stores, since that's the price you'd actually pay.
   const [maxPrice, setMaxPrice] = useState<number | null>(null);
+  const [priceStore, setPriceStore] = useState<PriceStore>("cheapest");
   const [rescoring, setRescoring] = useState(false);
   const [starredOnly, setStarredOnly] = useState(false);
   // Goal filter. recGoalIds maps rec id -> the goals it belongs to, so the
@@ -236,9 +253,10 @@ export default function RecommendationsPage() {
       if (filterTopic && r.topic !== filterTopic) return false;
       if (filterSource && !sourceMatches(r.recommended_by, filterSource)) return false;
       if (maxPrice != null) {
-        const c = cheapestOf(r);
-        // A book with no known price can't be shown to be under the cap, so it
-        // isn't. Claiming otherwise would put unpriced books in a budget list.
+        const c = priceAt(r, priceStore);
+        // A book with no known price at the chosen store can't be shown to be
+        // under the cap, so it isn't. Claiming otherwise would put unpriced
+        // books in a budget list.
         if (c == null || c > maxPrice) return false;
       }
       if (!q) return true;
@@ -265,7 +283,7 @@ export default function RecommendationsPage() {
       default: out.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
     }
     return out;
-  }, [recs, search, sortMode, filterTopic, filterSource, starredOnly, filterGoal, recGoalIds, maxPrice]);
+  }, [recs, search, sortMode, filterTopic, filterSource, starredOnly, filterGoal, recGoalIds, maxPrice, priceStore]);
 
   const paginated = filtered.slice(0, page * PAGE_SIZE);
   const hasMore = paginated.length < filtered.length;
@@ -519,9 +537,34 @@ export default function RecommendationsPage() {
                 aria-label="Custom maximum price"
                 className="w-14 bg-surface-2 border border-border-custom rounded px-1.5 py-0.5 text-[10px] text-foreground placeholder:text-muted-2 focus:outline-none focus:ring-1 focus:ring-emerald-600"
               />
+              {/* Which store the cap is measured at. A book ThriftBooks sells
+                  for $7 can be $40 on Abe, so "under $10" is a different shelf
+                  depending on where you'd actually buy it. */}
+              <span className="text-[10px] text-muted-2 lowercase">at</span>
+              <div className="flex gap-0.5 bg-surface rounded-lg p-0.5">
+                {([
+                  { v: "cheapest" as PriceStore, l: "Any",    active: "bg-foreground text-background" },
+                  { v: "abe"      as PriceStore, l: "Abe",    active: "bg-emerald-600 text-white" },
+                  { v: "thrift"   as PriceStore, l: "Thrift", active: "bg-blue-600 text-white" },
+                  { v: "amazon"   as PriceStore, l: "Amazon", active: "bg-amber-600 text-white" },
+                ]).map(({ v, l, active }) => (
+                  <button
+                    key={v}
+                    onClick={() => setPriceStore(v)}
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                      priceStore === v ? active : "text-muted-2 hover:text-muted"
+                    }`}
+                    title={v === "cheapest"
+                      ? "Cheapest of the three stores"
+                      : `Only books ${l} sells under the cap`}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
               {maxPrice != null && (
                 <button
-                  onClick={() => setMaxPrice(null)}
+                  onClick={() => { setMaxPrice(null); setPriceStore("cheapest"); }}
                   className="px-1.5 py-0.5 rounded text-[10px] text-red-400 hover:bg-red-500/10 transition-colors"
                   aria-label="Clear price cap"
                 >
