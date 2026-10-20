@@ -314,14 +314,23 @@ function fromHarvard(r: HarvardRecord): BookSearchResult {
 }
 
 /**
- * Look a book up, trying the most precise route first and falling through only
- * on a genuine miss:
+ * Look a book up across three catalogues, falling through only on a genuine
+ * miss:
  *
- *   1. ISBN      — exact and authoritative
- *   2. title + author
- *   3. title alone — catches pseudonyms, transliterations (Joüon/Jouon),
- *                    corporate authors, and plain author-spelling mismatches
- *   4. Google Books — more current than Open Library on new releases
+ *   1. Harvard LibraryCloud — a research-library catalogue, and the only one
+ *      carrying ISBN-13 with LC call number, Dewey and LCSH subjects together
+ *   2. Open Library — established backlist, and the source of cover art
+ *   3. K10plus — the German/Austrian union catalogue, stronger on continental
+ *      academic imprints and on recent academic ISBNs
+ *
+ * Within Open Library it tries ISBN, then title+author, then title alone —
+ * the last catching pseudonyms, transliterations (Joüon/Jouon) and corporate
+ * authors.
+ *
+ * There is deliberately no Google Books leg. All three of these are library
+ * catalogues, which means they are excellent on academic and backlist titles
+ * and will simply not have this year's popular trade releases. When every leg
+ * misses, that is a real answer — enter the book by hand.
  *
  * `author` is optional: when the caller only has a search box, pass the whole
  * string as `query` and it's used as the title.
@@ -377,42 +386,6 @@ export async function searchBooks(
     // established backlist and weak on new releases — a completed year still
     // back-fills for well over a year. Google Books tracks publisher feeds and
     // is the better bet for anything recent.
-    if (results.length === 0) {
-      const gq = isIsbn ? `isbn:${digits}` : [query, author].filter(Boolean).join(" ");
-      const gRes = await fetch(`/api/book-lookup/google?q=${encodeURIComponent(gq)}&limit=${limit}`);
-      // Check the status. Reading `.items` off a failed response made every
-      // quota error look like "no such book", which is how this leg stayed
-      // dead without anyone noticing.
-      if (!gRes.ok) {
-        const detail = await gRes.json().catch(() => null);
-        console.warn("Google Books leg unavailable:", gRes.status, detail?.message || "");
-        return results;
-      }
-      const gData = await gRes.json();
-
-      if (gData.items) {
-        for (const item of gData.items) {
-          const vol = item.volumeInfo;
-          const { title, subtitle } = cleanTitle(vol.title || "Unknown");
-          results.push({
-            title,
-            subtitle: subtitle || vol.subtitle || undefined,
-            author: vol.authors?.[0] || "Unknown Author",
-            isbn:
-              vol.industryIdentifiers?.find(
-                (id: { type: string; identifier: string }) => id.type === "ISBN_13"
-              )?.identifier ||
-              vol.industryIdentifiers?.[0]?.identifier ||
-              "",
-            cover_url: vol.imageLinks?.thumbnail?.replace("http:", "https:") || null,
-            description: vol.description?.substring(0, 300) || null,
-            pages: vol.pageCount || null,
-            publish_year: vol.publishedDate ? parseInt(vol.publishedDate.slice(0, 4), 10) || undefined : undefined,
-            topics: vol.categories || undefined,
-          });
-        }
-      }
-    }
   } catch {
     // fall through with whatever we have
   }

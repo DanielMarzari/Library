@@ -98,8 +98,15 @@ export function AddBookSheet({ onClose, onAdded, recentSources, prefill }: AddBo
 
     const found = await searchBooks(clean, 8);
     if (found.length === 0) {
-      setError(`No books found for: ${clean}`);
-      setSearchingIsbn(clean); // keep ISBN visible for manual use
+      // Every source behind this is a library catalogue, so a miss has a
+      // specific and usually correct meaning: no library has catalogued it yet.
+      // That is the normal case for a book published this year. Say so, rather
+      // than implying the title was wrong.
+      setError(
+        `Not in any catalogue we search (Harvard, Open Library, K10plus). ` +
+        `That's expected for a book published this year — add it by hand below.`
+      );
+      setSearchingIsbn(clean);
       setSearching(false);
     } else {
       setResults(found);
@@ -705,9 +712,20 @@ export function AddBookSheet({ onClose, onAdded, recentSources, prefill }: AddBo
             <div className="bg-red-950/30 border border-red-900/50 rounded-lg px-4 py-3 text-sm text-red-400">{error}</div>
             {searchingIsbn && (
               <div className="flex gap-2">
-                <button onClick={() => { setManIsbn(searchingIsbn); setMode("manual"); setError(""); }}
-                  className="flex-1 bg-surface-2 hover:bg-border-custom py-2.5 rounded-lg text-sm font-medium transition-colors">
-                  Add manually with ISBN {searchingIsbn}
+                <button
+                  onClick={() => {
+                    // Carry what was typed into the right field: an ISBN is an
+                    // ISBN, anything else is a title. Labelling a typed title
+                    // "ISBN" was just confusing.
+                    const looksIsbn = /^[0-9X-]{10,17}$/i.test(searchingIsbn.replace(/[^0-9X-]/gi, "")) &&
+                      searchingIsbn.replace(/[^0-9X]/gi, "").length >= 10;
+                    if (looksIsbn) setManIsbn(searchingIsbn);
+                    else setManTitle(searchingIsbn);
+                    setMode("manual");
+                    setError("");
+                  }}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">
+                  Add manually
                 </button>
                 <button onClick={() => { setQuery(searchingIsbn); setMode("isbn"); setError(""); }}
                   className="flex-1 bg-surface-2 hover:bg-border-custom py-2.5 rounded-lg text-sm font-medium transition-colors">

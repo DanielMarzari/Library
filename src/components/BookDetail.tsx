@@ -8,6 +8,7 @@ import { Book, ReadingUpdate, Density, ReadingMode } from "@/types/book";
 import { coverageOf, readableRange, describeIslands } from "@/lib/coverage";
 import { enrichBook, searchBooks } from "@/lib/bookLookup";
 import { coverSrc, safeCoverUrl } from "@/lib/coverUrl";
+import { harvardSearch } from "@/lib/harvard";
 
 interface BookDetailProps {
   book: Book;
@@ -449,23 +450,24 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
         }
       }
 
-      // 3. Google Books search
-      const gbQuery = `${encodeURIComponent(title || book.title)}+${encodeURIComponent(author || book.author)}`;
-      const gbUrl = `https://www.googleapis.com/books/v1/volumes?q=${gbQuery}&maxResults=6`;
-      const gbRes = await fetch(gbUrl);
-      if (gbRes.ok) {
-        const gbData = await gbRes.json();
-        if (gbData.items) {
-          for (const item of gbData.items) {
-            if (item.volumeInfo?.imageLinks?.thumbnail && options.length < 12) {
-              let imgUrl = item.volumeInfo.imageLinks.thumbnail;
-              imgUrl = imgUrl.replace(/zoom=1/, "zoom=3");
-              if (!options.includes(imgUrl)) {
-                options.push(imgUrl);
-              }
-            }
+      // 3. Harvard LibraryCloud, for the ISBNs Open Library's title search
+      //    missed. It holds no cover art itself, but a catalogue record for the
+      //    right edition gives us ISBNs to ask Open Library's cover service
+      //    about — which is often how an academic title's cover is found at all.
+      //
+      //    (Google Books used to sit here. Its keyless quota is zero, so every
+      //    call 429'd and it contributed nothing but latency.)
+      try {
+        const hv = await harvardSearch(title || book.title, author || book.author);
+        for (const rec of hv.slice(0, 3)) {
+          for (const isbn of rec.isbns) {
+            if (options.length >= 12) break;
+            const url = `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg?default=false`;
+            if (!options.includes(url)) options.push(url);
           }
         }
+      } catch {
+        // covers are a nice-to-have; never fail the dialog over them
       }
     } catch (error) {
       console.error("Error searching for covers:", error);
@@ -474,7 +476,9 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
     // Deduplicate
     const allCandidates = Array.from(new Set(options));
 
-    // Validate Open Library URLs with HEAD requests; Google Books URLs pass through
+    // All candidates are Open Library cover URLs now, so every one gets a HEAD
+    // check — ?default=false makes a missing cover a 404 rather than a grey
+    // placeholder, which is the whole point of asking.
     const validated: string[] = [];
     await Promise.all(
       allCandidates.map(async (url) => {
