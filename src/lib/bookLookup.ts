@@ -115,11 +115,32 @@ function cleanTitle(raw: string): { title: string; subtitle?: string } {
 }
 
 // Fetch classification data and subjects from Open Library edition/works APIs
+const GENERIC_SUBJECTS = new Set([
+  "fiction", "nonfiction", "large type books", "exhibitions", "specimens",
+  "accessible book", "protected daisy", "in library", "lending library",
+]);
+
+const usefulSubjects = (subjects: unknown): string[] =>
+  Array.isArray(subjects)
+    ? subjects
+        .filter((s): s is string => typeof s === "string")
+        .filter(s => !GENERIC_SUBJECTS.has(s.toLowerCase()) && !s.includes("--") && !s.includes("fiction,") && s.length < 60)
+        .slice(0, 10)
+    : [];
+
+/**
+ * Classification and subject headings, which Google Books does not carry at all.
+ *
+ * The EDITION record (/isbn/) is the one worth asking: it holds
+ * lc_classifications, subjects and a real number_of_pages. The work record is
+ * thinner than you'd expect — no description, no LCC, no DDC — so it's only a
+ * backstop for subjects.
+ */
 async function fetchClassifications(
   isbn: string,
   workKey?: string
-): Promise<{ lcc?: string; ddc?: string; topics?: string[] }> {
-  const result: { lcc?: string; ddc?: string; topics?: string[] } = {};
+): Promise<{ lcc?: string; ddc?: string; topics?: string[]; pages?: number }> {
+  const result: { lcc?: string; ddc?: string; topics?: string[]; pages?: number } = {};
 
   try {
     // Edition API for LCC/DDC
@@ -133,6 +154,15 @@ async function fetchClassifications(
         if (ed.dewey_decimal_class?.length) {
           result.ddc = ed.dewey_decimal_class[0];
         }
+        // This edition's actual page count, rather than the median across every
+        // edition the search endpoint knows about — that median reported 352
+        // for Joüon's grammar, which is really a ~750pp two-volume set.
+        if (typeof ed.number_of_pages === "number" && ed.number_of_pages > 0) {
+          result.pages = ed.number_of_pages;
+        }
+        // Subjects live on the edition too, and more reliably than on the work.
+        const edSubjects = usefulSubjects(ed.subjects);
+        if (edSubjects.length) result.topics = edSubjects;
         // If we don't have a work key yet, grab it from edition
         if (!workKey && ed.works?.length) {
           workKey = ed.works[0].key;
@@ -140,34 +170,13 @@ async function fetchClassifications(
       }
     }
 
-    // Works API for subjects
-    if (workKey) {
+    // Works API, only if the edition had no subjects of its own.
+    if (workKey && !result.topics?.length) {
       const wRes = await fetch(`https://openlibrary.org${workKey}.json`);
       if (wRes.ok) {
         const work = await wRes.json();
-        if (work.subjects?.length) {
-          // Take top 10 most relevant subjects, filter out overly generic ones
-          const skip = new Set([
-            "fiction",
-            "nonfiction",
-            "large type books",
-            "exhibitions",
-            "specimens",
-            "accessible book",
-            "protected daisy",
-            "in library",
-            "lending library",
-          ]);
-          result.topics = work.subjects
-            .filter(
-              (s: string) =>
-                !skip.has(s.toLowerCase()) &&
-                !s.includes("--") &&
-                !s.includes("fiction,") &&
-                s.length < 60
-            )
-            .slice(0, 10);
-        }
+        const workSubjects = usefulSubjects(work.subjects);
+        if (workSubjects.length) result.topics = workSubjects;
       }
     }
   } catch {
@@ -180,54 +189,97 @@ async function fetchClassifications(
 const OL_FIELDS =
   "key,title,subtitle,author_name,cover_i,number_of_pages_median,first_publish_year,isbn,edition_count";
 
+/**
+ * Open Library's `q=` runs through a dismax-style scorer that ORs loose tokens
+ * and fuzzy-matches them. Searching "AI and the Future Church" returned Dante's
+ * Divina Commedia (1472), because "Future"~"Fire" and "Church"~"Commedia".
+ *
+ * That isn't just noise — it broke the fallback. Google Books was only
+ * consulted when Open Library returned ZERO results, and a fuzzy OR over a
+ * multi-word title almost never returns zero. The fallback was structurally
+ * unreachable, so a book Open Library simply doesn't have came back as three
+ * confident wrong answers instead of an honest miss.
+ *
+ * Binding the title to a quoted phrase in its own field fixes it: the same
+ * search now returns 0 and falls through.
+ */
+function olQuery(title: string, author?: string): string {
+  // A stray quote would unbalance the phrase and make Solr throw; a Lucene
+  // operator in the author group would be parsed as syntax.
+  const t = title.replace(/["\\]/g, " ").trim();
+  // Author is a LENIENT group, not a phrase. Open Library catalogues from MARC,
+  // where middle initials are pervasive — it holds "Joshua A. Berman", so
+  // author:"Joshua Berman" matches nothing. Parentheses match the tokens
+  // without demanding adjacency, which matters across a whole theology shelf.
+  const a = (author || "").replace(/["\\+\-&|!(){}\[\]^~*?:]/g, " ").trim();
+  return a ? `title:"${t}" AND author:(${a})` : `title:"${t}"`;
+}
+
+const olUrl = (q: string, limit: number) =>
+  `https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=${limit}&fields=${OL_FIELDS}`;
+
+function docToResult(doc: any, isbnOverride?: string): BookSearchResult {
+  const { title, subtitle } = cleanTitle(doc.title || "Unknown");
+  return {
+    title,
+    subtitle: subtitle || (doc.subtitle ? cleanTitle(doc.subtitle).title : undefined),
+    author: doc.author_name?.[0] || "Unknown Author",
+    isbn: isbnOverride || doc.isbn?.[0] || "",
+    cover_url: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : null,
+    description: null,
+    // Per-edition and not always the edition you hold — Joüon's grammar reports
+    // 352 here against a ~750pp two-volume reality. Offered as a starting point,
+    // never as a page count to rely on.
+    pages: doc.number_of_pages_median || null,
+    publish_year: doc.first_publish_year || undefined,
+  };
+}
+
+/**
+ * Look a book up, trying the most precise route first and falling through only
+ * on a genuine miss:
+ *
+ *   1. ISBN      — exact and authoritative
+ *   2. title + author
+ *   3. title alone — catches pseudonyms, transliterations (Joüon/Jouon),
+ *                    corporate authors, and plain author-spelling mismatches
+ *   4. Google Books — more current than Open Library on new releases
+ *
+ * `author` is optional: when the caller only has a search box, pass the whole
+ * string as `query` and it's used as the title.
+ */
 export async function searchBooks(
   query: string,
-  limit = 5
+  limit = 5,
+  author?: string
 ): Promise<BookSearchResult[]> {
   const results: BookSearchResult[] = [];
+  const digits = query.replace(/[^0-9X]/gi, "");
+  const isIsbn = /^[0-9X-]{10,17}$/i.test(query.replace(/[^0-9X-]/gi, "")) && digits.length >= 10;
 
   try {
-    const isIsbn = /^[0-9X-]{10,17}$/i.test(query.replace(/[^0-9X-]/gi, ""));
-    const searchParam = isIsbn
-      ? `isbn:${query.replace(/[^0-9X]/gi, "")}`
-      : query;
+    const attempts = isIsbn
+      ? [`isbn:${digits}`]
+      : [olQuery(query, author), ...(author ? [olQuery(query)] : [])];
 
-    const res = await fetch(
-      `https://openlibrary.org/search.json?q=${encodeURIComponent(searchParam)}&limit=${limit}&fields=${OL_FIELDS}`
-    );
-    const data = await res.json();
-
-    if (data.docs) {
-      for (const doc of data.docs) {
-        const { title, subtitle } = cleanTitle(doc.title || "Unknown");
-        const bookIsbn = isIsbn
-          ? query.replace(/[^0-9X]/gi, "")
-          : doc.isbn?.[0] || "";
-
-        results.push({
-          title,
-          subtitle:
-            subtitle ||
-            (doc.subtitle ? cleanTitle(doc.subtitle).title : undefined),
-          author: doc.author_name?.[0] || "Unknown Author",
-          isbn: bookIsbn,
-          cover_url: doc.cover_i
-            ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`
-            : null,
-          description: null,
-          pages: doc.number_of_pages_median || null,
-          publish_year: doc.first_publish_year || undefined,
-        });
+    for (const q of attempts) {
+      const res = await fetch(olUrl(q, limit));
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (data.docs?.length) {
+        for (const doc of data.docs) results.push(docToResult(doc, isIsbn ? digits : undefined));
+        break;
       }
     }
 
-    // If Open Library returned nothing, try Google Books
+    // Open Library is built from library MARC dumps, so it is strong on
+    // established backlist and weak on new releases — a completed year still
+    // back-fills for well over a year. Google Books tracks publisher feeds and
+    // is the better bet for anything recent.
     if (results.length === 0) {
       const gRes = await fetch(
         `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(
-          isIsbn
-            ? `isbn:${query.replace(/[^0-9X]/gi, "")}`
-            : query
+          isIsbn ? `isbn:${digits}` : [query, author].filter(Boolean).join(" ")
         )}&maxResults=${limit}`
       );
       const gData = await gRes.json();
@@ -242,15 +294,14 @@ export async function searchBooks(
             author: vol.authors?.[0] || "Unknown Author",
             isbn:
               vol.industryIdentifiers?.find(
-                (id: { type: string; identifier: string }) =>
-                  id.type === "ISBN_13"
+                (id: { type: string; identifier: string }) => id.type === "ISBN_13"
               )?.identifier ||
               vol.industryIdentifiers?.[0]?.identifier ||
               "",
-            cover_url:
-              vol.imageLinks?.thumbnail?.replace("http:", "https:") || null,
+            cover_url: vol.imageLinks?.thumbnail?.replace("http:", "https:") || null,
             description: vol.description?.substring(0, 300) || null,
             pages: vol.pageCount || null,
+            publish_year: vol.publishedDate ? parseInt(vol.publishedDate.slice(0, 4), 10) || undefined : undefined,
             topics: vol.categories || undefined,
           });
         }
@@ -274,5 +325,7 @@ export async function enrichBook(
     lcc: cls.lcc || book.lcc,
     ddc: cls.ddc || book.ddc,
     topics: cls.topics?.length ? cls.topics : book.topics,
+    // Prefer this edition's real count over the cross-edition median.
+    pages: cls.pages ?? book.pages,
   };
 }
