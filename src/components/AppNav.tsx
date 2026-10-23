@@ -47,6 +47,7 @@ export function AppNav() {
         <div className="absolute top-full left-0 mt-2 w-56 bg-surface border border-border-custom rounded-xl shadow-xl p-2 z-50">
           <p className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-2 font-semibold">Library</p>
           {item("/", "Home shelf")}
+          {item("/articles", "Articles")}
 
           <div className="border-t border-border-custom my-1.5" />
           <p className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-2 font-semibold">Tracking</p>

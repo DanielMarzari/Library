@@ -17,6 +17,8 @@ interface AddBookSheetProps {
   onClose: () => void;
   onAdded: (optimisticBook: Partial<Book>) => void;
   recentSources: string[];
+  /** Skip the type chooser. The articles page knows what you're adding. */
+  startMode?: "choose" | "article";
   // Optional: pre-fill the form with a recommendation's data (jumps straight
   // to the confirm step so the user just fills the remaining fields).
   prefill?: {
@@ -40,8 +42,8 @@ type Mode =
   | "article"
   | "article-confirm";
 
-export function AddBookSheet({ onClose, onAdded, recentSources, prefill }: AddBookSheetProps) {
-  const [mode, setMode] = useState<Mode>("choose");
+export function AddBookSheet({ onClose, onAdded, recentSources, prefill, startMode = "choose" }: AddBookSheetProps) {
+  const [mode, setMode] = useState<Mode>(startMode);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<BookSearchResult[]>([]);
   const [selected, setSelected] = useState<BookSearchResult | null>(null);
@@ -257,7 +259,11 @@ export function AddBookSheet({ onClose, onAdded, recentSources, prefill }: AddBo
   };
 
   const handleArticleAdd = async () => {
-    if (!article || !articleTitle.trim() || !articleAuthor.trim()) return;
+    // A DOI is not required. Most of this library's articles predate DOIs
+    // entirely — HUCA, Eretz-Israel, pre-digital CBQ — and refusing to save
+    // them would make the articles page useless for exactly the material it
+    // exists to hold.
+    if (!articleTitle.trim() || !articleAuthor.trim()) return;
     setSaving(true);
 
     const ip = parseInt(introPages) || 0;
@@ -272,12 +278,12 @@ export function AddBookSheet({ onClose, onAdded, recentSources, prefill }: AddBo
         author: articleAuthor.trim(),
         status,
         item_type: "article",
-        doi: article.doi,
+        doi: article?.doi || undefined,
         journal: articleJournal.trim() || undefined,
         publication_year: Number.isFinite(yearNum) ? yearNum : undefined,
         url: articleUrl.trim() || undefined,
-        description: article.description || undefined,
-        pages: article.pages || undefined,
+        description: article?.description || undefined,
+        pages: article?.pages || undefined,
         intro_pages: ip || 0,
         start_page: sp,
         end_page: ep,
@@ -609,16 +615,28 @@ export function AddBookSheet({ onClose, onAdded, recentSources, prefill }: AddBo
                 Looks up article metadata from Crossref.
               </p>
             </div>
-            <button onClick={() => { setMode("choose"); setError(""); }} className="w-full bg-surface-2 hover:bg-border-custom py-2.5 rounded-lg text-sm font-medium transition-colors">Back</button>
+            <button
+              onClick={() => { setArticle(null); setError(""); setMode("article-confirm"); }}
+              className="w-full bg-surface-2 hover:bg-border-custom py-2.5 rounded-lg text-sm font-medium transition-colors"
+            >
+              No DOI — type it in
+            </button>
+            <button onClick={() => { setMode("choose"); setError(""); }} className="w-full text-muted hover:text-foreground py-2 rounded-lg text-sm font-medium transition-colors">Back</button>
           </div>
         )}
 
         {/* === CONFIRM ARTICLE === */}
-        {mode === "article-confirm" && article && (
+        {mode === "article-confirm" && (
           <div className="space-y-4">
-            <div className="bg-surface-2 border border-border-custom rounded-lg p-3 text-xs text-muted">
-              DOI: <span className="text-foreground font-mono">{article.doi}</span>
-            </div>
+            {article?.doi ? (
+              <div className="bg-surface-2 border border-border-custom rounded-lg p-3 text-xs text-muted">
+                DOI: <span className="text-foreground font-mono">{article.doi}</span>
+              </div>
+            ) : (
+              <div className="bg-surface-2 border border-border-custom rounded-lg p-3 text-xs text-muted">
+                No DOI — typing it in. Normal for anything published before the 2000s.
+              </div>
+            )}
 
             <div>
               <label className="block text-xs text-muted mb-1">Title *</label>

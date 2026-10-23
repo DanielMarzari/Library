@@ -241,7 +241,10 @@ export default function Home() {
           params.search = search.trim();
         }
 
-        const data = await api.books.list(params);
+        // Articles live on /articles now. They have no cover and no page
+        // count to speak of, so mixed into a grid of spines they were just
+        // blank tiles.
+        const data = (await api.books.list(params)).filter(b => b.item_type !== "article");
 
         if (!ignore) {
           setBooks((prev) => {

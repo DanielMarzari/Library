@@ -149,6 +149,9 @@ export default function RecommendationsPage() {
   const [priceStore, setPriceStore] = useState<PriceStore>("cheapest");
   const [rescoring, setRescoring] = useState(false);
   const [starredOnly, setStarredOnly] = useState(false);
+  // Books and articles answer different questions — one you buy, one you read
+  // now — and a shelf of footnotes is roughly half each.
+  const [kind, setKind] = useState<"all" | "book" | "article">("all");
   // Goal filter. recGoalIds maps rec id -> the goals it belongs to, so the
   // shelf can narrow to "things that serve the goal I'm working on".
   const [goals, setGoals] = useState<Array<{ id: string; name: string }>>([]);
@@ -249,6 +252,7 @@ export default function RecommendationsPage() {
     const q = search.trim().toLowerCase();
     let out = recs.filter(r => {
       if (starredOnly && !r.starred) return false;
+      if (kind !== "all" && (r.item_type || "book") !== kind) return false;
       if (filterGoal && !(recGoalIds[r.id] || []).includes(filterGoal)) return false;
       if (filterTopic && r.topic !== filterTopic) return false;
       if (filterSource && !sourceMatches(r.recommended_by, filterSource)) return false;
@@ -283,7 +287,7 @@ export default function RecommendationsPage() {
       default: out.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
     }
     return out;
-  }, [recs, search, sortMode, filterTopic, filterSource, starredOnly, filterGoal, recGoalIds, maxPrice, priceStore]);
+  }, [recs, search, sortMode, filterTopic, filterSource, starredOnly, filterGoal, recGoalIds, maxPrice, priceStore, kind]);
 
   const paginated = filtered.slice(0, page * PAGE_SIZE);
   const hasMore = paginated.length < filtered.length;
@@ -400,6 +404,30 @@ export default function RecommendationsPage() {
               <span aria-hidden>{starredOnly ? "★" : "☆"}</span>
               <span>Starred{starredOnly ? "" : ` (${recs.filter(r => r.starred).length})`}</span>
             </button>
+
+            {/* Books / articles. A price cap is meaningless on articles, so
+                choosing Articles clears it rather than leaving a filter applied
+                that silently excludes everything. */}
+            <div className="flex gap-0.5 bg-surface rounded-lg p-0.5">
+              {([
+                { v: "all" as const,     l: "All" },
+                { v: "book" as const,    l: "Books" },
+                { v: "article" as const, l: "Articles" },
+              ]).map(({ v, l }) => {
+                const n = v === "all" ? recs.length : recs.filter(r => (r.item_type || "book") === v).length;
+                return (
+                  <button
+                    key={v}
+                    onClick={() => { setKind(v); if (v === "article") setMaxPrice(null); }}
+                    className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                      kind === v ? "bg-surface-2 text-foreground" : "text-muted-2 hover:text-muted"
+                    }`}
+                  >
+                    {l} <span className="text-muted-2">{n.toLocaleString()}</span>
+                  </button>
+                );
+              })}
+            </div>
 
             {/* Goal filter — narrows the shelf to what serves one learning goal.
                 Counts come from the membership map so an empty goal is visible
