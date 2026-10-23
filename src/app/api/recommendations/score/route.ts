@@ -53,10 +53,15 @@ export async function POST() {
       byRec.set(l.rec_id, arr);
     }
 
+    // Articles are scored too. They were excluded here because they're
+    // excluded from PRICES — you don't buy a journal article — but that is a
+    // different question. "How much would this be worth to you" applies just as
+    // well to an article, and it is answered from the same evidence: whether
+    // you've read and rated the author, and whether it serves a goal. Leaving
+    // them out meant a batch of footnotes came back half-unranked.
     const recRows = db.prepare(`
       SELECT id, title, author, topic, starred
       FROM recommendations
-      WHERE COALESCE(item_type,'book') = 'book'
     `).all() as Array<{ id: string; title: string; author: string | null; topic: string | null; starred: number | null }>;
 
     const recs: RecInput[] = recRows.map(r => ({
