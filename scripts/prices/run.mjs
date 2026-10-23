@@ -17,6 +17,7 @@ const LIMIT = Number(arg('--limit', 0));
 const DELAY = Number(arg('--delay', 0));
 const ISBN_ONLY = process.argv.includes('--isbn-only');
 const REFRESH = process.argv.includes('--refresh');
+const SINCE = arg('--since', null);
 
 const ADAPTERS = {
   abe: {
@@ -65,7 +66,7 @@ if (!A) { console.error(`unknown store: ${store}`); process.exit(1); }
 const delay = DELAY || A.defaultDelay;
 const mod = await A.load();
 
-const all = queue(store, { refresh: REFRESH });
+const all = queue(store, { refresh: REFRESH, since: SINCE });
 // On a refresh the point is to re-check, so a prior result is not "done".
 const already = REFRESH ? new Map() : done(store);
 let todo = all.filter(r => !already.has(r.id));

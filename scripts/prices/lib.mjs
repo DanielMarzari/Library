@@ -35,15 +35,19 @@ export const COL = {
  * today, and the whole point of the cheapest-first sort is that the numbers are
  * comparable with each other right now.
  */
-export function queue(store, { refresh = false, dbPath } = {}) {
+export function queue(store, { refresh = false, dbPath, since } = {}) {
   const db = new Database(dbPath || process.env.LIBRARY_DB || path.join(SP, 'library.db'), { readonly: true });
   const { price, checked } = COL[store];
   const pending = refresh ? '1=1' : `${price} IS NULL AND ${checked} IS NULL`;
+  // `since` scopes a run to one day's additions — the usual shape of this job
+  // is "I just typed in a book's footnotes, price those" rather than a sweep.
+  const window = since ? `AND date(created_at) >= date('${since.replace(/'/g, "")}')` : '';
   const rows = db.prepare(`
     SELECT id, title, author, isbn
     FROM recommendations
     WHERE ${pending}
       AND COALESCE(item_type,'book') = 'book'
+      ${window}
     ORDER BY (isbn IS NULL OR trim(isbn)=''), title
   `).all();
   db.close();
