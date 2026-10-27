@@ -190,10 +190,13 @@ export default function LendingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background text-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
-          <p className="mt-4">Loading lending data...</p>
+      <div className="min-h-screen bg-background text-foreground">
+        <div className="p-4"><AppNav /></div>
+        <div className="flex items-center justify-center py-32">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
+            <p className="mt-4 text-muted">Loading lending data…</p>
+          </div>
         </div>
       </div>
     );

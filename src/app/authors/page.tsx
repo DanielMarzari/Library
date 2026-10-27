@@ -985,8 +985,9 @@ export default function AuthorsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
-        <div className="text-lg">Loading authors...</div>
+      <div className="min-h-screen bg-background text-foreground">
+        <div className="p-4"><AppNav /></div>
+        <div className="flex items-center justify-center py-32 text-lg text-muted">Loading authors…</div>
       </div>
     );
   }

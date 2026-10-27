@@ -7,6 +7,7 @@ import { api, ApiError } from "@/lib/api-client";
 import { Book } from "@/types/book";
 import { BookShelf } from "@/components/BookShelf";
 import { BookDetail } from "@/components/BookDetail";
+import { AppNav } from "@/components/AppNav";
 import { AddBookSheet } from "@/components/AddBookSheet";
 import Link from "next/link";
 import { canonicalCountryName } from "@/lib/countryAliases";
@@ -32,11 +33,8 @@ export default function Home() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Nav + header UI
-  const [showNav, setShowNav] = useState(false);
   const [headerTab, setHeaderTab] = useState<HeaderTab>("filter");
-  const [theme, setTheme] = useState<"system" | "light" | "dark">("system");
   const [gridSize, setGridSize] = useState<GridSize>("medium");
-  const navRef = useRef<HTMLDivElement>(null);
   const [readingListIds, setReadingListIds] = useState<Set<string>>(new Set());
   const [availableLists, setAvailableLists] = useState<Array<{ id: string; name: string; type: "year" | "goal" }>>([]);
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
@@ -133,8 +131,6 @@ export default function Home() {
 
   // Load persisted preferences
   useEffect(() => {
-    const savedTheme = localStorage.getItem("library-theme") as "system" | "light" | "dark" | null;
-    if (savedTheme) setTheme(savedTheme);
     const savedGrid = localStorage.getItem("library-grid-size") as GridSize | null;
     if (savedGrid) setGridSize(savedGrid);
     const savedFilter = localStorage.getItem("library-filter") as FilterStatus | null;
@@ -142,17 +138,6 @@ export default function Home() {
     const savedSort = localStorage.getItem("library-sort") as SortMode | null;
     if (savedSort) setSortMode(savedSort);
   }, []);
-
-  // Apply theme class to <html>
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme === "system") {
-      root.removeAttribute("data-theme");
-    } else {
-      root.setAttribute("data-theme", theme);
-    }
-    localStorage.setItem("library-theme", theme);
-  }, [theme]);
 
   useEffect(() => {
     localStorage.setItem("library-grid-size", gridSize);
@@ -169,17 +154,6 @@ export default function Home() {
   // Multi-select state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const selectMode = selectedIds.size > 0;
-
-  // Close nav menu on outside click
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (navRef.current && !navRef.current.contains(e.target as Node)) {
-        setShowNav(false);
-      }
-    };
-    if (showNav) document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [showNav]);
 
   useEffect(() => {
     let ignore = false;
@@ -534,7 +508,6 @@ export default function Home() {
     { label: "DDC", value: "ddc" },
   ];
 
-  const navLinkCls = "block px-3 py-2 text-sm text-muted hover:bg-surface-2 rounded-lg transition-colors";
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -543,73 +516,30 @@ export default function Home() {
         <div className="w-full px-4 py-3">
           {/* Top row: title, nav toggle, add */}
           <div className="flex items-center gap-3 mb-3">
-            <div className="relative" ref={navRef}>
-              <button
-                onClick={() => setShowNav((v) => !v)}
-                className="p-2 rounded-lg bg-surface hover:bg-surface-2 text-muted transition-colors"
-                aria-label="Menu"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-                </svg>
-              </button>
-
-              {showNav && (
-                <div className="absolute top-full left-0 mt-2 w-56 bg-surface border border-border-custom rounded-xl shadow-xl p-2 z-50">
-                  <p className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-2 font-semibold">Tracking</p>
-                  <Link href="/stats" className={navLinkCls} onClick={() => setShowNav(false)}>Stats</Link>
-                  <Link href="/goals" className={navLinkCls} onClick={() => setShowNav(false)}>Goals</Link>
-                  <Link href="/reading-list" className={navLinkCls} onClick={() => setShowNav(false)}>Reading List</Link>
-                  <Link href="/wrapped" className="block px-3 py-2 text-sm font-medium bg-gradient-to-r from-purple-600/20 to-pink-600/20 text-purple-300 hover:from-purple-600/30 hover:to-pink-600/30 rounded-lg transition-colors" onClick={() => setShowNav(false)}>Wrapped</Link>
-
-                  <div className="border-t border-border-custom my-1.5" />
-                  <p className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-2 font-semibold">Discover</p>
-                  <Link href="/authors" className={navLinkCls} onClick={() => setShowNav(false)}>Authors</Link>
-                  <Link href="/skills" className={navLinkCls} onClick={() => setShowNav(false)}>Skills</Link>
-                  <Link href="/recommendations" className={navLinkCls} onClick={() => setShowNav(false)}>Recommendations</Link>
-
-                  <div className="border-t border-border-custom my-1.5" />
-                  <p className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-2 font-semibold">Manage</p>
-                  <Link href="/lending" className={navLinkCls} onClick={() => setShowNav(false)}>Lending</Link>
-
-                  <div className="border-t border-border-custom my-1.5" />
-                  <div className="px-3 py-2 space-y-3">
-                    <div>
-                      <p className="text-[10px] uppercase tracking-wider text-muted-2 font-semibold mb-2">Theme</p>
-                      <div className="flex gap-1 bg-surface-2 rounded-lg p-0.5">
-                        {([["system", "Auto"], ["light", "Light"], ["dark", "Dark"]] as const).map(([val, label]) => (
-                          <button
-                            key={val}
-                            onClick={() => setTheme(val)}
-                            className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
-                              theme === val ? "bg-background text-foreground shadow-sm" : "text-muted-2 hover:text-muted"
-                            }`}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-[10px] uppercase tracking-wider text-muted-2 font-semibold mb-2">Book Size</p>
-                      <div className="flex gap-1 bg-surface-2 rounded-lg p-0.5">
-                        {([["xs", "XS"], ["small", "S"], ["medium", "M"], ["large", "L"], ["xl", "XL"]] as const).map(([val, label]) => (
-                          <button
-                            key={val}
-                            onClick={() => setGridSize(val)}
-                            className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
-                              gridSize === val ? "bg-background text-foreground shadow-sm" : "text-muted-2 hover:text-muted"
-                            }`}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+            {/* The shared nav, not a copy of it. The copy that used to live
+                here fell behind — What next, Finish and Articles were all
+                missing — so the shelf you land on could not reach half the app.
+                Book size is shelf-specific, so it rides along in `extras`. */}
+            <AppNav
+              extras={
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-2 font-semibold mb-2">Book Size</p>
+                  <div className="flex gap-1 bg-surface-2 rounded-lg p-0.5">
+                    {([["xs", "XS"], ["small", "S"], ["medium", "M"], ["large", "L"], ["xl", "XL"]] as const).map(([val, label]) => (
+                      <button
+                        key={val}
+                        onClick={() => setGridSize(val)}
+                        className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                          gridSize === val ? "bg-background text-foreground shadow-sm" : "text-muted-2 hover:text-muted"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
                   </div>
                 </div>
-              )}
-            </div>
+              }
+            />
 
             <h1 className="text-xl font-bold tracking-tight flex-1">My Library</h1>
 

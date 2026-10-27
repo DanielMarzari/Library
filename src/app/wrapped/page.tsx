@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { AppNav } from '@/components/AppNav';
 import { api } from '@/lib/api-client';
 import { Book } from '@/types/book';
 
@@ -194,9 +195,10 @@ export default function WrappedPage() {
   if (loading) {
     return (
       <div className="fixed inset-0 bg-zinc-950 flex items-center justify-center">
+        <div className="fixed top-4 left-4 z-[60]"><AppNav /></div>
         <div className="text-center">
           <div className="text-emerald-500 text-6xl font-bold mb-4">📚</div>
-          <p className="text-white text-xl">Loading your reading wrapped...</p>
+          <p className="text-white text-xl">Loading your reading wrapped…</p>
         </div>
       </div>
     );
@@ -215,6 +217,9 @@ export default function WrappedPage() {
           <Link href="/" className="px-8 py-3 bg-emerald-500 text-zinc-950 font-bold rounded-lg hover:bg-emerald-400 transition-colors">
             Back to Library
           </Link>
+        </div>
+        <div className="fixed top-4 left-4 z-[60]">
+          <AppNav />
         </div>
       </div>
     );
@@ -472,6 +477,12 @@ export default function WrappedPage() {
 
   return (
     <div className="relative bg-zinc-950 overflow-x-hidden">
+      {/* Wrapped is a full-screen slideshow, and it used to be a dead end —
+          the only way out was the button at the very bottom. Float the nav
+          above the slides so you can leave from anywhere. */}
+      <div className="fixed top-4 left-4 z-[60]">
+        <AppNav />
+      </div>
       <style>{`
         html {
           scroll-behavior: smooth;

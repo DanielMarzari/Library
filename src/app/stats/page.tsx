@@ -523,8 +523,11 @@ export default function StatsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-border-custom border-t-emerald-500" />
+      <div className="min-h-screen">
+        <div className="p-4"><AppNav /></div>
+        <div className="flex items-center justify-center py-32">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-border-custom border-t-emerald-500" />
+        </div>
       </div>
     );
   }
