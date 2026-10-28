@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { canonicalizeTopics } from '@/lib/topics';
+import { topicVocabulary } from '@/lib/topicVocabulary';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -193,13 +195,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       updates.push('ddc = ?');
       values.push(ddc);
     }
-    if (topics !== undefined) {
-      updates.push('topics = ?');
-      values.push(JSON.stringify(topics));
-    }
-    if (auto_topics !== undefined) {
-      updates.push('auto_topics = ?');
-      values.push(JSON.stringify(auto_topics));
+    // Same canonicalisation as on create; see the POST route.
+    if (topics !== undefined || auto_topics !== undefined) {
+      const vocab = topicVocabulary();
+      if (topics !== undefined) {
+        updates.push('topics = ?');
+        values.push(JSON.stringify(canonicalizeTopics(Array.isArray(topics) ? topics : [], vocab)));
+      }
+      if (auto_topics !== undefined) {
+        updates.push('auto_topics = ?');
+        values.push(JSON.stringify(canonicalizeTopics(Array.isArray(auto_topics) ? auto_topics : [], vocab)));
+      }
     }
     if (favorite !== undefined) {
       updates.push('favorite = ?');

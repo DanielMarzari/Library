@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { addTopic as addTopicTo } from "@/lib/topics";
 import { api, ApiError } from "@/lib/api-client";
 import { observedPace, hoursLeft, formatHours, type TierStat } from "@/lib/readingPace";
 import { GoalChips } from "@/components/GoalChips";
@@ -506,8 +507,11 @@ export function BookDetail({ book, onClose, onUpdated, onDeleted, recentSources 
   };
 
   const addTopic = () => {
-    const t = topicInput.trim();
-    if (t && !editTopics.includes(t)) { setEditTopics([...editTopics, t]); setTopicInput(""); scheduleAutoSave(); }
+    // See AddBookSheet: matching is case-insensitive so the same subject
+    // can't be entered twice under two spellings.
+    const next = addTopicTo(editTopics, topicInput);
+    if (next.length !== editTopics.length) { setEditTopics(next); scheduleAutoSave(); }
+    setTopicInput("");
   };
 
   // Reading rate = pages-per-session, where a "session" is a distinct calendar

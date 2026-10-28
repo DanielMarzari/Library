@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { canonicalizeTopics } from '@/lib/topics';
+import { topicVocabulary } from '@/lib/topicVocabulary';
 
 export async function GET(request: NextRequest) {
   try {
@@ -119,6 +121,14 @@ export async function POST(request: NextRequest) {
     const now = new Date().toISOString();
     const resolvedItemType = item_type === 'article' ? 'article' : 'book';
 
+    // Snap incoming tags onto the spellings the library already uses, so a
+    // book saved with "early church" joins "Early Church" rather than forking
+    // the subject. Done here, not in the browser, so it holds for every
+    // caller -- the add sheet, the detail pane and the import scripts alike.
+    const vocab = topicVocabulary();
+    const canonTopics = canonicalizeTopics(Array.isArray(topics) ? topics : [], vocab);
+    const canonAuto = canonicalizeTopics(Array.isArray(auto_topics) ? auto_topics : [], vocab);
+
     const stmt = db.prepare(`
       INSERT INTO books (
         id, title, author, isbn, cover_url, description, status, rating, density,
@@ -152,8 +162,8 @@ export async function POST(request: NextRequest) {
       source || null,
       lcc || null,
       ddc || null,
-      topics ? JSON.stringify(topics) : JSON.stringify([]),
-      auto_topics ? JSON.stringify(auto_topics) : JSON.stringify([]),
+      JSON.stringify(canonTopics),
+      JSON.stringify(canonAuto),
       favorite ? 1 : 0,
       resolvedItemType,
       doi || null,
@@ -186,8 +196,10 @@ export async function POST(request: NextRequest) {
       source,
       lcc,
       ddc,
-      topics: topics || [],
-      auto_topics: auto_topics || [],
+      // What was stored, not what was sent -- otherwise the caller holds the
+      // pre-canonical spellings until the next reload.
+      topics: canonTopics,
+      auto_topics: canonAuto,
       favorite: Boolean(favorite),
       item_type: resolvedItemType,
       doi: doi || null,

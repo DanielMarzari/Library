@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { addTopic as addTopicTo } from "@/lib/topics";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { api } from "@/lib/api-client";
 import { Book } from "@/types/book";
@@ -332,8 +333,11 @@ export function AddBookSheet({ onClose, onAdded, recentSources, prefill, startMo
   };
 
   const addTopic = () => {
-    const t = topicInput.trim();
-    if (t && !editTopics.includes(t)) { setEditTopics([...editTopics, t]); setTopicInput(""); }
+    // Case-insensitive: typing "bible" onto a book already tagged "Bible" is
+    // a no-op, not a second tag.
+    const next = addTopicTo(editTopics, topicInput);
+    if (next.length !== editTopics.length) setEditTopics(next);
+    setTopicInput("");
   };
 
   const reset = () => {
