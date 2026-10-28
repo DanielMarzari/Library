@@ -11,6 +11,7 @@ import { AppNav } from "@/components/AppNav";
 // Built from Natural Earth 110m via world-atlas — see scratchpad/build-world.mjs.
 import WORLD_COUNTRIES from "@/lib/worldCountries.json";
 import { canonicalCountryName } from "@/lib/countryAliases";
+import { itemPages } from "@/lib/coverage";
 
 interface ReadingUpdate {
   id: string;
@@ -122,13 +123,33 @@ export default function StatsPage() {
   }, []);
 
   const stats = useMemo(() => {
-    const total = books.length;
-    const read = books.filter((b) => b.status === "read");
-    const reading = books.filter((b) => b.status === "reading");
-    const notRead = books.filter((b) => b.status === "not_read");
+    // Books and articles are counted differently on purpose.
+    //
+    // A book is a book whatever its length -- a 30-page Lilias Trotter counts
+    // once, and so does a 700-page commentary. An article doesn't become a
+    // book by running to 40 pages: it's a different kind of thing, more
+    // specialised, rarely rebuilding a whole argument the way a monograph
+    // does. So articles stay out of every book COUNT (the 1,000-book life
+    // goal above all) and out of the charts built on those counts.
+    //
+    // Pages are the exception. A page read is a page read, so the two pools
+    // join for every page total. Until now articles were silently counted as
+    // books in all of it.
+    const vols = books.filter((b) => b.item_type !== "article");
+    const arts = books.filter((b) => b.item_type === "article");
 
-    const totalPages = books.reduce((s, b) => s + (b.reading_pages || b.pages || 0), 0);
-    const readPages = read.reduce((s, b) => s + (b.reading_pages || b.pages || 0), 0);
+    const total = vols.length;
+    const read = vols.filter((b) => b.status === "read");
+    const reading = vols.filter((b) => b.status === "reading");
+    const notRead = vols.filter((b) => b.status === "not_read");
+
+    const readArticles = arts.filter((b) => b.status === "read");
+    // Everything finished, of either kind -- the denominator for pages, never
+    // for counts.
+    const readAny = [...read, ...readArticles];
+
+    const totalPages = books.reduce((s, b) => s + itemPages(b), 0);
+    const readPages = readAny.reduce((s, b) => s + itemPages(b), 0);
     const readingPages = reading.reduce((s, b) => s + (b.current_page || 0), 0);
     const pctBooksRead = total > 0 ? ((read.length / total) * 100).toFixed(1) : "0";
     const pctPagesRead = totalPages > 0 ? (((readPages + readingPages) / totalPages) * 100).toFixed(1) : "0";
@@ -174,8 +195,8 @@ export default function StatsPage() {
 
     // --- Read/Unread/Reading by book length ---
     const lengthData = LENGTH_BUCKETS.map((bucket) => {
-      const inBucket = books.filter((b) => {
-        const p = b.reading_pages || b.pages || 0;
+      const inBucket = vols.filter((b) => {
+        const p = itemPages(b);
         return p >= bucket.min && p <= bucket.max;
       });
       const r = inBucket.filter((b) => b.status === "read").length;
@@ -226,6 +247,9 @@ export default function StatsPage() {
     }
 
     // --- Top user topics ---
+    // `books`, not `vols`: topics are the one place articles count in full.
+    // Twenty articles on lament teach the subject as surely as twenty books
+    // do -- more narrowly, but they are research on it all the same.
     const topicCounts: Record<string, number> = {};
     books.forEach((b) => {
       b.topics?.forEach((t) => {
@@ -247,6 +271,37 @@ export default function StatsPage() {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 15);
 
+    // --- Articles: a running log, not a goal ---
+    // No target here, by design. There's no lifetime article count to chase,
+    // so this records what's accumulated rather than progress toward a number.
+    const articlePages = arts.reduce((s, b) => s + itemPages(b), 0);
+    const articlePagesRead = readArticles.reduce((s, b) => s + itemPages(b), 0);
+    const articleSpans = arts.map(itemPages).filter((n) => n > 0);
+    const journalCounts: Record<string, number> = {};
+    const articleTopicCounts: Record<string, number> = {};
+    arts.forEach((b) => {
+      if (b.journal) journalCounts[b.journal] = (journalCounts[b.journal] || 0) + 1;
+      const t = new Set<string>();
+      b.topics?.forEach((x) => t.add(x));
+      b.auto_topics?.forEach((x) => t.add(x));
+      t.forEach((x) => { articleTopicCounts[x] = (articleTopicCounts[x] || 0) + 1; });
+    });
+    const articleStats = {
+      articleCount: arts.length,
+      articlesRead: readArticles.length,
+      articlePages,
+      articlePagesRead,
+      // Median, not mean: one 60-page review essay drags an average of
+      // seventeen-page articles somewhere no article actually sits.
+      articleMedianPages: articleSpans.length
+        ? articleSpans.sort((a, b) => a - b)[Math.floor(articleSpans.length / 2)]
+        : 0,
+      // How much of the library's page count the articles account for.
+      articlePagesShare: totalPages > 0 ? (articlePages / totalPages) * 100 : 0,
+      topJournals: Object.entries(journalCounts).sort((a, b) => b[1] - a[1]).slice(0, 6),
+      topArticleTopics: Object.entries(articleTopicCounts).sort((a, b) => b[1] - a[1]).slice(0, 8),
+    };
+
     // --- 1000 book life goal ---
     const LIFE_GOAL = 1000;
     const goalPct = ((read.length / LIFE_GOAL) * 100).toFixed(1);
@@ -265,7 +320,7 @@ export default function StatsPage() {
     const scatterData: Array<{ title: string; days: number; pages: number; rating: number }> = [];
     read.forEach((b) => {
       if (!b.start_date || !b.complete_date) return;
-      const pages = b.reading_pages || b.pages || 0;
+      const pages = itemPages(b);
       if (pages === 0) return;
       const startDate = new Date(b.start_date);
       const endDate = new Date(b.complete_date);
@@ -307,13 +362,13 @@ export default function StatsPage() {
     });
 
     // Add completion dates (if no reading_updates that day)
-    read.forEach((b) => {
+    readAny.forEach((b) => {
       if (b.complete_date) {
         const date = new Date(b.complete_date);
         if (date >= heatmapStartDate && date <= now) {
           const dateKey = date.toISOString().split('T')[0];
           if (!pagesPerDay[dateKey]) {
-            pagesPerDay[dateKey] = b.reading_pages || b.pages || 0;
+            pagesPerDay[dateKey] = itemPages(b);
           }
           daysWithActivity.add(dateKey);
         }
@@ -334,7 +389,7 @@ export default function StatsPage() {
 
     // --- Author stats ---
     const authorCounts: Record<string, { books: number; read: number }> = {};
-    books.forEach((b) => {
+    vols.forEach((b) => {
       if (!b.author) return;
       b.author.split(",").map((a) => a.trim()).filter(Boolean).forEach((name) => {
         if (!authorCounts[name]) authorCounts[name] = { books: 0, read: 0 };
@@ -348,6 +403,7 @@ export default function StatsPage() {
       .slice(0, 8);
 
     // --- Skill/topic stats ---
+    // Articles included in full, as on the skills page. See Top user topics.
     const allTopicCounts: Record<string, { total: number; read: number }> = {};
     books.forEach((b) => {
       const allT = new Set<string>();
@@ -364,7 +420,7 @@ export default function StatsPage() {
 
     // --- Top sources ---
     const sourceCounts: Record<string, number> = {};
-    books.forEach((b) => {
+    vols.forEach((b) => {
       if (b.source) sourceCounts[b.source] = (sourceCounts[b.source] || 0) + 1;
     });
     const topSources = Object.entries(sourceCounts)
@@ -474,6 +530,7 @@ export default function StatsPage() {
       totalPages,
       readPages,
       readingPages,
+      ...articleStats,
       pctBooksRead,
       pctPagesRead,
       yearCumulative,
@@ -955,6 +1012,57 @@ export default function StatsPage() {
             <StatCard label="Master-level Skills (50+)" value={stats.masterSkills} color="blue" />
           </div>
         </section>
+
+        {/* Articles -- a running log, deliberately without a goal */}
+        {stats.articleCount > 0 && (
+          <section>
+            <h2 className="text-lg font-semibold text-foreground mb-3">
+              Articles{" "}
+              <span className="text-sm text-muted font-normal">(a running log, no goal)</span>
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-3">
+              <StatCard label="In Library" value={stats.articleCount} />
+              <StatCard label="Read" value={stats.articlesRead} color="emerald" />
+              <StatCard label="Pages Read" value={stats.articlePagesRead.toLocaleString()} color="emerald" />
+              <StatCard label="Pages Total" value={stats.articlePages.toLocaleString()} />
+              <StatCard label="Median Length" value={`${stats.articleMedianPages}pp`} />
+            </div>
+            <div className="bg-surface border border-border-custom rounded-xl p-4 space-y-3">
+              <p className="text-xs text-muted-2">
+                Articles count toward your page totals and toward every topic on{" "}
+                <Link href="/skills" className="text-emerald-500 hover:text-emerald-400">What I Know</Link>
+                {" "}— they are {stats.articlePagesShare.toFixed(1)}% of the library&apos;s pages. They are
+                deliberately left out of the {stats.lifeGoal.toLocaleString()}-book goal and every
+                book count: a 17-page article isn&apos;t a book.
+              </p>
+              {stats.topJournals.length > 0 && (
+                <div>
+                  <p className="text-[10px] text-muted-2 uppercase tracking-wider mb-1.5">Journals</p>
+                  <div className="space-y-2">
+                    {stats.topJournals.map(([journal, count]) => (
+                      <div key={journal} className="flex items-center justify-between gap-3">
+                        <span className="text-sm text-foreground italic min-w-0 truncate">{journal}</span>
+                        <span className="text-sm text-muted shrink-0">{count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {stats.topArticleTopics.length > 0 && (
+                <div>
+                  <p className="text-[10px] text-muted-2 uppercase tracking-wider mb-1.5">What they&apos;re about</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {stats.topArticleTopics.map(([topic, count]) => (
+                      <span key={topic} className="bg-surface-2 text-foreground px-2.5 py-1 rounded-full text-xs">
+                        {topic} <span className="text-muted">({count})</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* Top sources */}
         {stats.topSources.length > 0 && (

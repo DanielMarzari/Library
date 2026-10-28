@@ -52,7 +52,9 @@ export default function WrappedPage() {
     const fetchWrappedData = async () => {
       try {
         // Fetch all books
-        const allBooks = await api.books.list();
+        // Books only: the year in review counts books, and articles would
+        // inflate every total on it. They have their own stats.
+        const allBooks = (await api.books.list() || []).filter(b => b.item_type !== "article");
         if (!allBooks || allBooks.length === 0) {
           setHasData(false);
           setLoading(false);

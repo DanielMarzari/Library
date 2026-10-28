@@ -48,7 +48,10 @@ export default function GoalsPage() {
       setLoading(true);
       try {
         const data = await api.books.list();
-        setBooks(data);
+        // Books only. These goals count books -- articles are tracked on their
+        // own page, and a 17-page article should not quietly advance a target
+        // set in whole books.
+        setBooks((data || []).filter(b => b.item_type !== "article"));
       } catch (error) {
         console.error("Error fetching books:", error);
       }

@@ -11,7 +11,10 @@ import { AppNav } from '@/components/AppNav';
 interface TopicProgress {
   topic: string;
   totalBooks: number;
+  /** Books plus articles -- what the tier is computed from. */
   readBooks: number;
+  /** Of those, how many were journal articles. */
+  readArticles: number;
   tier: TierName;
   progressPercent: number;
   nextTierThreshold: number;
@@ -108,7 +111,7 @@ export default function SkillsPage() {
     try {
       const data = await api.books.list();
       const books = (data as Book[]) || [];
-      const topicMap = new Map<string, { total: number; read: number }>();
+      const topicMap = new Map<string, { total: number; read: number; articles: number }>();
 
       books.forEach((book) => {
         let topicsToProcess: string[] = [];
@@ -131,14 +134,22 @@ export default function SkillsPage() {
 
         topicsToProcess.forEach((topic) => {
           if (!topicMap.has(topic)) {
-            topicMap.set(topic, { total: 0, read: 0 });
+            topicMap.set(topic, { total: 0, read: 0, articles: 0 });
           }
 
           const current = topicMap.get(topic)!;
           current.total += 1;
 
           if (book.status === 'read') {
+            // An article counts as a whole unit here, same as a book.
+            // Length isn't the measure: a 30-page Lilias Trotter is a book and
+            // a 40-page article isn't. What makes an article count in full is
+            // that reading twenty of them on one subject IS knowing that
+            // subject -- narrowly, from a specialist angle, but genuinely.
+            // The book COUNTS elsewhere (the 1,000-book goal, the stats page)
+            // exclude articles; this measures understanding, not volumes.
             current.read += 1;
+            if (book.item_type === 'article') current.articles += 1;
           }
         });
       });
@@ -160,6 +171,7 @@ export default function SkillsPage() {
             topic,
             totalBooks: stats.total,
             readBooks: stats.read,
+            readArticles: stats.articles,
             tier: tier.name,
             progressPercent,
             nextTierThreshold,
@@ -313,13 +325,23 @@ export default function SkillsPage() {
                             <p className="text-sm text-muted">
                               <span className="font-semibold text-foreground">{topic.readBooks}</span>
                               {topic.tier === 'Scholar'
-                                ? ' books read'
-                                : ` / ${topic.nextTierThreshold} books`}
+                                ? ' read'
+                                : ` / ${topic.nextTierThreshold} read`}
                             </p>
                             <p className="text-xs text-muted">
                               {topic.totalBooks} total
                             </p>
                           </div>
+                          {topic.readArticles > 0 && (
+                            // Articles count in full toward the tier, so the
+                            // split has to be visible -- otherwise a topic read
+                            // entirely in journals looks like a shelf of books.
+                            <p className="text-[11px] text-muted-2 mt-1.5">
+                              {topic.readBooks - topic.readArticles} book{topic.readBooks - topic.readArticles === 1 ? '' : 's'}
+                              {' · '}
+                              {topic.readArticles} article{topic.readArticles === 1 ? '' : 's'}
+                            </p>
+                          )}
                         </div>
                       );
                     })}

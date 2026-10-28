@@ -108,3 +108,30 @@ export function describeIslands(islands: Span[], max = 4): string {
   const rest = islands.length - shown.length;
   return shown.join(", ") + (rest > 0 ? ` +${rest} more` : "");
 }
+
+/**
+ * How many pages an item is worth when totalling what's been read.
+ *
+ * Books carry their length in `reading_pages` or `pages`. Articles usually
+ * don't: what an article has is where it sits in the journal — "pp. 229-239" —
+ * so the length has to be read off the span. Half the articles in the library
+ * (25 of 50) have a start and end page but no `pages` value at all, and the
+ * old `reading_pages || pages || 0` scored every one of them as zero. That
+ * silently lost 409 of their 939 pages.
+ *
+ * The span is a last resort, not a first: an item that states its own length
+ * is believed over one inferred from where it starts and stops. So nothing a
+ * book reported changes, and no page count here is a guess — every number
+ * comes from a field that was filled in by hand.
+ */
+export function itemPages(book: {
+  start_page?: number | null;
+  end_page?: number | null;
+  reading_pages?: number | null;
+  pages?: number | null;
+}): number {
+  if (book.reading_pages) return book.reading_pages;
+  if (book.pages) return book.pages;
+  const { lo, hi } = readableRange(book);
+  return hi != null ? Math.max(0, hi - lo + 1) : 0;
+}
