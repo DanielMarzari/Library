@@ -173,9 +173,15 @@ export default function ArticlesPage() {
         ) : (
           // A list, not a grid. Articles have no cover worth showing, and the
           // citation is the thing you actually scan for.
-          <ul className="max-w-4xl mx-auto divide-y divide-border-custom">
+          //
+          // Laid out in CSS columns rather than a flex/grid row-per-item,
+          // because the current sort has to survive the change: columns fill
+          // top-to-bottom, so reading order stays first-to-last down column
+          // one and on to column two. A grid would reorder it across the row
+          // and quietly break every sort button above.
+          <ul className="max-w-7xl mx-auto columns-1 md:columns-2 xl:columns-3 gap-8">
             {shown.map(a => (
-              <li key={a.id}>
+              <li key={a.id} className="break-inside-avoid border-b border-border-custom">
                 <button
                   onClick={() => setOpenArticle(a)}
                   className="w-full text-left py-3 px-2 hover:bg-surface rounded-lg transition-colors group"
