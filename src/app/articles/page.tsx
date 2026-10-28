@@ -179,7 +179,7 @@ export default function ArticlesPage() {
           // top-to-bottom, so reading order stays first-to-last down column
           // one and on to column two. A grid would reorder it across the row
           // and quietly break every sort button above.
-          <ul className="max-w-7xl mx-auto columns-1 md:columns-2 xl:columns-3 gap-8">
+          <ul className="w-full columns-1 md:columns-2 xl:columns-3 gap-8">
             {shown.map(a => (
               <li key={a.id} className="break-inside-avoid border-b border-border-custom">
                 <button
