@@ -51,6 +51,11 @@ export interface Book {
   /** Most recent reading_updates timestamp — set by the books list query, not
    *  a stored column. Distinct from updated_at, which moves on any edit. */
   last_read_at?: string | null;
+  /** Pages still to read — computed by the books list query, not a stored
+   *  column. null when the book's length isn't known. For a book read out of
+   *  order this is the length minus the UNION of logged spans, which is why
+   *  it can't be derived client-side from current_page. */
+  pages_remaining?: number | null;
   source?: string | null;
   lcc?: string | null;
   ddc?: string | null;

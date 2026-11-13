@@ -18,7 +18,7 @@ type FilterStatus = "all" | "not_read" | "reading" | "paused" | "read" | "exclud
  *  counts as stalled. Six weeks is long enough not to nag about a book you
  *  picked up last month, short enough to catch the ones that quietly died. */
 const STALE_AFTER_DAYS = 42;
-type SortMode = "recent" | "last" | "alpha" | "rating" | "lcc" | "ddc" | "pages_asc" | "pages_desc";
+type SortMode = "recent" | "last" | "alpha" | "rating" | "lcc" | "ddc" | "pages_asc" | "pages_desc" | "remaining";
 type HeaderTab = "filter" | "sort";
 type GridSize = "xs" | "small" | "medium" | "large" | "xl";
 
@@ -310,6 +310,25 @@ export default function Home() {
           return aDdc - bDdc;
         });
         break;
+      case "remaining":
+        // Fewest pages left first -- the "what could I actually finish this
+        // week" sort. A book you're 30 pages from the end of beats one you
+        // haven't opened, however short it is.
+        //
+        // Two kinds of book are pushed to the bottom rather than ranked.
+        // A finished book has 0 left and would otherwise fill the top of the
+        // list with things needing no reading at all; and a book of unknown
+        // length has no answer, which is not the same as having none left.
+        sorted.sort((a, b) => {
+          const left = (x: Book) =>
+            x.status === "read" || x.pages_remaining == null
+              ? Infinity
+              : x.pages_remaining;
+          const d = left(a) - left(b);
+          // Both parked at the bottom: keep it stable and readable.
+          return Number.isNaN(d) || d === 0 ? a.title.localeCompare(b.title) : d;
+        });
+        break;
       case "pages_asc":
         sorted.sort((a, b) => {
           const ap = a.pages ?? Infinity;
@@ -504,6 +523,7 @@ export default function Home() {
     { label: "Rating", value: "rating" },
     { label: "Shortest", value: "pages_asc" },
     { label: "Longest", value: "pages_desc" },
+    { label: "Left", value: "remaining" },
     { label: "LCC", value: "lcc" },
     { label: "DDC", value: "ddc" },
   ];

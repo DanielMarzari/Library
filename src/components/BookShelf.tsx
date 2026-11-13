@@ -49,6 +49,7 @@ function ShelfBook({
   onToggleSelect,
   onStartSelect,
   avgPagesPerDay,
+  showRemaining,
 }: {
   book: Book;
   onBookTap: (book: Book) => void;
@@ -57,6 +58,8 @@ function ShelfBook({
   onToggleSelect: (id: string) => void;
   onStartSelect: (id: string) => void;
   avgPagesPerDay?: number | null;
+  /** Set while the shelf is sorted by pages left, so the ordering is legible. */
+  showRemaining?: boolean;
 }) {
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const didLongPress = useRef(false);
@@ -159,6 +162,17 @@ function ShelfBook({
         {/* Spine shadow */}
         <div className="absolute inset-y-0 left-0 w-[3px] bg-black/30" />
 
+        {/* Pages left -- only while that's the sort, and only where there is
+            an answer: a finished book has none left, and one of unknown
+            length has no number to show rather than a zero. */}
+        {showRemaining && !book._optimistic && book.status !== "read" && book.pages_remaining != null && (
+          <div className="absolute bottom-1 left-1 bg-black/70 backdrop-blur-sm rounded px-1 py-0.5">
+            <span className="text-[8px] font-semibold text-emerald-300">
+              {book.pages_remaining.toLocaleString()} left
+            </span>
+          </div>
+        )}
+
         {/* Rating */}
         {book.rating && !book._optimistic && (
           <div className="absolute bottom-1 right-1 bg-black/70 backdrop-blur-sm rounded px-1 py-0.5 flex gap-px">
@@ -246,6 +260,7 @@ export function BookShelf({
                   onToggleSelect={onToggleSelect}
                   onStartSelect={onStartSelect}
                   avgPagesPerDay={avgPagesPerDay}
+                  showRemaining={sortMode === "remaining"}
                 />
               ))}
             </div>

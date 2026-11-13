@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { canonicalizeTopics } from '@/lib/topics';
+import { readableRange, coverageOf, type Span } from '@/lib/coverage';
 import { topicVocabulary } from '@/lib/topicVocabulary';
 
 export async function GET(request: NextRequest) {
@@ -65,6 +66,53 @@ export async function GET(request: NextRequest) {
     const stmt = db.prepare(query);
     const rows = stmt.all(...params) as any[];
 
+    // Pages still to read, computed here so there is ONE definition of it.
+    //
+    // It cannot be done in the client from current_page alone, because for a
+    // book read out of order current_page holds the last span's high end, not
+    // a position: log pages 200-210 of a devotional and current_page says 210
+    // while 199 pages remain unread. Those books need the union of their
+    // logged spans, which is what coverageOf gives.
+    //
+    // null means the length isn't known. That stays null rather than
+    // becoming a guess -- a book with no page count sorts last, it doesn't
+    // get invented a finish line.
+    const spansByBook = new Map<string, Span[]>();
+    const rangeIds = rows.filter(r => r.reading_mode === 'range').map(r => r.id as string);
+    if (rangeIds.length) {
+      const placeholders = rangeIds.map(() => '?').join(',');
+      const logs = db.prepare(
+        `SELECT book_id, range_start, current_page FROM reading_updates
+         WHERE range_start IS NOT NULL AND book_id IN (${placeholders})`
+      ).all(...rangeIds) as Array<{ book_id: string; range_start: number; current_page: number }>;
+      for (const l of logs) {
+        if (l.range_start == null || l.current_page == null) continue;
+        const arr = spansByBook.get(l.book_id) ?? [];
+        arr.push({ start: l.range_start, end: l.current_page });
+        spansByBook.set(l.book_id, arr);
+      }
+    }
+
+    type RemainingRow = {
+      id: string; status: string; reading_mode: string | null;
+      current_page: number | null; start_page: number | null; end_page: number | null;
+      reading_pages: number | null; pages: number | null;
+    };
+    const remainingFor = (row: RemainingRow): number | null => {
+      const range = readableRange(row);
+      if (range.hi == null) return null;
+      const length = Math.max(0, range.hi - range.lo + 1);
+      // A finished book has nothing left, whatever its last logged page says.
+      if (row.status === 'read') return 0;
+      if (row.reading_mode === 'range') {
+        const { covered } = coverageOf(spansByBook.get(row.id) ?? [], range);
+        return Math.max(0, length - covered);
+      }
+      const cur = row.current_page;
+      if (cur == null || cur < range.lo) return length;
+      return Math.max(0, range.hi - cur);
+    };
+
     // Parse JSON fields
     const books = rows.map(row => ({
       ...row,
@@ -72,6 +120,7 @@ export async function GET(request: NextRequest) {
       topics: row.topics ? JSON.parse(row.topics) : [],
       auto_topics: row.auto_topics ? JSON.parse(row.auto_topics) : [],
       favorite: Boolean(row.favorite),
+      pages_remaining: remainingFor(row),
     }));
 
     return NextResponse.json(books);
